@@ -1,20 +1,19 @@
+
 import type { MenuItem, MenuGroup } from '../types/menu';
 
 // --- Type Guards ---
 function isGroup(item: MenuItem | MenuGroup): item is MenuGroup {
     return 'level' in item;
 }
-function isVariantPrice(item: MenuItem | MenuGroup): item is (MenuItem & { variants: any }) {
-    return 'variants' in item;
-}
+
 function isFixedPrice(item: MenuItem | MenuGroup): item is (MenuItem & { price: number }) {
-    return 'price' in item;
+    return !isGroup(item) && 'price' in item;
 }
 
-// --- Iconos ---
-function getIconForItem(item: MenuItem | MenuGroup): string {
-    if (isGroup(item)) { 
-        if (item.rules_ref) return ''; 
+// --- Iconos (Función externa para ser usada en otros componentes) ---
+export function getIconForItem(item: MenuItem | MenuGroup): string {
+    if (isGroup(item)) {
+        if (item.rules_ref) return '✨';
         if (item.id.includes('dulces')) return '🥞';
         if (item.id.includes('saladas')) return '🥓';
         if (item.id.includes('bebidas_frias')) return '🧊';
@@ -23,21 +22,21 @@ function getIconForItem(item: MenuItem | MenuGroup): string {
         if (item.id.includes('postres')) return '🍰';
         return '➡️';
     }
-    if (item.category.includes('Calientes')) return '';
-    if (item.id.includes('bublee')) return '';
-    if (item.category.includes('Frias')) return '';
-    if (item.category.includes('Dulces')) return '';
-    if (item.category.includes('Saladas')) return '';
-    if (item.category.includes('Postres')) return '';
+    // Es un Item
+    if (item.category.includes('Calientes')) return '☕';
+    if (item.id.includes('bublee')) return '🧋';
+    if (item.category.includes('Frias')) return '🧊';
+    if (item.category.includes('Dulces')) return '🥞';
+    if (item.category.includes('Saladas')) return '🥓';
+    if (item.category.includes('Postres')) return '🍮';
     return '🍽️';
 }
 
 // --- Precio ---
-function getDisplayPrice(item: MenuItem | MenuGroup): string {
+function getDisplayPrice(item: MenuItem): string {
     if (isFixedPrice(item)) {
       return `$${item.price.toFixed(2)}`;
     }
-    
     return '';
 }
 
@@ -55,10 +54,22 @@ export const ProductCard: React.FC<ProductCardProps> = ({ item, onClick }) => {
         className += ' card-item';
     }
 
+    const description = 'description' in item ? item.description : null;
+
     return (
         <div className={className} onClick={onClick}>
-            <span style={{fontSize: '2.5em', marginBottom: '10px'}}>{getIconForItem(item)}</span>
-            <h4 style={{margin: 0}}>{item.name.split('(')[0]}</h4>
+            <div className="card-main-content">
+                <span className="card-icon">{getIconForItem(item)}</span>
+                <h4 className="card-title">{item.name.split('(')[0].trim()}</h4>
+                 {description && <small className="card-description">{description}</small>}
+            </div>
+            <div className="card-footer">
+                 {!isGroup(item) ? (
+                    <p className="card-price">{getDisplayPrice(item as MenuItem)}</p>
+                ) : (
+                    <p className="card-price">Ver más</p> 
+                )}
+            </div>
         </div>
     );
 }

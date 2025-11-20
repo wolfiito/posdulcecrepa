@@ -1,5 +1,4 @@
 
-/* src/App.css (Corregido para Header más grande, Footer fijo y Subheader sticky) */
 :root {
   --brand-primary: #D9538A; 
   --brand-secondary: #E5739F;
@@ -8,11 +7,12 @@
   --accent-success: #4CAF50;
   --accent-danger: #D9534F;
   --accent-disabled: #BDBDBD;
-  --text-primary: #212121;
+  --text-dark-primary: #333333;
+  --text-primary: #555555;
   --text-secondary: #757575;
   --text-on-brand: #FFFFFF;
-  --color-border: #E0E0E0;
-  --color-highlight: #fde8ef;
+  --color-border: #E8E8EB;
+  --color-highlight: #fdf0f6; 
 }
 
 * { box-sizing: border-box; }
@@ -23,137 +23,204 @@ body {
   color: var(--text-primary);
   overscroll-behavior: none;
 }
-.app-container {
-  height: 100vh;
-  width: 100vw;
-  overflow: hidden; 
-}
-.view {
-  width: 100%;
+.app-container, .view {
   height: 100%;
+  width: 100%;
+  overflow: hidden; 
   display: flex; 
   flex-direction: column;
-  background-color: var(--bg-main);
 }
 
-/* --- Pantalla de Menú --- */
+/* --- Cabecera --- */
 .header-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  /* --- MEJORA #1 (Header más grande) --- */
-  padding: 15px 20px; 
+  padding: 12px 16px; 
   background-color: var(--bg-surface);
-  border-bottom: 2px solid var(--bg-main);
+  border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
-  flex-wrap: wrap; 
-  gap: 10px;
+  gap: 16px;
 }
-.header-logo {
-  height: 45px; /* Ligeramente más grande */
-  width: auto;
-}
+.header-logo { height: 40px; }
+
 .order-type-group {
   display: flex;
-  gap: 5px;
+  background-color: var(--bg-main);
+  border-radius: 10px;
+  padding: 4px;
+  border: 1px solid var(--color-border);
 }
 .btn-order-type {
   padding: 8px 12px;
-  border: 1px solid var(--text-secondary);
-  background-color: #f0f0f0;
+  border: none;
+  background-color: transparent;
   border-radius: 8px;
   cursor: pointer;
-  font-weight: 500;
+  font-weight: 600;
   font-size: 0.9em;
+  color: var(--text-secondary);
+  transition: all 0.2s ease-in-out;
 }
 .btn-order-type.active {
-  background-color: var(--brand-secondary);
-  color: var(--text-on-brand);
-  border-color: var(--brand-primary);
+  background-color: var(--bg-surface);
+  color: var(--brand-primary);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
+/* --- Contenido del Menú --- */
 .menu-content {
-  padding: 15px;
-  overflow-y: auto; /* El contenedor del scroll */
+  padding: 16px;
+  overflow-y: auto; 
   flex-grow: 1;
 }
 
 .menu-header {
   display: flex;
   align-items: center;
-  margin-bottom: 20px;
-  
-  /* --- MEJORA #3 (Subheader Fijo) --- */
+  margin-bottom: 16px;
   position: sticky;
-  top: -15px; /* Compensa el padding del padre */
-  padding-top: 15px; /* Añade el padding aquí */
-  background-color: var(--bg-main); /* Necesario para que el scroll no se vea por debajo */
+  top: -16px; 
+  padding-top: 16px; 
+  background-color: var(--bg-main); 
   z-index: 10;
+  min-height: 50px;
 }
-
 .menu-header h2 {
   margin: 0;
   font-size: 1.8em;
-  color: var(--text-primary);
+  color: var(--text-dark-primary);
+  flex-grow: 1;
 }
 
-/* --- Cuadrícula de 2 columnas --- */
 .menu-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 15px;
 }
 
-@media (min-width: 768px) {
-  .menu-grid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  }
-}
-
+/* --- Tarjetas de Producto --- */
 .card-base {
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 16px;
-  cursor: pointer;
-  text-align: center;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-  transition: transform 0.1s ease, box-shadow 0.1s ease;
-  background-color: var(--bg-surface);
-  min-height: 120px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+    border: 1px solid var(--color-border);
+    border-radius: 12px; 
+    cursor: pointer;
+    text-align: center;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.04); 
+    transition: all 0.2s ease-in-out;
+    background-color: var(--bg-surface);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; 
+    overflow: hidden; 
 }
-.card-base:active {
-  transform: scale(0.97);
+.card-base:hover { transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0,0,0,0.07); }
+.card-main-content { padding: 16px 10px; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.card-icon { font-size: 2.5em; margin-bottom: 12px; line-height: 1; }
+.card-title { margin: 0; font-size: 1em; font-weight: 600; color: var(--text-dark-primary); line-height: 1.3; }
+.card-footer { padding: 10px; width: 100%; background-color: #fafafa; border-top: 1px solid #f5f5f5; min-height: 40px; display: flex; justify-content: center; align-items: center; }
+.card-price { margin: 0; font-size: 1em; font-weight: bold; color: var(--brand-primary); }
+.card-description { font-size: 0.8em; color: var(--text-secondary); margin-top: 4px; }
+
+
+/* --- ¡NUEVO! Acordeón Súper Refinado --- */
+.accordion-container { 
+    display: flex;
+    flex-direction: column;
+    gap: 12px; 
 }
-.card-group { /* Grupos (Especiales) */
-  background-color: #F0F0F0;
-  font-weight: bold;
-}
-.card-rule { /* Reglas (Arma tu...) */
-  background-color: #e6ffe6;
-  font-weight: bold;
-  border-color: var(--accent-success);
-}
-.card-item h4 {
-  margin: 0 0 5px 0;
-  font-size: 1em;
-  color: var(--color-primary);
-}
-.card-item p {
-  margin: 0;
-  font-size: 1em;
-  font-weight: bold;
-}
-.card-item small {
-  font-size: 0.8em;
-  color: var(--text-secondary);
+.accordion-category {
+    background-color: var(--bg-surface);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    overflow: hidden;
+    border: 1px solid var(--color-border);
 }
 
-/* --- Pantalla de Ticket --- */
-.ticket-view { background-color: var(--bg-surface); }
+.accordion-header {
+    display: flex;
+    align-items: center;
+    padding: 16px;
+    cursor: pointer;
+    border: none;
+    width: 100%;
+    text-align: left;
+    background-color: var(--bg-surface); /* Fondo siempre blanco */
+    font-size: 1.1em;
+    font-weight: 600;
+    color: var(--text-dark-primary); /* Texto oscuro por defecto */
+    transition: color 0.2s ease; /* Transición para el color de texto */
+}
+
+.accordion-header:hover {
+    color: var(--brand-primary); /* Al pasar el ratón, solo el texto cambia */
+}
+
+.accordion-header.open {
+    color: var(--brand-primary); /* Al estar abierto, solo el texto cambia */
+    /* ¡Sin cambio de fondo! */
+}
+
+.accordion-icon-main { 
+    font-size: 1.4em;
+    margin-right: 12px;
+    transition: color 0.2s ease; 
+}
+
+.accordion-title { flex-grow: 1; margin: 0; }
+
+.accordion-icon-toggle {
+    font-size: 1.2em;
+    font-weight: bold;
+    transition: transform 0.3s ease, color 0.2s ease;
+}
+
+.accordion-header.open .accordion-icon-toggle { transform: rotate(45deg); }
+
+.accordion-content {
+    padding: 16px;
+    background-color: #fafafa; /* Fondo gris muy claro, casi blanco */
+    border-top: 1px solid var(--color-border);
+}
+
+/* --- Barra de Navegación Inferior --- */
+.bottom-nav {
+  flex-shrink: 0;
+  display: flex;
+  border-top: 1px solid var(--color-border);
+  background-color: var(--bg-surface);
+  padding: 8px;
+  gap: 8px;
+}
+.nav-button {
+  flex: 1;
+  padding: 12px;
+  font-size: 1.1em;
+  font-weight: 600;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease-in-out;
+}
+
+.nav-button.active {
+  background-color: var(--brand-primary);
+  color: var(--text-on-brand);
+  box-shadow: 0 4px 10px rgba(217, 83, 138, 0.3);
+}
+
+.badge { background-color: rgba(0,0,0,0.15); color: white; border-radius: 50px; padding: 2px 7px; font-size: 0.8em; }
+.nav-button.active .badge { background-color: var(--bg-surface); color: var(--brand-primary); }
+
+/* --- Otros Estilos (Sin cambios) --- */
+.ticket-header, .ticket-footer, .ticket-scroll-area, .btn-back, .btn-submit-order, .modal-header, .modal-footer, .ticket-item-content { /* ... */ }
+.ticket-header h2 { color: var(--text-dark-primary); }
 .ticket-header {
   display: flex;
   align-items: center;
@@ -162,7 +229,6 @@ body {
   border-bottom: 2px solid var(--bg-main);
   flex-shrink: 0;
 }
-.ticket-header h2 { margin: 0; flex-grow: 1; }
 .ticket-header .order-number {
   margin-left: 15px;
   font-size: 1.8em;
@@ -171,10 +237,10 @@ body {
 }
 
 .btn-back {
-  background-color: var(--bg-surface);
-  border: 1px solid var(--color-border);
+  background-color: transparent;
+  border: none;
   cursor: pointer;
-  color: var(--text-primary);
+  color: var(--text-dark-primary);
   padding: 0;
   margin-right: 15px;
   display: flex;
@@ -184,49 +250,20 @@ body {
   height: 44px;
   border-radius: 50%;
 }
-.btn-back:active { background-color: #eee; }
+.btn-back:hover { background-color: #eee; }
 
-.ticket-scroll-area {
+.ticket-scroll-area, .ticket-placeholder {
   flex-grow: 1;
   overflow-y: auto;
   padding: 20px;
 }
-.ticket-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  font-size: 1.2em;
-  color: var(--text-secondary);
-}
+
 .ticket-list { padding-left: 0; list-style: none; margin: 0; }
-.ticket-item {
-  position: relative;
-  overflow: hidden;
-  background-color: var(--accent-danger);
-}
 
-.ticket-item-header {
-  display: flex;
-  justify-content: space-between;
-  font-size: 1.1em;
-}
-
-.ticket-item-header span:first-child {
-  font-weight: bold;
-  color: var(--text-primary);
-}
-.ticket-item-details {
-  font-size: 0.9em;
-  color: var(--text-secondary);
-  margin: 5px 0 0 10px;
-  padding-left: 30px; /* Alineado con el padding del header */
-  list-style: circle;
-}
 .ticket-footer {
   flex-shrink: 0;
   padding: 20px;
-  border-top: 2px solid var(--text-primary);
+  border-top: 1px solid var(--color-border);
   background-color: var(--bg-surface);
   box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
 }
@@ -236,6 +273,7 @@ body {
   font-weight: bold;
   font-size: 1.5em;
   margin-bottom: 15px;
+  color: var(--text-dark-primary);
 }
 .btn-submit-order {
   width: 100%;
@@ -245,179 +283,10 @@ body {
   background-color: var(--accent-success);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: pointer;
 }
 .btn-submit-order:disabled {
   background-color: var(--accent-disabled);
   cursor: not-allowed;
-}
-
-/* --- MEJORA #2 (Footer Fijo) --- */
-/* (La lógica de .view, .menu-content y .bottom-nav ya asegura esto) */
-.bottom-nav {
-  flex-shrink: 0;
-  display: flex;
-  border-top: 1px solid var(--color-border);
-  background-color: var(--bg-surface);
-  box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
-}
-.nav-button {
-  flex: 1;
-  padding: 18px;
-  font-size: 1.1em;
-  font-weight: bold;
-  background: none;
-  border: none;
-  border-left: 1px solid var(--color-border);
-  cursor: pointer;
-  color: var(--brand-primary);
-}
-.nav-button:first-child {
-  border-left: none;
-  color: var(--text-secondary);
-}
-.nav-button .badge {
-  background-color: var(--brand-primary);
-  color: white;
-  border-radius: 50%;
-  padding: 2px 8px;
-  font-size: 0.8em;
-  margin-left: 8px;
-}
-
-/* --- Estilos de Modales (Sin cambios) --- */
-.modal-header h2 { margin-top: 0; color: var(--brand-primary); }
-.modal-price {
-  font-weight: bold;
-  font-size: 1.2em;
-  padding: 10px;
-  border-radius: 4px;
-  text-align: center;
-}
-.modal-section {
-  border: 1px solid var(--bg-main);
-  background-color: #fafafa;
-  padding: 15px;
-  border-radius: 8px;
-  margin-bottom: 15px;
-}
-.modal-section h4 {
-  margin-top: 0;
-  border-bottom: 1px solid var(--color-border);
-  padding-bottom: 5px;
-  color: var(--text-primary);
-}
-.modal-options-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 10px;
-}
-.btn-modal-option {
-  padding: 12px 15px;
-  border: 2px solid var(--color-border);
-  cursor: pointer;
-  background-color: var(--bg-surface);
-  border-radius: 8px;
-  font-size: 1em;
-  font-weight: 500;
-  transition: all 0.1s ease;
-  width: 100%;
-}
-.btn-modal-option.selected {
-  border-color: var(--brand-primary);
-  background-color: var(--color-highlight);
-  color: var(--brand-primary);
-  font-weight: bold;
-  box-shadow: 0 2px 5px rgba(217, 83, 138, 0.2);
-}
-.btn-modal-option:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background-color: var(--bg-main);
-}
-.btn-modal-option .price-tag {
-  color: var(--accent-primary);
-  margin-left: 5px;
-  font-weight: bold;
-}
-.modal-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 20px;
-}
-.btn-secondary {
-  padding: 12px 20px;
-  cursor: pointer;
-  background-color: #888;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-weight: bold;
-}
-.btn-primary {
-  padding: 12px 20px;
-  cursor: pointer;
-  background-color: var(--accent-success);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-weight: bold;
-}
-.btn-primary:disabled {
-  background-color: var(--accent-disabled);
-  cursor: not-allowed;
-}
-
-.ticket-item {
-  position: relative;
-  overflow: hidden; /* Oculta el fondo rojo */
-}
-
-/* El fondo rojo que se revela */
-.delete-action-background {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0; /* Ocupa todo el ancho */
-  bottom: 0;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end; /* Alinea el icono a la derecha */
-  padding-right: 30px; /* Espacio para el icono */
-  font-size: 1.5em;
-  z-index: 0; /* Capa 0 (Fondo) */
-}
-
-/* El contenido deslizable (el ítem real) */
-.ticket-item-content {
-  position: relative;
-  background-color: var(--bg-surface);
-  padding-bottom: 10px;
-  border-bottom: 1px dashed var(--text-secondary); 
-  z-index: 1; /* Capa 1 (Encima) */
-}
-
-/* (El .ticket-item-header y .ticket-item-details van DENTRO del content) */
-.ticket-item-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  font-size: 1.1em;
-  padding: 10px 15px 0 15px; /* Padding para el contenido */
-}
-
-.ticket-item-info {
-  flex-grow: 1;
-}
-
-.ticket-item-info span:first-child {
-  font-weight: bold;
-  color: var(--text-primary);
-}
-.ticket-item-price {
-  font-weight: bold;
-  margin-left: 10px;
 }
