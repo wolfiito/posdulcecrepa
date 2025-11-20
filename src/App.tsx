@@ -44,6 +44,7 @@ function App() {
   const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
   const [itemToSelectVariant, setItemToSelectVariant] = useState<MenuItem | null>(null);
   const [currentGroup, setCurrentGroup] = useState<MenuGroup | null>(null);
+  const [barsVisible, setBarsVisible] = useState(true);
 
   useEffect(() => {
     const fetchMenuData = async () => {
@@ -128,8 +129,15 @@ function App() {
           onSetOrderMode={setCurrentOrderMode}
           onProductClick={handleProductClick}
           onGoBack={handleGoBack}
+          barsVisible={barsVisible}
+          setBarsVisible={setBarsVisible}
         />
-        <BottomNav currentView={view} ticketCount={ticketItems.length} onNavigate={setView} />
+        <BottomNav 
+            currentView={view} 
+            ticketCount={ticketItems.length} 
+            onNavigate={setView} 
+            isVisible={barsVisible} 
+        />
       </div>
 
       <div className="view" style={{ display: view === 'ticket' ? 'flex' : 'none' }}>
@@ -150,9 +158,8 @@ function App() {
 }
 
 // --- Pantalla de Menú ---
-const MenuScreen: React.FC<any> = ({ allData, currentGroup, currentOrderMode, onSetOrderMode, onProductClick, onGoBack }) => {
+const MenuScreen: React.FC<any> = ({ allData, currentGroup, currentOrderMode, onSetOrderMode, onProductClick, onGoBack, barsVisible, setBarsVisible }) => {
     const [activeAccordion, setActiveAccordion] = useState<string | null>(null);
-    const [headerVisible, setHeaderVisible] = useState(true);
     const lastScrollTop = useRef(0);
     const menuContentRef = useRef<HTMLDivElement>(null);
 
@@ -164,13 +171,13 @@ const MenuScreen: React.FC<any> = ({ allData, currentGroup, currentOrderMode, on
         const handleScroll = () => {
             if (!menuContentRef.current) return;
             const currentScrollTop = menuContentRef.current.scrollTop;
-            // Tolerance to prevent hiding on small scrolls
+            
             if (Math.abs(currentScrollTop - lastScrollTop.current) <= 10) return;
 
-            if (currentScrollTop > lastScrollTop.current && currentScrollTop > 80) { // Scrolling down
-                setHeaderVisible(false);
-            } else { // Scrolling up
-                setHeaderVisible(true);
+            if (currentScrollTop > lastScrollTop.current && currentScrollTop > 80) { 
+                setBarsVisible(false);
+            } else { 
+                setBarsVisible(true);
             }
             lastScrollTop.current = currentScrollTop <= 0 ? 0 : currentScrollTop;
         };
@@ -178,7 +185,7 @@ const MenuScreen: React.FC<any> = ({ allData, currentGroup, currentOrderMode, on
         const menuElement = menuContentRef.current;
         menuElement?.addEventListener('scroll', handleScroll);
         return () => menuElement?.removeEventListener('scroll', handleScroll);
-    }, []);
+    }, [setBarsVisible]);
 
     const rootGroups = useMemo(() => allData.groups.filter((g: MenuGroup) => g.parent === 'root'), [allData.groups]);
     const currentSubGroups = useMemo(() => !currentGroup || currentGroup.id === 'root' ? [] : allData.groups.filter((g: MenuGroup) => g.parent === currentGroup.id), [currentGroup, allData.groups]);
@@ -196,7 +203,7 @@ const MenuScreen: React.FC<any> = ({ allData, currentGroup, currentOrderMode, on
 
     return (
         <>
-            <header className={`header-bar ${headerVisible ? 'visible' : 'hidden'}`}>
+            <header className={`header-bar ${barsVisible ? 'visible' : 'hidden'}`}>
                 <div className="order-type-group">
                     {(['Mesa 1', 'Mesa 2', 'Para Llevar'] as OrderMode[]).map(mode => (
                         <button key={mode} className={`btn-order-type ${currentOrderMode === mode ? 'active' : ''}`} onClick={() => onSetOrderMode(mode)}>{mode}</button>
@@ -246,9 +253,9 @@ const TicketScreen: React.FC<any> = ({ ticketItems, totalTicket, onSubmitOrder, 
 
 
 // --- Barra de Navegación Inferior ---
-const BottomNav: React.FC<{currentView: View, ticketCount: number, onNavigate: (v: View) => void}> = ({ currentView, ticketCount, onNavigate }) => {
+const BottomNav: React.FC<{currentView: View, ticketCount: number, onNavigate: (v: View) => void, isVisible: boolean}> = ({ currentView, ticketCount, onNavigate, isVisible }) => {
   return (
-    <nav className="bottom-nav">
+    <nav className={`bottom-nav ${isVisible ? 'visible' : 'hidden'}`}>
       <button className={`nav-button ${currentView === 'menu' ? 'active' : ''}`} onClick={() => onNavigate('menu')}>
           <IconMenu /> Menú
       </button>
