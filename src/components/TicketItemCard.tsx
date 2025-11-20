@@ -1,5 +1,6 @@
-import { motion, useAnimation } from 'framer-motion';
+import { motion, useAnimation, type PanInfo } from 'framer-motion';
 import type { TicketItem } from '../types/menu';
+import './TicketItemCard.css';
 
 interface Props {
   item: TicketItem;
@@ -15,44 +16,42 @@ const IconTrash = () => (
 
 export const TicketItemCard: React.FC<Props> = ({ item, onRemove }) => {
   const controls = useAnimation();
-  const dragThreshold = -80; // Cuánto deslizar (en px) para borrar
+  const dragThreshold = -80; // Drag distance threshold to trigger delete
 
-  const onDragEnd = (event: any, info: any) => {
+  const onDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     if (info.offset.x < dragThreshold) {
-      // Si deslizó lo suficiente, animar la salida
-      controls.start({ 
-        x: "-100%", 
+      // Animate out to the left
+      controls.start({
+        x: "-110%", // A little more to be sure it's off-screen
         opacity: 0,
-        transition: { duration: 0.3 } 
+        transition: { type: "spring", stiffness: 500, damping: 50 } // Stiffer spring for a quick exit
       }).then(() => onRemove(item.id));
     } else {
-      // Si no, volver al inicio
-      controls.start({ x: 0, transition: { type: "spring", stiffness: 300, damping: 30 } });
+      // Animate back to origin
+      controls.start({ x: 0, transition: { type: "spring", stiffness: 400, damping: 35 } });
     }
   };
 
   return (
     <li className="ticket-item">
-      {/* 1. El Fondo Rojo (Oculto) */}
       <div className="delete-action-background">
         <IconTrash />
       </div>
       
-      {/* 2. El Contenido Deslizable */}
       <motion.div
         className="ticket-item-content"
-        drag="x" // Habilitar drag horizontal
-        dragConstraints={{ right: 0, left: 0 }} // No jalar a la derecha
+        drag="x"
+        dragConstraints={{ right: 0, left: 0 }}
         onDragEnd={onDragEnd}
         animate={controls}
-        dragElastic={0.1} // Poca resistencia a jalar más de 0
+        dragElastic={{ left: 0.2, right: 0.05 }} // More elastic to the left, less to the right
+        whileTap={{ scale: 0.98, cursor: 'grabbing' }}
       >
         <div className="ticket-item-header">
           <div className="ticket-item-info">
             <span>{item.baseName} {item.details?.variantName && `(${item.details.variantName})`}</span>
           </div>
           <span className="ticket-item-price">${item.finalPrice.toFixed(2)}</span>
-          {/* (El botón de eliminar 'X' se ha ido) */}
         </div>
         
         {item.details && item.details.selectedModifiers.length > 0 && (
