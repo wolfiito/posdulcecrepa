@@ -129,7 +129,7 @@ body {
 
 /* --- Parrilla de Productos (Mobile-First) --- */
 .menu-grid { display: grid; gap: 15px; grid-template-columns: 1fr; }
-@media (min-width: 576px) { .menu-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 576px) { .menu-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (min-width: 992px) { .menu-grid { grid-template-columns: repeat(3, 1fr); } }
 
 /* --- Tarjetas de Producto --- */
