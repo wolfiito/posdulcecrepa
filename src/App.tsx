@@ -161,7 +161,7 @@ const MenuScreen: React.FC<any> = ({ allData, currentGroup, currentOrderMode, on
     const currentSubGroups = useMemo(() => !currentGroup || currentGroup.id === 'root' ? [] : allData.groups.filter((g: MenuGroup) => g.parent === currentGroup.id), [currentGroup, allData.groups]);
     const currentItems = useMemo(() => currentGroup?.items_ref ? currentGroup.items_ref.map((refId: string) => allData.items.find((item: MenuItem) => item.id === refId)).filter(Boolean) : [], [currentGroup, allData.items]);
   
-    const getTitle = () => !currentGroup || currentGroup.id === 'root' ? "" : currentGroup.name;
+    const getTitle = () => !currentGroup || currentGroup.id === 'root' ? "Menú" : currentGroup.name;
     const isRoot = currentGroup?.id === 'root';
 
     const itemsInsideAccordion = (groupId: string): (MenuItem | MenuGroup)[] => {
@@ -181,6 +181,15 @@ const MenuScreen: React.FC<any> = ({ allData, currentGroup, currentOrderMode, on
                 </div>
             </header>
             <div className="menu-content">
+                <header className="menu-header">
+                    {!isRoot && (
+                        <button onClick={onGoBack} className="btn-back">
+                            <IconBack />
+                        </button>
+                    )}
+                    <h2>{getTitle()}</h2>
+                </header>
+                
                 {isRoot ? (
                     <div className="accordion-container">
                         {rootGroups.map((group: MenuGroup) => {
