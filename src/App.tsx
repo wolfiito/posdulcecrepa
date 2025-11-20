@@ -181,10 +181,6 @@ const MenuScreen: React.FC<any> = ({ allData, currentGroup, currentOrderMode, on
                 </div>
             </header>
             <div className="menu-content">
-                <div className="menu-header">
-                    {currentGroup?.parent && <button onClick={onGoBack} className="btn-back"><IconBack /></button>}
-                    <h2>{getTitle()}</h2>
-                </div>
                 {isRoot ? (
                     <div className="accordion-container">
                         {rootGroups.map((group: MenuGroup) => {

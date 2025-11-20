@@ -24,7 +24,7 @@ body {
   overscroll-behavior: none;
 }
 
-/* --- Layout Principal Corregido --- */
+/* --- Layout Principal --- */
 .app-container {
   height: 100vh; 
   width: 100vw;
@@ -39,50 +39,66 @@ body {
   background-color: var(--bg-main);
 }
 
-/* --- Cabecera --- */
+/* --- Cabeceras (¡DISEÑO FINAL!) --- */
+.header-bar, .ticket-header {
+  flex-shrink: 0; 
+  display: flex;
+  align-items: center;
+  padding: 12px 16px; 
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 20; 
+}
+
+/* Cabecera del Menú: ahora es invisible, solo sirve de contenedor */
 .header-bar {
-  flex-shrink: 0; 
-  display: flex;
-  align-items: center;
-  justify-content: right; /* ¡NUEVO! Centra el contenido horizontalmente */
-  padding: 12px 16px; 
-  background-color: var(--bg-surface);
-  border-bottom: 1px solid var(--color-border);
-  gap: 16px;
+  justify-content: center;
+  background-color: var(--bg-main); /* Se funde con el fondo */
+  border-bottom: none; /* Sin línea */
+  padding-top: 14px; 
+  padding-bottom: 10px;
 }
 
+/* Cabecera del Ticket: mantiene su estilo */
 .ticket-header {
-  flex-shrink: 0; 
-  display: flex;
-  align-items: center;
-  padding: 12px 16px; 
+  justify-content: space-between;
   background-color: var(--bg-surface);
   border-bottom: 1px solid var(--color-border);
-  gap: 16px;
 }
 
+
+/* --- Grupo de Tipo de Pedido (¡DISEÑO FINAL!) --- */
 .order-type-group {
   display: flex;
-  background-color: var(--bg-main);
-  border-radius: 10px;
-  padding: 4px;
-  border: 1px solid var(--color-border);
+  background-color: var(--color-border); /* Fondo sutil para el efecto de incrustación */
+  border-radius: 50px;
+  padding: 5px; 
+  border: none; /* ¡Sin borde! */
 }
+
 .btn-order-type {
-  padding: 8px 12px;
+  padding: 8px 20px;
   border: none;
+  outline: none; 
   background-color: transparent;
-  border-radius: 8px;
+  border-radius: 50px;
   cursor: pointer;
   font-weight: 600;
   font-size: 0.9em;
   color: var(--text-secondary);
-  transition: all 0.2s ease-in-out;
+  transition: all 0.3s ease;
 }
+
+.btn-order-type:focus-visible {
+  outline: none;
+}
+
 .btn-order-type.active {
-  background-color: var(--bg-surface);
-  color: var(--brand-primary);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  background-color: var(--brand-primary);
+  color: var(--text-on-brand);
+  box-shadow: 0 3px 8px rgba(217, 83, 138, 0.4);
+  transform: translateY(-1px);
 }
 
 /* --- Contenido Central (Scrollable) --- */
@@ -98,7 +114,7 @@ body {
   align-items: center;
   margin-bottom: 16px;
   position: sticky;
-  top: -16px; 
+  top: 0; 
   padding-top: 16px; 
   background-color: var(--bg-main); 
   z-index: 10;
@@ -146,7 +162,6 @@ body {
 .nav-button.active .badge { background-color: var(--bg-surface); color: var(--brand-primary); }
 
 /* --- Estilos del Ticket --- */
-.ticket-header { justify-content: space-between; }
 .ticket-header h2 { color: var(--text-dark-primary); flex-grow: 0; }
 .ticket-header .order-number { font-size: 1.5em; font-weight: bold; color: var(--brand-primary); }
 .btn-back { background: none; border: none; cursor: pointer; color: var(--text-dark-primary); padding: 0; display: flex; }
