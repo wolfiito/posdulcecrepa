@@ -227,3 +227,173 @@ body {
 .ticket-total { display: flex; justify-content: space-between; font-weight: bold; font-size: 1.5em; margin-bottom: 15px; color: var(--text-dark-primary); }
 .btn-submit-order { width: 100%; padding: 20px; font-size: 1.3em; font-weight: bold; background-color: var(--accent-success); color: white; border: none; border-radius: 12px; cursor: pointer; }
 .btn-submit-order:disabled { background-color: var(--accent-disabled); cursor: not-allowed; }
+
+/* --- Estilos del Modal de Personalización --- */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  background: var(--bg-surface);
+  border-radius: 16px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+  border: 1px solid var(--color-border);
+}
+
+.modal-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--color-border);
+  text-align: center;
+  position: relative;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.4em;
+  font-weight: 700;
+  color: var(--text-dark-primary);
+}
+
+.wizard-steps {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+  margin: 10px 0;
+}
+
+.step-indicator {
+  width: 25px;
+  height: 6px;
+  background-color: var(--color-border);
+  border-radius: 3px;
+  transition: background-color 0.3s ease;
+}
+
+.step-indicator.active {
+  background-color: var(--brand-primary);
+}
+
+.modal-price {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+.modal-price.valid {
+  background-color: var(--accent-success);
+  color: white;
+}
+.modal-price.invalid {
+  background-color: var(--accent-danger);
+  color: white;
+}
+
+.modal-section {
+  padding: 20px;
+  flex-grow: 1;
+  overflow-y: auto;
+}
+
+.modal-section h4 {
+  margin: 0 0 15px;
+  font-size: 1.1em;
+  font-weight: 600;
+  color: var(--text-dark-primary);
+}
+.required-tag {
+  color: var(--accent-danger);
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+.modal-options-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.btn-modal-option {
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: var(--bg-surface);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 600;
+  text-align: center;
+  font-size: 0.9em;
+}
+
+.btn-modal-option:hover {
+  border-color: var(--brand-secondary);
+  color: var(--brand-primary);
+}
+
+.btn-modal-option.selected {
+  background-color: var(--brand-primary);
+  color: var(--text-on-brand);
+  border-color: var(--brand-primary);
+  box-shadow: 0 2px 8px rgba(217, 83, 138, 0.3);
+}
+
+.btn-modal-option:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: var(--bg-main);
+}
+
+.price-tag {
+  display: block;
+  font-size: 0.85em;
+  font-weight: 500;
+  margin-top: 4px;
+  color: var(--text-secondary);
+}
+.btn-modal-option.selected .price-tag {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+
+.modal-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 20px;
+  border-top: 1px solid var(--color-border);
+  background-color: var(--bg-main);
+}
+.btn-primary, .btn-secondary {
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1em;
+  cursor: pointer;
+  border: none;
+}
+.btn-primary {
+  background-color: var(--brand-primary);
+  color: var(--text-on-brand);
+}
+.btn-primary:disabled {
+  background-color: var(--accent-disabled);
+  cursor: not-allowed;
+}
+.btn-secondary {
+  background-color: var(--color-border);
+  color: var(--text-dark-primary);
+}

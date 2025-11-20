@@ -1,4 +1,4 @@
-// src/components/CustomizeCrepeModal.tsx (Reemplazo Completo)
+// src/components/CustomizeCrepeModal.tsx
 
 import { useState, useMemo, useEffect } from 'react';
 import Modal from 'react-modal';
@@ -20,27 +20,6 @@ const CREPA_TOPPING_SECO = "crepa_topping_seco";
 
 const exclusiveBaseGroups = [FRA_SABORES_BASE, MALTEADA_SABORES, FRAPPE_ESP_SABORES, SODA_SABORES, CHAMOYADA_SABORES, ICEE_SABORES];
 const exclusiveGroups = [...exclusiveBaseGroups, BEBIDA_LECHE_GRUPO, CREPA_TOPPING_SALSA, CREPA_TOPPING_SECO];
-
-const customStyles = {
-    content: {
-        top: '50%',
-        left: '50%',
-        right: 'auto',
-        bottom: 'auto',
-        marginRight: '-50%',
-        transform: 'translate(-50%, -50%)',
-        width: '90%',
-        maxWidth: '800px',
-        maxHeight: '90vh',
-        overflow: 'auto',
-        border: 'none',
-        borderRadius: '8px',
-        padding: '25px'
-    },
-    overlay: {
-        backgroundColor: 'rgba(0, 0, 0, 0.6)'
-    }
-};
 
 Modal.setAppElement('#root');
 
@@ -261,8 +240,9 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
     <Modal
       isOpen={isOpen}
       onRequestClose={onClose}
-      style={customStyles}
       contentLabel={`Personalizar: ${group.name}`}
+      className="modal-content"
+      overlayClassName="modal-overlay"
     >
       <div className="modal-header">
         <h2>{group.name}</h2>
@@ -271,17 +251,17 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
                 <div key={s.name} className={`step-indicator ${index <= step ? 'active' : ''}`} />
             ))}
         </div>
-        <p 
-          className="modal-price"
-          style={{ backgroundColor: isValid ? '#e6ffe6' : '#ffe6e6', color: isValid ? 'green' : 'red' }}
-        >
-          {currentRule} &rarr; **${currentPrice.toFixed(2)}**
+        <p className={`modal-price ${isValid ? 'valid' : 'invalid'}`}>
+          {currentRule} &rarr; <strong>${currentPrice.toFixed(2)}</strong>
         </p>
       </div>
       
       {/* Contenido del Asistente */}
       <div className="modal-section">
-          <h4>Paso {step + 1}: {currentStepInfo.name} {currentStepInfo.isRequired && !isStepValid && '(Obligatorio)'}</h4>
+          <h4>
+            Paso {step + 1}: {currentStepInfo.name} 
+            {currentStepInfo.isRequired && !isStepValid && <span className="required-tag"> (Obligatorio)</span>}
+          </h4>
           <div className="modal-options-grid">
               {modifiersForCurrentStep.map(mod => {
                   const isSelected = selectedModifiers.has(mod.id);
@@ -290,19 +270,12 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
                   const isCrepeOrPostreBase = mod.group === CREPA_DULCE_BASE || mod.group === CREPA_SALADA_BASE;
                   const shouldBeDisabled = isCrepeOrPostreBase && isCrepeLimitReached && !isSelected;
 
-                  const isExclusive = (isBaseGroupExclusive && mod.group === group.base_group) || 
-                                        exclusiveGroups.includes(mod.group);
-
                   return (
                       <button
                           key={mod.id}
                           onClick={() => handleModifierChange(mod)}
                           disabled={shouldBeDisabled}
                           className={`btn-modal-option ${isSelected ? 'selected' : ''}`}
-                          style={{
-                              opacity: shouldBeDisabled ? 0.6 : 1,
-                              cursor: shouldBeDisabled ? 'not-allowed' : 'pointer'
-                          }}
                       >
                           {mod.name} 
                           {mod.price > 0 && <span className="price-tag">(+${mod.price.toFixed(2)})</span>}
