@@ -60,14 +60,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({ item, onClick }) => {
         <div className={className} onClick={onClick}>
             <div className="card-main-content">
                 <span className="card-icon">{getIconForItem(item)}</span>
-                <h4 className="card-title">{item.name.split('(')[0].trim()}</h4>
                  {description && <small className="card-description">{description}</small>}
             </div>
             <div className="card-footer">
                  {!isGroup(item) ? (
                     <p className="card-price">{getDisplayPrice(item as MenuItem)}</p>
                 ) : (
-                    <p className="card-price">Ver más</p> 
+                    <h4 className="card-price">{item.name.split('(')[0].trim()}</h4>
+
+                    // <p className="card-price">Ver más</p> 
                 )}
             </div>
         </div>
