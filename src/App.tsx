@@ -129,7 +129,6 @@ function App() {
           onProductClick={handleProductClick}
           onGoBack={handleGoBack}
         />
-        {/* --- ¡PASO 2: Pasar la vista actual a la navegación! --- */}
         <BottomNav currentView={view} ticketCount={ticketItems.length} onNavigate={setView} />
       </div>
 
@@ -175,7 +174,6 @@ const MenuScreen: React.FC<any> = ({ allData, currentGroup, currentOrderMode, on
     return (
         <>
             <header className="header-bar">
-                <img src="/logo.png" alt="Dulce Crepa" className="header-logo" /> 
                 <div className="order-type-group">
                     {(['Mesa 1', 'Mesa 2', 'Para Llevar'] as OrderMode[]).map(mode => (
                         <button key={mode} className={`btn-order-type ${currentOrderMode === mode ? 'active' : ''}`} onClick={() => onSetOrderMode(mode)}>{mode}</button>
@@ -223,7 +221,6 @@ const TicketScreen: React.FC<any> = ({ ticketItems, totalTicket, onSubmitOrder, 
 const BottomNav: React.FC<{currentView: View, ticketCount: number, onNavigate: (v: View) => void}> = ({ currentView, ticketCount, onNavigate }) => {
   return (
     <nav className="bottom-nav">
-      {/* --- ¡PASO 3: Asignar la clase 'active' dinámicamente! --- */}
       <button className={`nav-button ${currentView === 'menu' ? 'active' : ''}`} onClick={() => onNavigate('menu')}>
           <IconMenu /> Menú
       </button>
