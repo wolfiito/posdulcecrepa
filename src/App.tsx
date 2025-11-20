@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { 
     db, 
     collection, 
@@ -152,10 +152,33 @@ function App() {
 // --- Pantalla de Menú ---
 const MenuScreen: React.FC<any> = ({ allData, currentGroup, currentOrderMode, onSetOrderMode, onProductClick, onGoBack }) => {
     const [activeAccordion, setActiveAccordion] = useState<string | null>(null);
+    const [headerVisible, setHeaderVisible] = useState(true);
+    const lastScrollTop = useRef(0);
+    const menuContentRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (currentGroup?.id === 'root') setActiveAccordion(null);
     }, [currentGroup]);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            if (!menuContentRef.current) return;
+            const currentScrollTop = menuContentRef.current.scrollTop;
+            // Tolerance to prevent hiding on small scrolls
+            if (Math.abs(currentScrollTop - lastScrollTop.current) <= 10) return;
+
+            if (currentScrollTop > lastScrollTop.current && currentScrollTop > 80) { // Scrolling down
+                setHeaderVisible(false);
+            } else { // Scrolling up
+                setHeaderVisible(true);
+            }
+            lastScrollTop.current = currentScrollTop <= 0 ? 0 : currentScrollTop;
+        };
+
+        const menuElement = menuContentRef.current;
+        menuElement?.addEventListener('scroll', handleScroll);
+        return () => menuElement?.removeEventListener('scroll', handleScroll);
+    }, []);
 
     const rootGroups = useMemo(() => allData.groups.filter((g: MenuGroup) => g.parent === 'root'), [allData.groups]);
     const currentSubGroups = useMemo(() => !currentGroup || currentGroup.id === 'root' ? [] : allData.groups.filter((g: MenuGroup) => g.parent === currentGroup.id), [currentGroup, allData.groups]);
@@ -173,14 +196,14 @@ const MenuScreen: React.FC<any> = ({ allData, currentGroup, currentOrderMode, on
 
     return (
         <>
-            <header className="header-bar">
+            <header className={`header-bar ${headerVisible ? 'visible' : 'hidden'}`}>
                 <div className="order-type-group">
                     {(['Mesa 1', 'Mesa 2', 'Para Llevar'] as OrderMode[]).map(mode => (
                         <button key={mode} className={`btn-order-type ${currentOrderMode === mode ? 'active' : ''}`} onClick={() => onSetOrderMode(mode)}>{mode}</button>
                     ))}
                 </div>
             </header>
-            <div className="menu-content">
+            <div className="menu-content" ref={menuContentRef}>
                 <header className="menu-header">
                     {!isRoot && (
                         <button onClick={onGoBack} className="btn-back">
