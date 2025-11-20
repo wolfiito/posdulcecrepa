@@ -1,4 +1,4 @@
-// src/components/CustomizeVariantModal.tsx (Reemplazo Completo)
+// src/components/CustomizeVariantModal.tsx
 
 import { useState, useMemo, useEffect } from 'react';
 import Modal from 'react-modal';
@@ -9,27 +9,6 @@ const BEBIDA_LECHE_GRUPO = "leche_opciones";
 const BEBIDA_SABOR_GRUPO = "sabor_te";
 const SABOR_TISANA_GRUPO = "sabor_tisana";
 const TOPPING_GRUPOS_TODOS = ["bebida_topping_general", "bublee_topping"];
-
-const customStyles = {
-    content: {
-        top: '50%',
-        left: '50%',
-        right: 'auto',
-        bottom: 'auto',
-        marginRight: '-50%',
-        transform: 'translate(-50%, -50%)',
-        width: '90%',
-        maxWidth: '600px',
-        maxHeight: '90vh',
-        overflow: 'auto',
-        border: 'none',
-        borderRadius: '8px',
-        padding: '25px'
-    },
-    overlay: {
-        backgroundColor: 'rgba(0, 0, 0, 0.6)'
-    }
-};
 
 Modal.setAppElement('#root');
 
@@ -86,10 +65,10 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
         };
     }, [allModifiers, allowedModifierGroups]);
     
-    const { price: currentPrice, extraCost } = useMemo(() => {
+    const { price: currentPrice } = useMemo(() => {
         const variantPrice = isVariantPrice(item) ? selectedVariant.price : item.price;
         const extra = Array.from(selectedModifiers.values()).reduce((sum, mod) => sum + mod.price, 0);
-        return { price: variantPrice + extra, extraCost: extra };
+        return { price: variantPrice + extra };
     }, [item, selectedVariant, selectedModifiers]);
 
     // --- Definición de Pasos del Asistente ---
@@ -120,7 +99,7 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
     // --- Validación de Paso Actual ---
     const isStepValid = useMemo(() => {
         if (!currentStep || !currentStep.isRequired) return true;
-        if (currentStep.group === 'variants') return selectedVariant.price > 0; // Validar que se seleccionó un tamaño
+        if (currentStep.group === 'variants') return selectedVariant.price > 0;
         return Array.from(selectedModifiers.values()).some(mod => mod.group === currentStep.group);
     }, [currentStep, selectedModifiers, selectedVariant]);
 
@@ -169,21 +148,28 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
         <Modal
             isOpen={isOpen}
             onRequestClose={onClose}
-            style={customStyles}
+            className="modal-content"
+            overlayClassName="modal-overlay"
             contentLabel={`Personalizar: ${item.name}`}
         >
             <div className="modal-header">
-                <h2>Personalizar: {item.name}</h2>
+                <h2>{item.name}</h2>
                 <div className="wizard-steps">
                     {steps.map((s, index) => (
                         <div key={s.name} className={`step-indicator ${index <= step ? 'active' : ''}`} />
                     ))}
                 </div>
+                 <p className={`modal-price ${isStepValid ? 'valid' : 'invalid'}`}>
+                    Total: <strong>${currentPrice.toFixed(2)}</strong>
+                </p>
             </div>
             
             {currentStep && (
                  <div className="modal-section">
-                    <h4>Paso {step + 1}: {currentStep.name} {currentStep.isRequired && !isStepValid && '(Obligatorio)'}</h4>
+                    <h4>
+                        Paso {step + 1}: {currentStep.name} 
+                        {currentStep.isRequired && !isStepValid && <span className="required-tag"></span>}
+                    </h4>
                     <div className="modal-options-grid">
                         
                         {currentStep.group === 'variants' && (currentStep.options as {name: string, price: number}[]).map(variant => (
@@ -192,7 +178,8 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
                                 onClick={() => setSelectedVariant(variant)}
                                 className={`btn-modal-option ${selectedVariant.name === variant.name ? 'selected' : ''}`}
                             >
-                                {variant.name} (${variant.price.toFixed(2)})
+                                {variant.name}
+                                <span className="price-tag">(${variant.price.toFixed(2)})</span>
                             </button>
                         ))}
                         
@@ -214,10 +201,6 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
                 <button onClick={step === 0 ? onClose : handlePrev} className="btn-secondary">
                     {step === 0 ? 'Cancelar' : 'Atrás'}
                 </button>
-                
-                <div className="total-display">
-                    Total: ${currentPrice.toFixed(2)}
-                </div>
 
                 {isLastStep ? (
                     <button 

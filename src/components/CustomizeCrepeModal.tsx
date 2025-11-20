@@ -36,7 +36,12 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
   const [step, setStep] = useState(0);
   const [selectedModifiers, setSelectedModifiers] = useState<Map<string, Modifier>>(new Map());
 
-  const MAX_INGREDIENTS = 5;
+  const maxIngredients = useMemo(() => {
+    if (group?.id.includes('hotcakes')) {
+      return 3;
+    }
+    return 5;
+  }, [group]);
 
   useEffect(() => {
     if (isOpen) {
@@ -64,7 +69,7 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
         allSteps.push({ 
             name: group.id.includes('licuado') ? `Ingredientes (${group.id.includes('sencillo') ? 'Elija 1' : 'Elija 2'})` : 
                   (group.id.includes('frappe') || group.id.includes('malteada') || group.id.includes('soda') || group.id.includes('chamoyada') || group.id.includes('icee')) ? 'Seleccione Sabor' : 
-                  (group.id.includes('postre') ? `Ingredientes (Max ${MAX_INGREDIENTS})` : `Ingredientes Base (Max ${MAX_INGREDIENTS})`),
+                  (group.id.includes('postre') || group.id.includes('hotcakes')) ? `Ingredientes (Max ${maxIngredients})` : `Ingredientes Base (Max ${maxIngredients})`,
             groups: baseGroups,
             isRequired: true
         });
@@ -87,7 +92,7 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
         }
     }
     return allSteps.filter(s => s.groups.length > 0); // Filtra pasos que no tienen grupos asignados
-  }, [group]);
+  }, [group, maxIngredients]);
 
   const currentStepInfo = steps[step];
   const isLastStep = step === steps.length - 1;
@@ -110,7 +115,7 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
     return count;
   }, [group, selectedModifiers]);
   
-  const isCrepeLimitReached = selectedBaseCount >= MAX_INGREDIENTS;
+  const isCrepeLimitReached = selectedBaseCount >= maxIngredients;
 
 
   const calculateCrepePrice = (
@@ -234,7 +239,6 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
   if (!isOpen || !group || !currentStepInfo) return null;
   
   const isAddButtonDisabled = !isValid || (currentPrice === 0 && !group.id.includes('licuados'));
-  const isBaseGroupExclusive = group.base_group ? exclusiveBaseGroups.includes(group.base_group) : false;
 
   return (
     <Modal
@@ -275,8 +279,7 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
                           key={mod.id}
                           onClick={() => handleModifierChange(mod)}
                           disabled={shouldBeDisabled}
-                          className={`btn-modal-option ${isSelected ? 'selected' : ''}`}
-                      >
+                          className={`btn-modal-option ${isSelected ? 'selected' : ''}`}>
                           {mod.name} 
                           {mod.price > 0 && <span className="price-tag">(+${mod.price.toFixed(2)})</span>}
                       </button>
