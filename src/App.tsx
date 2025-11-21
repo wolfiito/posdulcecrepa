@@ -24,6 +24,8 @@ const IconTicket = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" heig
 const IconBack = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>;
 const IconHistory = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>;
 const IconCash = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>;
+const IconPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>;
+const IconMinus = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>;
 const IconCheck = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>;
 
 // --- Tipos ---
@@ -165,34 +167,46 @@ function App() {
   return (
     <div className="min-h-screen bg-base-200 pb-[140px] font-sans transition-colors duration-300">
       
-      {/* Navbar */}
+      {/* Navbar Superior */}
       <div className="navbar bg-base-100/90 backdrop-blur-md sticky top-0 z-50 shadow-sm px-2 border-b border-base-200 h-16">
         <div className="navbar-start flex gap-1 items-center w-auto">
-            <div className="dropdown dropdown-bottom">
-                <div tabIndex={0} role="button" className="btn btn-ghost btn-circle m-1">
-                    <IconMenu />
+            
+            {/* LÓGICA DE NAVEGACIÓN: Hamburguesa en Menu, Atrás en Ticket */}
+            {view === 'ticket' ? (
+                <button 
+                    onClick={() => setView('menu')} 
+                    className="btn btn-ghost btn-circle m-1 animate-pop-in text-primary hover:bg-primary/10"
+                >
+                    <IconBack />
+                </button>
+            ) : (
+                <div className="dropdown dropdown-bottom">
+                    <div tabIndex={0} role="button" className="btn btn-ghost btn-circle m-1">
+                        <IconMenu />
+                    </div>
+                    <ul tabIndex={0} className="dropdown-content z-[50] menu p-2 shadow-xl bg-base-100 rounded-box w-60 border border-base-200 mt-2">
+                        <li className="menu-title text-xs uppercase opacity-50">Configuración</li>
+                        <li className="mb-2">
+                            <label className="flex justify-between cursor-pointer active:bg-base-200">
+                                <span className="flex gap-2 items-center">
+                                    {theme === 'dulce-light' ? <IconSun /> : <IconMoon />}
+                                    Modo Oscuro
+                                </span>
+                                <input 
+                                    type="checkbox" 
+                                    className="toggle toggle-sm toggle-primary" 
+                                    checked={theme === 'dulce-dark'}
+                                    onChange={toggleTheme} 
+                                />
+                            </label>
+                        </li>
+                        <div className="divider my-1"></div>
+                        <li><a><IconHistory/> Historial de Ventas</a></li>
+                        <li><a><IconCash/> Corte de Caja</a></li>
+                    </ul>
                 </div>
-                <ul tabIndex={0} className="dropdown-content z-[50] menu p-2 shadow-xl bg-base-100 rounded-box w-60 border border-base-200 mt-2">
-                    <li className="menu-title text-xs uppercase opacity-50">Configuración</li>
-                    <li className="mb-2">
-                        <label className="flex justify-between cursor-pointer active:bg-base-200">
-                            <span className="flex gap-2 items-center">
-                                {theme === 'dulce-light' ? <IconSun /> : <IconMoon />}
-                                Modo Oscuro
-                            </span>
-                            <input 
-                                type="checkbox" 
-                                className="toggle toggle-sm toggle-primary" 
-                                checked={theme === 'dulce-dark'}
-                                onChange={toggleTheme} 
-                            />
-                        </label>
-                    </li>
-                    <div className="divider my-1"></div>
-                    <li><a><IconHistory/> Historial de Ventas</a></li>
-                    <li><a><IconCash/> Corte de Caja</a></li>
-                </ul>
-            </div>
+            )}
+            
             <a onClick={handleGoToMenu} className="text-lg font-black tracking-tight text-base-content select-none cursor-pointer active:scale-95 transition-transform hidden sm:block">
               DulceCrepa
             </a>
@@ -201,6 +215,7 @@ function App() {
         <div className="navbar-center hidden md:flex"></div>
 
         <div className="navbar-end flex-1 w-full justify-end min-w-0">
+            {/* SELECTOR DE MESA (Recuperado) */}
             <div className="join shadow-sm border border-base-300 bg-base-200/80 p-1 rounded-btn">
                 {(['Mesa 1', 'Mesa 2', 'Llevar'] as const).map((mode) => {
                     const displayMode = mode === 'Llevar' ? 'Para Llevar' : mode;
@@ -307,10 +322,10 @@ function App() {
 const MenuScreen: React.FC<any> = ({ allData, currentGroup, onProductClick, onGoBack }) => {
     if (!currentGroup) {
         return (
-          <div className="flex justify-center items-center h-full min-h-[50vh]">
-              <span className="loading loading-spinner loading-lg text-primary"></span>
-          </div>
-      );
+            <div className="flex justify-center items-center h-full min-h-[50vh]">
+                <span className="loading loading-spinner loading-lg text-primary"></span>
+            </div>
+        );
     }
 
     const isRoot = currentGroup.id === 'root';
@@ -348,10 +363,8 @@ const MenuScreen: React.FC<any> = ({ allData, currentGroup, onProductClick, onGo
             </div>
 
             {isRoot ? (
-                // VUELTA AL GRID PARA CATEGORÍAS - AHORA CON TARJETAS GRANDES
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     {rootGroups.map((group: MenuGroup) => (
-                        // Pasamos isLarge={true} aquí para que se vean gigantes
                         <ProductCard 
                             key={group.id} 
                             item={group} 
@@ -361,7 +374,6 @@ const MenuScreen: React.FC<any> = ({ allData, currentGroup, onProductClick, onGo
                     ))}
                 </div>
             ) : (
-                // Grid de Items Normales (isLarge={false} por defecto)
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     {[...currentItems, ...currentSubGroups].map((item: any) => (
                         <ProductCard 
@@ -401,7 +413,6 @@ const TicketScreen: React.FC<any> = ({ ticketItems, onBackToMenu, currentOrderNu
                 ))
             )}
         </div>
-        {/* El footer del ticket se ha movido a la barra fija inferior */}
     </div>
 );
 
