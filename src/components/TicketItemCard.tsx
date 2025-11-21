@@ -44,7 +44,8 @@ export const TicketItemCard: React.FC<Props> = ({ item, onRemove }) => {
       
       {/* Contenido Frontal (Card) */}
       <motion.div
-        className="relative bg-base-100 p-4 rounded-box shadow-sm border border-base-200 z-10 active:cursor-grabbing cursor-grab"
+        // CORRECCIÓN: rounded-box para coincidir con el tema
+        className="relative bg-base-100 p-4 rounded-box shadow-sm border border-base-200 z-10 active:cursor-grabbing cursor-grab active:shadow-md active:border-primary/30 transition-colors"
         drag="x"
         dragConstraints={{ right: 0, left: 0 }}
         onDragEnd={onDragEnd}
@@ -54,16 +55,16 @@ export const TicketItemCard: React.FC<Props> = ({ item, onRemove }) => {
         whileTap={{ scale: 0.98 }}
         style={{ touchAction: "none" }} // Importante para móviles
       >
-        <div className="flex justify-between items-start mb-1">
-          <div className="font-bold text-base-content pr-2">
+        <div className="flex justify-between items-start mb-1 gap-4">
+          <div className="font-bold text-base-content text-sm leading-tight">
             {item.baseName} 
             {item.details?.variantName && (
-                <span className="text-primary font-normal ml-1 text-sm">
+                <span className="text-primary font-normal ml-1 text-xs opacity-90">
                     ({item.details.variantName})
                 </span>
             )}
           </div>
-          <span className="font-black text-lg text-success">
+          <span className="font-black text-base text-success shrink-0">
             ${item.finalPrice.toFixed(2)}
           </span>
         </div>
@@ -71,8 +72,8 @@ export const TicketItemCard: React.FC<Props> = ({ item, onRemove }) => {
         {/* Lista de Modificadores */}
         {item.details && item.details.selectedModifiers.length > 0 && (
           <ul className="text-xs text-base-content/60 space-y-1 mt-2 border-l-2 border-base-200 pl-2">
-            {item.details.selectedModifiers.map(mod => (
-                <li key={mod.id} className="flex justify-between">
+            {item.details.selectedModifiers.map((mod, idx) => (
+                <li key={`${mod.id}-${idx}`} className="flex justify-between">
                     <span>• {mod.name}</span>
                     {mod.price > 0 && <span>+${mod.price.toFixed(2)}</span>}
                 </li>
@@ -80,8 +81,8 @@ export const TicketItemCard: React.FC<Props> = ({ item, onRemove }) => {
           </ul>
         )}
         
-        {/* Indicador visual de "deslizar" */}
-        <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-10">
+        {/* Indicador visual de "deslizar" - Solo visible si no se está arrastrando (opcional, aquí lo dejo sutil) */}
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-5 pointer-events-none">
             <svg width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M15 19l-7-7 7-7" /></svg>
         </div>
       </motion.div>

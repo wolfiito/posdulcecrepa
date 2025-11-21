@@ -126,26 +126,33 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
         <Modal
             isOpen={isOpen}
             onRequestClose={onClose}
-            className="bg-base-100 w-full max-w-lg max-h-[90dvh] rounded-3xl shadow-2xl flex flex-col overflow-hidden outline-none animate-pop-in"
+            // CORRECCIÓN: rounded-box para consistencia con el tema
+            className="bg-base-100 w-full max-w-lg max-h-[90dvh] rounded-box shadow-2xl flex flex-col overflow-hidden outline-none animate-pop-in border border-base-200"
             overlayClassName="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
         >
+            {/* Header */}
             <div className="p-5 border-b border-base-200 bg-base-100 text-center relative">
                 <h2 className="text-xl font-bold text-base-content">{item.name}</h2>
+                
+                {/* Steps Indicator */}
                 <div className="flex gap-1 justify-center my-3 h-1.5 w-full max-w-xs mx-auto">
                     {steps.map((s, index) => (
                         <div key={s.name} className={`flex-1 rounded-full transition-colors duration-300 ${index <= step ? 'bg-primary' : 'bg-base-300'}`} />
                     ))}
                 </div>
-                 <div className={`badge badge-lg font-bold transition-colors duration-300 ${isStepValid ? 'badge-success text-white' : 'badge-ghost opacity-50'}`}>
+                
+                {/* Precio Dinámico */}
+                 <div className={`badge badge-lg font-bold transition-colors duration-300 ${isStepValid ? 'badge-success text-success-content' : 'badge-ghost opacity-50'}`}>
                     Total: ${currentPrice.toFixed(2)}
                 </div>
             </div>
             
+            {/* Contenido */}
             {currentStep && (
-                 <div className="flex-1 overflow-y-auto p-4 bg-base-200/30">
+                 <div className="flex-1 overflow-y-auto p-4 bg-base-200/50">
                     <h4 className="text-sm font-bold uppercase tracking-wide opacity-70 mb-3 flex justify-between">
                         {currentStep.name} 
-                        {currentStep.isRequired && !isStepValid && <span className="text-error text-xs">Requerido</span>}
+                        {currentStep.isRequired && !isStepValid && <span className="text-error text-xs font-bold">Requerido</span>}
                     </h4>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         
@@ -156,16 +163,17 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
                                 <button
                                     key={variant.name}
                                     onClick={() => setSelectedVariant(variant)}
+                                    // CORRECCIÓN: Estilos unificados con el modal de crepas
                                     className={`
-                                        btn h-auto min-h-[3.5rem] py-2 px-3 flex flex-col leading-tight normal-case border-2
+                                        btn h-auto min-h-[3.5rem] py-2 px-3 flex flex-col leading-tight normal-case border
                                         ${isSelected 
-                                            ? 'btn-primary border-primary shadow-lg scale-[1.02]' 
-                                            : 'btn-ghost bg-base-100 border-base-200 hover:border-primary/50'
+                                            ? 'btn-primary border-primary shadow-md scale-[1.02]' 
+                                            : 'btn-ghost bg-base-100 border-base-300 hover:border-primary/50'
                                         }
                                     `}
                                 >
                                     <span className="text-sm font-semibold">{variant.name}</span>
-                                    <span className={`text-xs font-normal mt-1 ${isSelected ? 'text-primary-content/80' : 'text-base-content/60'}`}>
+                                    <span className={`text-xs font-normal mt-1 ${isSelected ? 'text-primary-content/90' : 'text-base-content/60'}`}>
                                         ${variant.price.toFixed(2)}
                                     </span>
                                 </button>
@@ -180,16 +188,16 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
                                     key={mod.id}
                                     onClick={() => handleModifierChange(mod, currentStep.isExclusive)}
                                     className={`
-                                        btn h-auto min-h-[3.5rem] py-2 px-3 flex flex-col leading-tight normal-case border-2
+                                        btn h-auto min-h-[3.5rem] py-2 px-3 flex flex-col leading-tight normal-case border
                                         ${isSelected 
-                                            ? 'btn-primary border-primary shadow-lg scale-[1.02]' 
-                                            : 'btn-ghost bg-base-100 border-base-200 hover:border-primary/50'
+                                            ? 'btn-primary border-primary shadow-md scale-[1.02]' 
+                                            : 'btn-ghost bg-base-100 border-base-300 hover:border-primary/50'
                                         }
                                     `}
                                 >
                                     <span className="text-sm font-semibold">{mod.name}</span> 
                                     {mod.price > 0 && (
-                                        <span className={`text-xs font-normal mt-1 ${isSelected ? 'text-primary-content/80' : 'text-base-content/60'}`}>
+                                        <span className={`text-xs font-normal mt-1 ${isSelected ? 'text-primary-content/90' : 'text-base-content/60'}`}>
                                             +${mod.price.toFixed(2)}
                                         </span>
                                     )}
@@ -200,6 +208,7 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
                 </div>
             )}
             
+            {/* Footer */}
             <div className="p-4 border-t border-base-200 bg-base-100 flex gap-3">
                 <button onClick={step === 0 ? onClose : handlePrev} className="btn btn-ghost text-base-content/70">
                     {step === 0 ? 'Cancelar' : 'Atrás'}
@@ -209,7 +218,7 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
                     <button 
                         onClick={handleAddToTicket} 
                         disabled={!isStepValid}
-                        className="btn btn-primary flex-1 shadow-lg shadow-primary/30"
+                        className="btn btn-primary flex-1 shadow-lg shadow-primary/20"
                     >
                         Agregar ${currentPrice.toFixed(2)}
                     </button>

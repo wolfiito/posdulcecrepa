@@ -2,13 +2,96 @@
 @tailwind components;
 @tailwind utilities;
 
+/* DEFINICIÓN MANUAL DE TEMAS (DaisyUI v5 compatible)
+  Sobrescribimos las variables CSS directamente para asegurar
+  que los colores sean exactos.
+*/
+
+@layer base {
+  /* Tema Claro: dulce-light */
+  :root[data-theme="dulce-light"] {
+    --color-base-100: oklch(97% 0.013 236.62);
+    --color-base-200: oklch(95% 0.026 236.824);
+    --color-base-300: oklch(90% 0.058 230.902);
+    --color-base-content: oklch(40% 0.153 2.432);
+    
+    --color-primary: oklch(87% 0.15 154.449);
+    --color-primary-content: oklch(26% 0.065 152.934);
+    
+    --color-secondary: oklch(80% 0.114 19.571);
+    --color-secondary-content: oklch(25% 0.092 26.042);
+    
+    --color-accent: oklch(85% 0.138 181.071);
+    --color-accent-content: oklch(27% 0.046 192.524);
+    
+    --color-neutral: oklch(59% 0.249 0.584);
+    --color-neutral-content: oklch(97% 0.013 236.62);
+    
+    --color-info: oklch(58% 0.158 241.966);
+    --color-info-content: oklch(97% 0.013 236.62);
+    
+    --color-success: oklch(64% 0.2 131.684);
+    --color-success-content: oklch(98% 0.031 120.757);
+    
+    --color-warning: oklch(64% 0.222 41.116);
+    --color-warning-content: oklch(98% 0.016 73.684);
+    
+    --color-error: oklch(59% 0.249 0.584);
+    --color-error-content: oklch(97% 0.014 343.198);
+
+    /* Variables de Radio (Redondeado) */
+    --radius-selector: 0.5rem;
+    --radius-field: 0.5rem;
+    --radius-box: 2rem;
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    --border: 2px;
+    --depth: 0;
+    --noise: 0;
+  }
+
+  /* Tema Oscuro: dulce-dark */
+  :root[data-theme="dulce-dark"] {
+    --color-base-100: oklch(14% 0 0);
+  --color-base-200: oklch(20% 0 0);
+  --color-base-300: oklch(26% 0 0);
+  --color-base-content: oklch(97% 0 0);
+  --color-primary: oklch(59% 0.249 0.584);
+  --color-primary-content: oklch(96% 0.003 264.542);
+  --color-secondary: oklch(70% 0.165 254.624);
+  --color-secondary-content: oklch(28% 0.091 267.935);
+  --color-accent: oklch(70% 0.165 254.624);
+  --color-accent-content: oklch(28% 0.091 267.935);
+  --color-neutral: oklch(37% 0 0);
+  --color-neutral-content: oklch(98% 0 0);
+  --color-info: oklch(70% 0.165 254.624);
+  --color-info-content: oklch(28% 0.091 267.935);
+  --color-success: oklch(77% 0.152 181.912);
+  --color-success-content: oklch(27% 0.046 192.524);
+  --color-warning: oklch(82% 0.189 84.429);
+  --color-warning-content: oklch(27% 0.077 45.635);
+  --color-error: oklch(71% 0.194 13.428);
+  --color-error-content: oklch(27% 0.105 12.094);
+  --radius-selector: 2rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 1;
+  }
+}
+
+/* Estilos Globales */
 body {
-  @apply bg-base-200 text-base-content antialiased overflow-hidden;
+  @apply bg-base-200 text-base-content antialiased overflow-y-auto;
   overscroll-behavior: none; 
 }
 
 #root {
-  @apply h-[100dvh] w-screen flex flex-col;
+  /* CORRECCIÓN: Altura mínima, no fija, para que crezca con el contenido */
+  @apply min-h-[100dvh] w-screen flex flex-col;
 }
 
 .hide-scrollbar::-webkit-scrollbar {
