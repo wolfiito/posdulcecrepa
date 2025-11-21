@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import Modal from 'react-modal';
 import type { VariantPriceItem, FixedPriceItem, Modifier, TicketItem, MenuItem } from '../types/menu'; 
 
-// --- CONSTANTES DE GRUPOS DE MODIFICADORES ---
+// --- CONSTANTES ---
 const BEBIDA_LECHE_GRUPO = "leche_opciones";
 const BEBIDA_SABOR_GRUPO = "sabor_te";
 const SABOR_TISANA_GRUPO = "sabor_tisana";
@@ -26,10 +26,9 @@ function isVariantPrice(item: MenuItem): item is VariantPriceItem {
   return 'variants' in item;
 }
 
-// Tipo para un paso del asistente
 type WizardStep = {
     name: string;
-    options: (Modifier | {name: string, price: number})[]; // Puede ser Modifiers o Variants
+    options: (Modifier | {name: string, price: number})[]; 
     isExclusive: boolean;
     isRequired: boolean;
     group: string;
@@ -38,7 +37,6 @@ type WizardStep = {
 export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onAddItem }: Props) {
     if (!item) return null;
     
-    // --- ESTADOS DEL ASISTENTE ---
     const [step, setStep] = useState(0);
     const [selectedVariant, setSelectedVariant] = useState(isVariantPrice(item) ? item.variants[0] : initialVariant);
     const [selectedModifiers, setSelectedModifiers] = useState<Map<string, Modifier>>(new Map());
@@ -53,11 +51,8 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
 
     const allowedModifierGroups = item.modifierGroups || [];
 
-    // Opciones filtradas
     const { milkOptions, flavorOptions, toppingOptions } = useMemo(() => { 
-        const relevantMods = allModifiers.filter(mod => 
-            allowedModifierGroups.includes(mod.group)
-        );
+        const relevantMods = allModifiers.filter(mod => allowedModifierGroups.includes(mod.group));
         return {
             milkOptions: relevantMods.filter(mod => mod.group === BEBIDA_LECHE_GRUPO),
             flavorOptions: relevantMods.filter(mod => mod.group === BEBIDA_SABOR_GRUPO || mod.group === SABOR_TISANA_GRUPO),
@@ -71,10 +66,8 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
         return { price: variantPrice + extra };
     }, [item, selectedVariant, selectedModifiers]);
 
-    // --- Definición de Pasos del Asistente ---
     const steps = useMemo(() => {
         const stepList: WizardStep[] = [];
-        
         if (isVariantPrice(item)) {
             stepList.push({ 
                 name: 'Tamaño', 
@@ -84,36 +77,27 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
                 isExclusive: true
             });
         }
-        
         if (milkOptions.length > 0) stepList.push({ name: 'Leche', options: milkOptions, isExclusive: true, isRequired: true, group: BEBIDA_LECHE_GRUPO });
         if (flavorOptions.length > 0) stepList.push({ name: 'Sabor', options: flavorOptions, isExclusive: true, isRequired: true, group: (item.id.includes('tisana') ? SABOR_TISANA_GRUPO : BEBIDA_SABOR_GRUPO) });
         if (toppingOptions.length > 0) stepList.push({ name: 'Toppings', options: toppingOptions, isExclusive: false, isRequired: false, group: 'toppings' });
-        
         return stepList;
     }, [item, milkOptions, flavorOptions, toppingOptions]);
-
 
     const currentStep = steps[step];
     const isLastStep = step === steps.length - 1;
 
-    // --- Validación de Paso Actual ---
     const isStepValid = useMemo(() => {
         if (!currentStep || !currentStep.isRequired) return true;
         if (currentStep.group === 'variants') return selectedVariant.price > 0;
         return Array.from(selectedModifiers.values()).some(mod => mod.group === currentStep.group);
     }, [currentStep, selectedModifiers, selectedVariant]);
 
-
     const handleModifierChange = (modifier: Modifier, isExclusive: boolean) => {
         setSelectedModifiers(prev => {
             const newMap = new Map(prev);
-            
             if (isExclusive) { 
-                allModifiers
-                    .filter(mod => mod.group === modifier.group)
-                    .forEach(mod => newMap.delete(mod.id));
+                allModifiers.filter(mod => mod.group === modifier.group).forEach(mod => newMap.delete(mod.id));
             }
-            
             if (newMap.has(modifier.id)) newMap.delete(modifier.id);
             else newMap.set(modifier.id, modifier);
             return newMap;
@@ -122,7 +106,7 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
 
     const handleAddToTicket = () => {
         const modsArray = Array.from(selectedModifiers.values());
-        const newTicketItem: TicketItem = {
+        onAddItem({
             id: Date.now().toString(),
             baseName: item.name,
             finalPrice: currentPrice,
@@ -132,87 +116,106 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
                 variantName: isVariantPrice(item) ? selectedVariant.name : '',
                 selectedModifiers: modsArray,
             }
-        };
-        onAddItem(newTicketItem);
+        });
     };
     
-    const handleNext = () => {
-        if (isStepValid) setStep(s => s + 1);
-        else alert(`Por favor, selecciona una opción para ${currentStep.name}.`);
-    };
+    const handleNext = () => { if (isStepValid) setStep(s => s + 1); };
     const handlePrev = () => setStep(s => s - 1);
-
-    const isAddButtonDisabled = !isStepValid;
 
     return (
         <Modal
             isOpen={isOpen}
             onRequestClose={onClose}
-            className="modal-content"
-            overlayClassName="modal-overlay"
-            contentLabel={`Personalizar: ${item.name}`}
+            className="bg-base-100 w-full max-w-lg max-h-[90dvh] rounded-3xl shadow-2xl flex flex-col overflow-hidden outline-none animate-pop-in"
+            overlayClassName="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
         >
-            <div className="modal-header">
-                <h2>{item.name}</h2>
-                <div className="wizard-steps">
+            <div className="p-5 border-b border-base-200 bg-base-100 text-center relative">
+                <h2 className="text-xl font-bold text-base-content">{item.name}</h2>
+                <div className="flex gap-1 justify-center my-3 h-1.5 w-full max-w-xs mx-auto">
                     {steps.map((s, index) => (
-                        <div key={s.name} className={`step-indicator ${index <= step ? 'active' : ''}`} />
+                        <div key={s.name} className={`flex-1 rounded-full transition-colors duration-300 ${index <= step ? 'bg-primary' : 'bg-base-300'}`} />
                     ))}
                 </div>
-                 <p className={`modal-price ${isStepValid ? 'valid' : 'invalid'}`}>
-                    Total: <strong>${currentPrice.toFixed(2)}</strong>
-                </p>
+                 <div className={`badge badge-lg font-bold transition-colors duration-300 ${isStepValid ? 'badge-success text-white' : 'badge-ghost opacity-50'}`}>
+                    Total: ${currentPrice.toFixed(2)}
+                </div>
             </div>
             
             {currentStep && (
-                 <div className="modal-section">
-                    <h4>
-                        Paso {step + 1}: {currentStep.name} 
-                        {currentStep.isRequired && !isStepValid && <span className="required-tag"></span>}
+                 <div className="flex-1 overflow-y-auto p-4 bg-base-200/30">
+                    <h4 className="text-sm font-bold uppercase tracking-wide opacity-70 mb-3 flex justify-between">
+                        {currentStep.name} 
+                        {currentStep.isRequired && !isStepValid && <span className="text-error text-xs">Requerido</span>}
                     </h4>
-                    <div className="modal-options-grid">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         
-                        {currentStep.group === 'variants' && (currentStep.options as {name: string, price: number}[]).map(variant => (
-                            <button
-                                key={variant.name}
-                                onClick={() => setSelectedVariant(variant)}
-                                className={`btn-modal-option ${selectedVariant.name === variant.name ? 'selected' : ''}`}
-                            >
-                                {variant.name}
-                                <span className="price-tag">(${variant.price.toFixed(2)})</span>
-                            </button>
-                        ))}
+                        {/* Renderizado de Variantes (Tamaños) */}
+                        {currentStep.group === 'variants' && (currentStep.options as {name: string, price: number}[]).map(variant => {
+                            const isSelected = selectedVariant.name === variant.name;
+                            return (
+                                <button
+                                    key={variant.name}
+                                    onClick={() => setSelectedVariant(variant)}
+                                    className={`
+                                        btn h-auto min-h-[3.5rem] py-2 px-3 flex flex-col leading-tight normal-case border-2
+                                        ${isSelected 
+                                            ? 'btn-primary border-primary shadow-lg scale-[1.02]' 
+                                            : 'btn-ghost bg-base-100 border-base-200 hover:border-primary/50'
+                                        }
+                                    `}
+                                >
+                                    <span className="text-sm font-semibold">{variant.name}</span>
+                                    <span className={`text-xs font-normal mt-1 ${isSelected ? 'text-primary-content/80' : 'text-base-content/60'}`}>
+                                        ${variant.price.toFixed(2)}
+                                    </span>
+                                </button>
+                            )
+                        })}
                         
-                        {currentStep.group !== 'variants' && (currentStep.options as Modifier[]).map(mod => (
-                            <button
-                                key={mod.id}
-                                onClick={() => handleModifierChange(mod, currentStep.isExclusive)}
-                                className={`btn-modal-option ${selectedModifiers.has(mod.id) ? 'selected' : ''}`}
-                            >
-                                {mod.name} 
-                                {mod.price > 0 && <span className="price-tag">(+${mod.price.toFixed(2)})</span>}
-                            </button>
-                        ))}
+                        {/* Renderizado de Modificadores Normales */}
+                        {currentStep.group !== 'variants' && (currentStep.options as Modifier[]).map(mod => {
+                            const isSelected = selectedModifiers.has(mod.id);
+                            return (
+                                <button
+                                    key={mod.id}
+                                    onClick={() => handleModifierChange(mod, currentStep.isExclusive)}
+                                    className={`
+                                        btn h-auto min-h-[3.5rem] py-2 px-3 flex flex-col leading-tight normal-case border-2
+                                        ${isSelected 
+                                            ? 'btn-primary border-primary shadow-lg scale-[1.02]' 
+                                            : 'btn-ghost bg-base-100 border-base-200 hover:border-primary/50'
+                                        }
+                                    `}
+                                >
+                                    <span className="text-sm font-semibold">{mod.name}</span> 
+                                    {mod.price > 0 && (
+                                        <span className={`text-xs font-normal mt-1 ${isSelected ? 'text-primary-content/80' : 'text-base-content/60'}`}>
+                                            +${mod.price.toFixed(2)}
+                                        </span>
+                                    )}
+                                </button>
+                            )
+                        })}
                     </div>
                 </div>
             )}
             
-            <div className="modal-footer">
-                <button onClick={step === 0 ? onClose : handlePrev} className="btn-secondary">
+            <div className="p-4 border-t border-base-200 bg-base-100 flex gap-3">
+                <button onClick={step === 0 ? onClose : handlePrev} className="btn btn-ghost text-base-content/70">
                     {step === 0 ? 'Cancelar' : 'Atrás'}
                 </button>
 
                 {isLastStep ? (
                     <button 
                         onClick={handleAddToTicket} 
-                        disabled={isAddButtonDisabled}
-                        className="btn-primary"
+                        disabled={!isStepValid}
+                        className="btn btn-primary flex-1 shadow-lg shadow-primary/30"
                     >
-                        Añadir al Ticket
+                        Agregar ${currentPrice.toFixed(2)}
                     </button>
                 ) : (
-                    <button onClick={handleNext} disabled={!isStepValid} className="btn-primary">
-                        Continuar &rarr;
+                    <button onClick={handleNext} disabled={!isStepValid} className="btn btn-secondary flex-1">
+                        Siguiente
                     </button>
                 )}
             </div>

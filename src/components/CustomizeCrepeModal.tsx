@@ -2,23 +2,16 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import Modal from 'react-modal';
-import type { MenuGroup, Modifier, TicketItem, PriceRule } from '../types/menu'; 
+import type { MenuGroup, Modifier, TicketItem, PriceRule } from '../types/menu';
 
-// --- CONSTANTES DE GRUPOS DE MODIFICADORES ---
+// --- CONSTANTES DE GRUPOS ---
 const BEBIDA_LECHE_GRUPO = "leche_opciones";
-const FRA_SABORES_BASE = "frappe_sabores";
-const MALTEADA_SABORES = "malteada_sabores";
-const FRAPPE_ESP_SABORES = "frappe_especial_sabores";
-const SODA_SABORES = "soda_sabores";
-const CHAMOYADA_SABORES = "chamoyada_sabores";
-const ICEE_SABORES = "icee_sabores";
-const LICUADO_INGREDIENTES = "licuado_ingredientes";
 const CREPA_DULCE_BASE = "crepa_dulce_base";
 const CREPA_SALADA_BASE = "crepa_salada_base";
 const CREPA_TOPPING_SALSA = "crepa_topping_salsa";
 const CREPA_TOPPING_SECO = "crepa_topping_seco";
 
-const exclusiveBaseGroups = [FRA_SABORES_BASE, MALTEADA_SABORES, FRAPPE_ESP_SABORES, SODA_SABORES, CHAMOYADA_SABORES, ICEE_SABORES];
+const exclusiveBaseGroups = ["frappe_sabores", "malteada_sabores", "frappe_especial_sabores", "soda_sabores", "chamoyada_sabores", "icee_sabores"];
 const exclusiveGroups = [...exclusiveBaseGroups, BEBIDA_LECHE_GRUPO, CREPA_TOPPING_SALSA, CREPA_TOPPING_SECO];
 
 Modal.setAppElement('#root');
@@ -36,12 +29,8 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
   const [step, setStep] = useState(0);
   const [selectedModifiers, setSelectedModifiers] = useState<Map<string, Modifier>>(new Map());
 
-  const maxIngredients = useMemo(() => {
-    if (group?.id.includes('hotcakes')) {
-      return 3;
-    }
-    return 5;
-  }, [group]);
+  // --- Lógica de Negocio (Sin cambios mayores) ---
+  const maxIngredients = useMemo(() => group?.id.includes('hotcakes') ? 3 : 5, [group]);
 
   useEffect(() => {
     if (isOpen) {
@@ -55,56 +44,46 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
     return allPriceRules.find(rule => rule.id === group.rules_ref) || null;
   }, [group, allPriceRules]);
 
-  // --- Definición de Pasos del Asistente ---
   const steps = useMemo(() => {
     if (!group) return [];
-    
     const baseGroups = group.base_group ? [group.base_group] : [];
     const extraGroups = group.extra_groups || [];
     const toppingGroups = group.topping_groups || [];
-
     const allSteps = [];
 
     if (baseGroups.length > 0) {
         allSteps.push({ 
-            name: group.id.includes('licuado') ? `Ingredientes (${group.id.includes('sencillo') ? 'Elija 1' : 'Elija 2'})` : 
-                  (group.id.includes('frappe') || group.id.includes('malteada') || group.id.includes('soda') || group.id.includes('chamoyada') || group.id.includes('icee')) ? 'Seleccione Sabor' : 
-                  (group.id.includes('postre') || group.id.includes('hotcakes')) ? `Ingredientes (Max ${maxIngredients})` : `Ingredientes Base (Max ${maxIngredients})`,
+            name: (group.id.includes('frappe') || group.id.includes('malteada')) ? 'Seleccione Sabor' : 'Ingredientes Base',
             groups: baseGroups,
             isRequired: true
         });
     }
     if (extraGroups.length > 0) {
         allSteps.push({
-            name: extraGroups.includes(BEBIDA_LECHE_GRUPO) ? 'Tipo de Leche' : 'Extras Adicionales',
+            name: extraGroups.includes(BEBIDA_LECHE_GRUPO) ? 'Tipo de Leche' : 'Extras',
             groups: extraGroups,
             isRequired: extraGroups.includes(BEBIDA_LECHE_GRUPO) 
         });
     }
     if (toppingGroups.length > 0) {
-        // Lógica para Crepas: 2 tipos de toppings gratis
         if (group.id.includes('dulces') || group.id.includes('postre')) {
-             allSteps.push({ name: 'Topping de Salsa (1 Gratis)', groups: [CREPA_TOPPING_SALSA], isRequired: false });
+             allSteps.push({ name: 'Salsas (1 Gratis)', groups: [CREPA_TOPPING_SALSA], isRequired: false });
              allSteps.push({ name: 'Topping Seco (1 Gratis)', groups: [CREPA_TOPPING_SECO], isRequired: false });
         } else {
-            // Lógica para Bebidas Frías
-            allSteps.push({ name: 'Toppings y Finales', groups: toppingGroups, isRequired: false });
+            allSteps.push({ name: 'Toppings', groups: toppingGroups, isRequired: false });
         }
     }
-    return allSteps.filter(s => s.groups.length > 0); // Filtra pasos que no tienen grupos asignados
-  }, [group, maxIngredients]);
+    return allSteps.filter(s => s.groups.length > 0);
+  }, [group]);
 
   const currentStepInfo = steps[step];
   const isLastStep = step === steps.length - 1;
 
-  // Modificadores para el paso actual
   const modifiersForCurrentStep = useMemo(() => {
       if (!currentStepInfo) return [];
       return allModifiers.filter(mod => currentStepInfo.groups.includes(mod.group));
   }, [currentStepInfo, allModifiers]);
 
-
-  // Contar ingredientes base seleccionados (para el límite de 5 en crepas)
   const selectedBaseCount = useMemo(() => {
     let count = 0;
     if (group?.base_group === CREPA_DULCE_BASE || group?.base_group === CREPA_SALADA_BASE) {
@@ -117,87 +96,65 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
   
   const isCrepeLimitReached = selectedBaseCount >= maxIngredients;
 
-
-  const calculateCrepePrice = (
-    selectedMods: Map<string, Modifier>
-  ): { price: number; rule: string; isValid: boolean } => {
+  const { price: currentPrice, rule: currentRule, isValid } = useMemo(() => {
     if (!priceRule || !group) return { price: 0, rule: 'N/A', isValid: false };
-
-    let baseIngredientCount = 0;
+    let baseCount = 0;
     let extraCost = 0;
-    
-    selectedMods.forEach(mod => {
-        if (mod.group === group.base_group) baseIngredientCount++; 
+    selectedModifiers.forEach(mod => {
+        if (mod.group === group.base_group) baseCount++; 
         if (mod.price > 0) extraCost += mod.price;
     });
     
-    let ruleDescription = group.rules_ref === "regla_precio_fijo" ? (group.name.split('(')[0].trim()) : `${baseIngredientCount} Ingredientes`;
+    let ruleDesc = group.rules_ref === "regla_precio_fijo" ? group.name : `${baseCount} Ingredientes`;
     let basePrice = 0;
-    let isValid = true;
+    let valid = true;
     
-    const isBaseGroupExclusive = group.base_group ? exclusiveBaseGroups.includes(group.base_group) : false;
+    const isBaseExclusive = group.base_group ? exclusiveBaseGroups.includes(group.base_group) : false;
 
-    if (isBaseGroupExclusive) {
-        if (baseIngredientCount !== 1) {
-            isValid = false;
-            ruleDescription = 'Debe elegir 1 Sabor Base';
-        }
+    if (isBaseExclusive) {
+        if (baseCount !== 1) valid = false;
         basePrice = group.price || 0; 
-    }
-    else if (group.id.includes('licuados')) {
-        const requiredCount = group.id.includes('sencillo') ? 1 : 2;
-        if (baseIngredientCount !== requiredCount) {
-             isValid = false;
-             ruleDescription = `Debe elegir ${requiredCount} Ingrediente(s)`;
-        }
-        const matchedRule = priceRule.basePrices.find(r => r.count === requiredCount);
-        basePrice = matchedRule?.price || 0;
-    }
-    else if (group.base_group === CREPA_DULCE_BASE || group.base_group === CREPA_SALADA_BASE) {
-         if (baseIngredientCount === 0) {
-            isValid = false;
-            ruleDescription = 'Debe elegir al menos 1 Ingrediente Base';
-         }
-         const matchedRule = priceRule.basePrices.sort((a, b) => b.count - a.count).find(r => baseIngredientCount >= r.count);
-         basePrice = matchedRule?.price || 0;
+    } else if (group.id.includes('licuados')) {
+        const req = group.id.includes('sencillo') ? 1 : 2;
+        if (baseCount !== req) valid = false;
+        basePrice = priceRule.basePrices.find(r => r.count === req)?.price || 0;
+    } else if (group.base_group === CREPA_DULCE_BASE || group.base_group === CREPA_SALADA_BASE) {
+         if (baseCount === 0) valid = false;
+         basePrice = priceRule.basePrices.sort((a, b) => b.count - a.count).find(r => baseCount >= r.count)?.price || 0;
     }
 
     if (group.extra_groups?.includes(BEBIDA_LECHE_GRUPO)) {
-        const lecheSeleccionada = selectedMods.has('leche_entera') || selectedMods.has('leche_deslactosada');
-        const selectedBaseMod = Array.from(selectedMods.values()).find(mod => mod.group === group.base_group);
-        const requiresMilk = selectedBaseMod && !selectedBaseMod.name.includes('(sin leche cond.)');
-        
-        if (requiresMilk && !lecheSeleccionada) {
-            isValid = false;
-            ruleDescription = 'El sabor requiere seleccionar un tipo de Leche';
-        }
+        const hasMilk = selectedModifiers.has('leche_entera') || selectedModifiers.has('leche_deslactosada');
+        if (!hasMilk) valid = false;
     }
     
-    const finalPrice = basePrice + extraCost;
-    return { price: finalPrice, rule: ruleDescription, isValid: isValid };
-  };
-
-  const { price: currentPrice, rule: currentRule, isValid } = useMemo(() => {
-    return calculateCrepePrice(selectedModifiers);
+    return { price: basePrice + extraCost, rule: ruleDesc, isValid: valid };
   }, [selectedModifiers, priceRule, group]);
 
-
-  // Validación del Paso Actual para el botón "Continuar"
   const isStepValid = useMemo(() => {
     if (!currentStepInfo || !currentStepInfo.isRequired) return true;
-    
-    // Si el paso es obligatorio (ej. Sabor Frappé o Leche), verifica que al menos uno de ESE GRUPO esté seleccionado
     return Array.from(selectedModifiers.values()).some(mod => currentStepInfo.groups.includes(mod.group));
   }, [currentStepInfo, selectedModifiers]);
 
+  const handleModifierChange = (modifier: Modifier) => {
+    const isExclusive = exclusiveGroups.includes(modifier.group);
+    setSelectedModifiers(prev => {
+        const newMap = new Map(prev);
+        if (isExclusive) { 
+            allModifiers.filter(mod => mod.group === modifier.group).forEach(mod => newMap.delete(mod.id));
+        }
+        if (newMap.has(modifier.id)) newMap.delete(modifier.id);
+        else newMap.set(modifier.id, modifier);
+        return newMap;
+    });
+  };
 
+  const handleNext = () => { if (isStepValid) setStep(s => s + 1); };
+  const handlePrev = () => setStep(s => s - 1);
+  
   const handleAddToTicket = () => {
-    if (!group || !isValid) {
-        alert("Por favor, revisa las selecciones obligatorias.");
-        return;
-    }
-    
-    const newTicketItem: TicketItem = {
+    if (!group || !isValid) return;
+    onAddItem({
       id: Date.now().toString(),
       baseName: group.name.split('(')[0].trim(), 
       finalPrice: currentPrice,
@@ -207,70 +164,49 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
         basePriceRule: currentRule,
         selectedModifiers: Array.from(selectedModifiers.values()),
       }
-    };
-    onAddItem(newTicketItem);
-  };
-  
-  const handleModifierChange = (modifier: Modifier) => {
-    const isExclusive = exclusiveGroups.includes(modifier.group);
-
-    setSelectedModifiers(prev => {
-        const newMap = new Map(prev);
-        
-        if (isExclusive) { 
-            allModifiers 
-                .filter(mod => mod.group === modifier.group)
-                .forEach(mod => newMap.delete(mod.id));
-        }
-
-        if (newMap.has(modifier.id)) newMap.delete(modifier.id);
-        else newMap.set(modifier.id, modifier);
-        
-        return newMap;
     });
   };
 
-  const handleNext = () => {
-    if (isStepValid) setStep(s => s + 1);
-    else alert(`Por favor, selecciona una opción para ${currentStepInfo.name}.`);
-  };
-  const handlePrev = () => setStep(s => s - 1);
-
-  if (!isOpen || !group || !currentStepInfo) return null;
-  
-  const isAddButtonDisabled = !isValid || (currentPrice === 0 && !group.id.includes('licuados'));
+  if (!group || !currentStepInfo) return null;
 
   return (
     <Modal
       isOpen={isOpen}
       onRequestClose={onClose}
-      contentLabel={`Personalizar: ${group.name}`}
-      className="modal-content"
-      overlayClassName="modal-overlay"
+      // Clases Tailwind para el overlay y contenido
+      className="bg-base-100 w-full max-w-lg max-h-[90dvh] rounded-3xl shadow-2xl flex flex-col overflow-hidden outline-none animate-pop-in"
+      overlayClassName="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
     >
-      <div className="modal-header">
-        <h2>{group.name}</h2>
-        <div className="wizard-steps">
+      {/* Header */}
+      <div className="p-5 border-b border-base-200 bg-base-100 text-center relative">
+        <h2 className="text-xl font-bold text-base-content">{group.name}</h2>
+        
+        {/* Wizard Steps */}
+        <div className="flex gap-1 justify-center my-3 h-1.5 w-full max-w-xs mx-auto">
             {steps.map((s, index) => (
-                <div key={s.name} className={`step-indicator ${index <= step ? 'active' : ''}`} />
+                <div 
+                    key={s.name} 
+                    className={`flex-1 rounded-full transition-colors duration-300 ${index <= step ? 'bg-primary' : 'bg-base-300'}`} 
+                />
             ))}
         </div>
-        <p className={`modal-price ${isValid ? 'valid' : 'invalid'}`}>
-          {currentRule} &rarr; <strong>${currentPrice.toFixed(2)}</strong>
-        </p>
+
+        {/* Precio Dinámico */}
+        <div className={`badge badge-lg font-bold transition-colors duration-300 ${isValid ? 'badge-success text-white' : 'badge-ghost opacity-50'}`}>
+          {currentRule} &rarr; ${currentPrice.toFixed(2)}
+        </div>
       </div>
       
-      {/* Contenido del Asistente */}
-      <div className="modal-section">
-          <h4>
-            Paso {step + 1}: {currentStepInfo.name} 
-            {currentStepInfo.isRequired && !isStepValid && <span className="required-tag"> (Obligatorio)</span>}
+      {/* Contenido Scrollable */}
+      <div className="flex-1 overflow-y-auto p-4 bg-base-200/30">
+          <h4 className="text-sm font-bold uppercase tracking-wide opacity-70 mb-3 flex justify-between">
+            {currentStepInfo.name}
+            {currentStepInfo.isRequired && !isStepValid && <span className="text-error text-xs">Requerido</span>}
           </h4>
-          <div className="modal-options-grid">
+          
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {modifiersForCurrentStep.map(mod => {
                   const isSelected = selectedModifiers.has(mod.id);
-                  
-                  // Lógica de deshabilitación (Max 5 ingredientes para Crepas/Postres)
                   const isCrepeOrPostreBase = mod.group === CREPA_DULCE_BASE || mod.group === CREPA_SALADA_BASE;
                   const shouldBeDisabled = isCrepeOrPostreBase && isCrepeLimitReached && !isSelected;
 
@@ -279,31 +215,51 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
                           key={mod.id}
                           onClick={() => handleModifierChange(mod)}
                           disabled={shouldBeDisabled}
-                          className={`btn-modal-option ${isSelected ? 'selected' : ''}`}>
-                          {mod.name} 
-                          {mod.price > 0 && <span className="price-tag">(+${mod.price.toFixed(2)})</span>}
+                          className={`
+                            btn h-auto min-h-[3.5rem] py-2 px-3 flex flex-col leading-tight normal-case border-2
+                            ${isSelected 
+                                ? 'btn-primary border-primary shadow-lg scale-[1.02]' 
+                                : 'btn-ghost bg-base-100 border-base-200 hover:border-primary/50'
+                            }
+                            ${shouldBeDisabled ? 'opacity-30' : ''}
+                          `}
+                      >
+                          <span className="text-sm font-semibold">{mod.name}</span>
+                          {mod.price > 0 && (
+                              <span className={`text-xs font-normal mt-1 ${isSelected ? 'text-primary-content/80' : 'text-base-content/60'}`}>
+                                  +${mod.price.toFixed(2)}
+                              </span>
+                          )}
                       </button>
                   );
               })}
           </div>
       </div>
       
-      <div className="modal-footer">
-        <button onClick={step === 0 ? onClose : handlePrev} className="btn-secondary">
+      {/* Footer Acciones */}
+      <div className="p-4 border-t border-base-200 bg-base-100 flex gap-3">
+        <button 
+            onClick={step === 0 ? onClose : handlePrev} 
+            className="btn btn-ghost text-base-content/70"
+        >
             {step === 0 ? 'Cancelar' : 'Atrás'}
         </button>
 
         {isLastStep ? (
             <button 
                 onClick={handleAddToTicket} 
-                disabled={isAddButtonDisabled}
-                className="btn-primary"
+                disabled={!isValid}
+                className="btn btn-primary flex-1 shadow-lg shadow-primary/30"
             >
-                Añadir al Ticket
+                Agregar ${currentPrice.toFixed(2)}
             </button>
         ) : (
-            <button onClick={handleNext} disabled={!isStepValid} className="btn-primary">
-                Continuar &rarr;
+            <button 
+                onClick={handleNext} 
+                disabled={!isStepValid} 
+                className="btn btn-secondary flex-1"
+            >
+                Siguiente
             </button>
         )}
       </div>
