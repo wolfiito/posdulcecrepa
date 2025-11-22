@@ -1,4 +1,4 @@
-// Import the functions you need from the SDKs you need
+// src/firebase.ts
 import { initializeApp } from "firebase/app";
 import { 
   getFirestore,
@@ -8,16 +8,16 @@ import {
   runTransaction, 
   doc, 
   getDocs,
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager,
   // Importamos los TIPOS que necesitamos
-  type Transaction,
+  type Transaction, 
   type DocumentData,
   type QueryDocumentSnapshot 
 } from "firebase/firestore";
 
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
+// Tu configuración (No cambies tus claves)
 const firebaseConfig = {
   apiKey: "AIzaSyA_H_rGtLHa_WKzn2DvduS2m6L69C5xCYs",
   authDomain: "dulcecrepapos.firebaseapp.com",
@@ -30,8 +30,12 @@ const firebaseConfig = {
 // Inicializa Firebase
 const app = initializeApp(firebaseConfig);
 
-// Exporta la instancia de Firestore
-export const db = getFirestore(app);
+// Esto permite que la app funcione sin internet y cargue instantáneamente.
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+});
 
 // Exporta las funciones que usaremos
 export { collection, addDoc, serverTimestamp, runTransaction, doc, getDocs };

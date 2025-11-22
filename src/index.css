@@ -91,3 +91,44 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+@media print {
+  /* 1. Ocultar todo lo que no sea el ticket */
+  body * {
+    visibility: hidden;
+  }
+
+  /* 2. Hacer visible solo el contenedor del ticket */
+  #receipt-print-area, #receipt-print-area * {
+    visibility: visible;
+  }
+
+  /* 3. Posicionar el ticket en la esquina superior izquierda (0,0) del papel */
+  #receipt-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 58mm; /* Ancho estándar de impresoras térmicas */
+    padding: 0;
+    margin: 0;
+    background-color: white;
+    color: black;
+  }
+
+  /* 4. Ajustes generales de página para impresoras térmicas */
+  @page {
+    size: 58mm auto; /* Ancho fijo, alto automático */
+    margin: 0;       /* Sin márgenes extra del navegador */
+  }
+
+  /* Ajustes de texto para legibilidad en térmica */
+  .print-text {
+    font-family: 'Courier New', Courier, monospace; /* Monospaced se lee mejor */
+    font-size: 12px;
+    line-height: 1.2;
+    color: black !important; /* Forzar negro puro */
+  }
+  .print-bold { font-weight: 900; }
+  .print-center { text-align: center; }
+  .print-right { text-align: right; }
+  .print-line { border-bottom: 1px dashed black; margin: 5px 0; }
+}
