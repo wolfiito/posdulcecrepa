@@ -53,10 +53,10 @@ export const buildReceiptJSON = (order: Order) => {
     // --- 1. ENCABEZADO ---
     // Format 2 = Doble Ancho y Alto (Gigante)
     add({ type: 5, content: "DULCE CREPA", bold: 1, align: 1, format: 2, size:12 }); 
-    add({ type: 0, content: "Sucursal: Centro", bold: 0, align: 0, format: 0 });
-    add({ type: 0, content: `Fecha: ${date}`, bold: 0, align: 0, format: 0 });
-    add({ type: 0, content: `Hora: ${time}`, bolde: 0, align: 0, format: 0 });
-    add({ type: 0, content: `Atendió: Cajero #1`, bold: 0, align: 0, format: 0 });
+    add({ type: 2, content: "Sucursal: Centro", bold: 0, align: 0, format: 0 });
+    add({ type: 5, content: `Fecha: ${date}`, bold: 0, align: 0, format: 0 });
+    add({ type: 4, content: `Hora: ${time}`, bolde: 0, align: 0, format: 0 });
+    add({ type: 3, content: `Atendió: Cajero #1`, bold: 0, align: 0, format: 0 });
     add({ type: 0, content: "--------------------------------", bold: 1, align: 1, format: 0 });
     add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
     // --- 2. PRODUCTOS ---
