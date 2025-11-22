@@ -30,7 +30,7 @@ export const printService = {
         alert("Error al abrir Thermer.");
       }
 
-    } else if (isAndroid) {
+    } else {
       // --- ESTRATEGIA ANDROID (Nube - Bluetooth Print) ---
       try {
         console.log("🤖 Android: Subiendo ticket para compatibilidad...");
@@ -60,13 +60,13 @@ export const printService = {
         alert("Error: No se pudo subir el ticket. Revisa tu internet.");
       }
 
-    } else {
-      // --- ESTRATEGIA PC (Nativa) ---
-      console.log("💻 PC: Impresión nativa");
-      useUIStore.getState().setOrderToPrint(order);
-      setTimeout(() => {
-        window.print();
-      }, 500);
+    // } else {
+    //   // --- ESTRATEGIA PC (Nativa) ---
+    //   console.log("💻 PC: Impresión nativa");
+    //   useUIStore.getState().setOrderToPrint(order);
+    //   setTimeout(() => {
+    //     window.print();
+      // }, 500);
     }
   }
 };
