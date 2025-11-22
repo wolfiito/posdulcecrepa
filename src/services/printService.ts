@@ -10,7 +10,7 @@ export const printService = {
     
     // Detección de Sistema Operativo
     // (Nota: iPad/iPhone se detectan como iOS, el resto asumimos Android o PC)
-    const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream;
+    const isIOS = /iPad|iPhone|iPod/.test(userAgent);
     const isAndroid = /android/i.test(userAgent);
 
     if (isIOS) {
