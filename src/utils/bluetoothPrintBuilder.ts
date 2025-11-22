@@ -3,7 +3,7 @@ import type { Order } from '../services/orderService';
 
 // CONFIGURACIÓN DE ANCHO (58mm suele ser 32 caracteres con fuente normal)
 const MAX_CHARS = 32;
-
+const CARD_FEE_PERCENT = 0.035;
 /**
  * Ayuda a crear una línea con texto a la izquierda y a la derecha
  * Ejemplo: "Crepa Dulce ........... $55.00"
@@ -59,7 +59,6 @@ export const buildReceiptJSON = (order: Order) => {
     add({ type: 0, content: `Atendió: Cajero #1`, bold: 0, align: 0, format: 0 });
     add({ type: 0, content: "--------------------------------", bold: 1, align: 1, format: 0 });
     add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
-    add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
     // --- 2. PRODUCTOS ---
     order.items.forEach(item => {
       const variant = item.details?.variantName ? `(${item.details.variantName})` : '';
@@ -73,38 +72,68 @@ export const buildReceiptJSON = (order: Order) => {
           bold: 1, 
           align: 0, 
           format: 0 
-      });
-      add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
-  
+      });  
       // Extras (Con signo + en negrita)
       if (item.details?.selectedModifiers) {
+        
          item.details.selectedModifiers.forEach(mod => {
+            const modName = ` + ${mod.name}`;
+            const modPrice = mod.price > 0 ? `$${mod.price.toFixed(2)}` : '$0.00';
              // Format 0 (Normal) para que se lea bien, Bold activado
-             add({ type: 0, content: ` + ${mod.name}`, bold: 1, align: 0, format: 0 }); 
+             add({ 
+                type: 0, 
+                content: formatLine(modName, modPrice), 
+                bold: 1, 
+                align: 0, 
+                format: 0 }); 
          });
       }
       add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
     });
     
     add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
-    add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
-    add({ type: 0, content: "--------------------------------", bold: 1, align: 1, format: 0 });
-    // --- 3. TOTALES ---
-    const totalStr = `$${order.total.toFixed(2)}`;
-    // Total Grande (Format 2) y a la derecha
-    add({ type: 0, content: `Total: ${totalStr}`, bold: 1, align: 2, format: 2 });
-    
-    add({ type: 0, content: "--------------------------------", bold: 1, align: 1, format: 0 });
+    add({ type: 0, content: "________________________________", bold: 1, align: 1, format: 0 });
+
+  // --- 3. TOTALES Y PAGOS (LÓGICA MEJORADA) ---
   
-    // --- 4. PIE ---
-    add({ type: 0, content: " ", bold: 0, align: 0, format: 0 });
-    add({ type: 0, content: "¡Gracias por su compra!", bold: 1, align: 1, format: 0 });
-    
-    // Espacios finales para corte
-    add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
-    add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
-    add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
-  
+    // Si pagó con tarjeta, calculamos el desglose
+    if (order.payment?.method === 'card') {
+        // Mostrar Subtotal (que es el total de los productos)
+        add({ type: 0, content: formatLine("Subtotal:", `$${order.total.toFixed(2)}`), bold: 0, align: 2, format: 0 });
+        
+        // Calcular Comisión
+        const fee = order.total * CARD_FEE_PERCENT;
+        add({ type: 0, content: formatLine(`Comisión (${(CARD_FEE_PERCENT*100)}%):`, `$${fee.toFixed(2)}`), bold: 0, align: 2, format: 0 });
+        
+        // Nuevo Gran Total
+        const grandTotal = order.total + fee;
+        add({ type: 0, content: formatLine("TOTAL:", `$${grandTotal.toFixed(2)}`), bold: 1, align: 2, format: 1 });
+        
+        add({ type: 0, content: "[PAGO CON TARJETA]", bold: 1, align: 1, format: 0 });
+
+    } else if (order.payment?.method === 'cash') {
+        // Efectivo: Total normal
+        add({ type: 0, content: formatLine("TOTAL:", `$${order.total.toFixed(2)}`), bold: 1, align: 2, format: 1 });
+        
+        // Desglose de cambio
+        const paid = order.payment.amountPaid || order.total;
+        const change = order.payment.change || 0;
+
+        add({ type: 0, content: formatLine("Su Pago:", `$${paid.toFixed(2)}`), bold: 0, align: 2, format: 0 });
+        add({ type: 0, content: formatLine("Cambio:", `$${change.toFixed(2)}`), bold: 1, align: 2, format: 0 });
+        add({ type: 0, content: "[PAGO EN EFECTIVO]", bold: 1, align: 1, format: 0 });
+
+    } else if (order.payment?.method === 'transfer') {
+        // Transferencia
+        add({ type: 0, content: formatLine("TOTAL:", `$${order.total.toFixed(2)}`), bold: 1, align: 2, format: 1 });
+        add({ type: 0, content: "[TRANSFERENCIA]", bold: 1, align: 1, format: 0 });
+
+    } else {
+        // Caso "Pending" o sin datos de pago (ej. Mesa abierta)
+        add({ type: 0, content: formatLine("TOTAL:", `$${order.total.toFixed(2)}`), bold: 1, align: 2, format: 1 });
+        const statusText = order.status === 'paid' ? 'PAGADO' : 'PENDIENTE DE PAGO';
+        add({ type: 0, content: statusText, bold: 1, align: 1, format: 0 });
+  }
     return JSON.stringify(data);
   };
 

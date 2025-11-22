@@ -1,6 +1,17 @@
+// src/services/orderService.ts
 import { db, collection, addDoc, serverTimestamp } from '../firebase';
-import { printService } from './printService'; // <--- Importamos el nuevo servicio
+import { printService } from './printService';
 import type { TicketItem } from '../types/menu';
+
+// --- NUEVOS TIPOS PARA PAGO ---
+export type PaymentMethod = 'cash' | 'card' | 'transfer';
+
+export interface PaymentDetails {
+  method: PaymentMethod;
+  amountPaid: number; // Cuánto entregó el cliente (ej. $500)
+  change: number;     // Cambio devuelto (ej. $50)
+  cardFee?: number;   // Comisión de tarjeta (si aplica)
+}
 
 export interface Order {
   items: TicketItem[];
@@ -9,6 +20,8 @@ export interface Order {
   status: 'pending' | 'paid' | 'cancelled';
   orderNumber: number;
   createdAt: any;
+  // Agregamos esto:
+  payment?: PaymentDetails;
 }
 
 export const orderService = {
@@ -16,7 +29,9 @@ export const orderService = {
     items: TicketItem[], 
     total: number, 
     mode: 'Mesa 1' | 'Mesa 2' | 'Para Llevar', 
-    orderNumber: number
+    orderNumber: number,
+    // Recibimos los detalles de pago (opcional por ahora para no romper tu código actual)
+    payment?: PaymentDetails 
   ): Promise<string> {
     
     const initialStatus = mode === 'Para Llevar' ? 'paid' : 'pending';
@@ -28,19 +43,17 @@ export const orderService = {
       status: initialStatus,
       orderNumber,
       createdAt: serverTimestamp(),
+      payment // Guardamos la info de pago
     };
 
     try {
       const docRef = await addDoc(collection(db, "orders"), newOrder);
       
-      // --- LÓGICA DE IMPRESIÓN AUTOMÁTICA ---
       if (initialStatus === 'paid') {
-        // Si se cobró, imprimimos ticket cliente
         console.log("🖨️ Imprimiendo Ticket...");
         printService.printReceipt(newOrder);
       } else {
-        // Si es para mesa (pendiente), podríamos imprimir solo comanda
-        // Por ahora imprimimos el mismo ticket para probar
+        console.log("👨‍🍳 Imprimiendo Comanda...");
         printService.printReceipt(newOrder); 
       }
 

@@ -1,11 +1,11 @@
 // src/App.tsx
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useMenuStore } from './store/useMenuStore';
 import { useTicketStore } from './store/useTicketStore';
 import { useUIStore } from './store/useUIStore';
 // import { orderService } from './services/orderService'; // No se usa directamente aquí, pero está bien tenerlo
 import { ReceiptTemplate } from './components/ReceiptTemplate';
-
+import { PaymentModal } from './components/PaymentModal';
 // Componentes
 import { CustomizeCrepeModal } from './components/CustomizeCrepeModal';
 import { CustomizeVariantModal } from './components/CustomizeVariantModal';
@@ -24,7 +24,8 @@ const IconBack = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height
 function App() {
   // Conexión a Stores
   const { fetchMenuData, isLoading, modifiers, rules } = useMenuStore();
-  
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+    
   // CORRECCIÓN AQUÍ: Extraemos 'orderToPrint' del store global en lugar de usar useState local
   const { 
     view, theme, toggleTheme, setView, 
@@ -57,7 +58,48 @@ function App() {
         </div>
     );
   }
+  // --- NUEVA LÓGICA DE COBRO Y PEDIDOS ---
+  
+  // 1. Esta función decide qué hacer cuando picas el botón verde
+  const handleMainBtnClick = () => {
+      const { items, orderMode } = useTicketStore.getState();
+      if (items.length === 0) return;
 
+      if (orderMode === 'Para Llevar') {
+          setIsPaymentModalOpen(true); // Abrir modal de cobro
+      } else {
+          handleFinalizeOrder(undefined); // Mesa: Enviar directo a cocina
+      }
+  };
+
+  // 2. Esta función hace el trabajo sucio (Guardar en Firebase + Imprimir)
+  const handleFinalizeOrder = async (paymentDetails?: any) => {
+      const { items, getTotal, orderMode, orderNumber, incrementOrderNumber, clearTicket } = useTicketStore.getState();
+      
+      try {
+          setIsPaymentModalOpen(false); 
+          
+          // Llamamos al servicio (que ya configuramos para imprimir en iPhone/Android)
+          await orderService.createOrder(
+              items,
+              getTotal(), 
+              orderMode,
+              orderNumber,
+              paymentDetails
+          );
+
+          const actionMsg = orderMode === 'Para Llevar' ? 'cobrada' : 'enviada a cocina';
+          alert(`¡Orden #${orderNumber} ${actionMsg} con éxito!`);
+          
+          incrementOrderNumber();
+          clearTicket();
+          useUIStore.getState().setView('menu');
+
+      } catch (e) {
+          console.error("Error:", e);
+          alert("Error al procesar la orden.");
+      }
+  };
   return (
     <div className="min-h-screen bg-base-200 pb-[140px] font-sans transition-colors duration-300">
       
@@ -111,7 +153,7 @@ function App() {
       </main>
 
       {/* Bottom Bar Inteligente */}
-      <BottomBar />
+      <BottomBar onAction={handleMainBtnClick} />
 
       {/* Modales */}
       {activeModal === 'custom_crepe' && groupToCustomize && (
@@ -136,6 +178,13 @@ function App() {
       )}
 
       {/* COMPONENTE DE IMPRESIÓN - Ahora conectado al Store Correcto */}
+      {/* Modal de Pago */}
+      <PaymentModal 
+        isOpen={isPaymentModalOpen} 
+        onClose={() => setIsPaymentModalOpen(false)} 
+        total={useTicketStore.getState().getTotal()} 
+        onConfirm={handleFinalizeOrder} 
+      />
       <ReceiptTemplate order={orderToPrint} />
     </div>
   );
@@ -244,25 +293,16 @@ const TicketScreen: React.FC = () => {
     );
 };
 
-const BottomBar: React.FC = () => {
-    const { items, getTotal, orderMode, orderNumber, incrementOrderNumber, clearTicket } = useTicketStore();
+
+// Modifica la definición de BottomBar al final del archivo:
+const BottomBar: React.FC<{ onAction: () => void }> = ({ onAction }) => {
+    // Usamos los hooks para saber si mostrarse o no
+    const { items, getTotal, orderMode } = useTicketStore();
     const { view, setView } = useUIStore();
     const total = getTotal();
 
+    // Si no hay items y no estoy en el ticket, ME OCULTO
     if (items.length === 0 && view !== 'ticket') return null;
-
-    const handleMainAction = async () => {
-        try {
-            await orderService.createOrder(items, total, orderMode, orderNumber);
-            const actionName = orderMode === 'Para Llevar' ? 'cobrada' : 'enviada a cocina';
-            alert(`¡Orden #${orderNumber} ${actionName} con éxito!`);
-            incrementOrderNumber();
-            clearTicket();
-            if (view === 'ticket') setView('menu');
-        } catch (error) {
-            alert("Hubo un error al procesar la orden.");
-        }
-    };
 
     const getButtonColor = () => orderMode === 'Para Llevar' ? 'btn-success text-white' : 'btn-warning text-black';
     const getButtonLabel = () => orderMode === 'Para Llevar' ? 'Cobrar y Finalizar' : 'Enviar a Cocina';
@@ -279,8 +319,9 @@ const BottomBar: React.FC = () => {
                         Ver Ticket ({items.length})
                     </button>
                 ) : (
-                    <button onClick={handleMainAction} className={`btn ${getButtonColor()} rounded-box shadow-lg px-8`} disabled={items.length === 0}>
-                        {getButtonLabel()} <IconCheckSVG />
+                    // AQUÍ ESTÁ EL CAMBIO: Ejecuta onAction al hacer click
+                    <button onClick={onAction} className={`btn ${getButtonColor()} rounded-box shadow-lg px-8`} disabled={items.length === 0}>
+                        {getButtonLabel()} <IconCheck />
                     </button>
                 )}
             </div>
