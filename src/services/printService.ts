@@ -13,7 +13,7 @@ export const printService = {
     const isIOS = /iPad|iPhone|iPod/.test(userAgent);
     const isAndroid = /android/i.test(userAgent);
 
-    if (isIOS) {
+    if (!isIOS) {
       // --- ESTRATEGIA IPHONE (Directa - Thermer) ---
       try {
         console.log("🍎 iOS: Enviando datos directos...");
