@@ -1,8 +1,9 @@
+// src/App.tsx
 import React, { useEffect } from 'react';
 import { useMenuStore } from './store/useMenuStore';
 import { useTicketStore } from './store/useTicketStore';
 import { useUIStore } from './store/useUIStore';
-import { orderService } from './services/orderService';
+// import { orderService } from './services/orderService'; // No se usa directamente aquí, pero está bien tenerlo
 import { ReceiptTemplate } from './components/ReceiptTemplate';
 
 // Componentes
@@ -12,25 +13,31 @@ import { ProductCard } from './components/ProductCard';
 import { TicketItemCard } from './components/TicketItemCard';
 import type { MenuItem, MenuGroup, TicketItem } from './types/menu';
 
-// --- Iconos SVG (Mantenemos los pequeños aquí, los grandes deberían ir a archivos separados idealmente) ---
+// --- Iconos SVG ---
 const IconMoon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>;
 const IconSun = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>;
 const IconMenu = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>;
 const IconTicket = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>;
 const IconBack = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>;
-const IconCheck = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>;
 
 // --- Componente Principal ---
 function App() {
   // Conexión a Stores
   const { fetchMenuData, isLoading, modifiers, rules } = useMenuStore();
-  const { view, theme, toggleTheme, setView, activeModal, groupToCustomize, itemToSelectVariant, closeModals, currentGroup, navigateToGroup } = useUIStore();
+  
+  // CORRECCIÓN AQUÍ: Extraemos 'orderToPrint' del store global en lugar de usar useState local
+  const { 
+    view, theme, toggleTheme, setView, 
+    activeModal, groupToCustomize, itemToSelectVariant, closeModals, 
+    currentGroup, navigateToGroup,
+    orderToPrint // <--- ¡Esto es lo que faltaba!
+  } = useUIStore();
+  
   const { addItem, orderMode, setOrderMode } = useTicketStore();
-  const [printOrder, setPrintOrder] = React.useState<any>(null);
+
   // Cargar datos al inicio
   useEffect(() => {
     fetchMenuData();
-    // Restaurar tema inicial
     const savedTheme = localStorage.getItem('theme') as 'dulce-light' | 'dulce-dark';
     if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
   }, []);
@@ -40,7 +47,7 @@ function App() {
     addItem(item);
     closeModals();
     setView('menu');
-    navigateToGroup(null); // Volver a root opcionalmente
+    navigateToGroup(null);
   };
 
   if (isLoading) {
@@ -106,7 +113,7 @@ function App() {
       {/* Bottom Bar Inteligente */}
       <BottomBar />
 
-      {/* Modales (Renderizado Condicional) */}
+      {/* Modales */}
       {activeModal === 'custom_crepe' && groupToCustomize && (
         <CustomizeCrepeModal 
             isOpen={true} 
@@ -127,22 +134,29 @@ function App() {
             onAddItem={handleAddItem} 
         />
       )}
-      {/* COMPONENTE DE IMPRESIÓN (Siempre renderizado pero oculto) */}
-      <ReceiptTemplate order={printOrder} />
+
+      {/* COMPONENTE DE IMPRESIÓN - Ahora conectado al Store Correcto */}
+      <ReceiptTemplate order={orderToPrint} />
     </div>
   );
 }
 
-// --- Sub-componentes (Ahora usan Stores directamente) ---
+// --- Sub-componentes ---
+// (Importamos el BottomBar de forma local, pero idealmente debería estar en otro archivo para evitar ciclos, 
+// pero como ya lo tenías aquí, lo dejamos para no romper tu estructura)
+import { orderService } from './services/orderService';
+const IconCheck = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>;
+
+const IconCheckSVG = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>;
+
 
 const MenuScreen: React.FC = () => {
     const { groups, items } = useMenuStore();
     const { currentGroup, navigateToGroup, openCustomModal, openVariantModal } = useUIStore();
     const { addItem } = useTicketStore();
 
-    const isRoot = !currentGroup; // Si es null, estamos en root
+    const isRoot = !currentGroup;
 
-    // Lógica de Drill-down
     const groupsToShow = React.useMemo(() => {
         if (isRoot) return groups.filter(g => g.parent === 'root');
         return groups.filter(g => g.parent === currentGroup.id);
@@ -156,29 +170,21 @@ const MenuScreen: React.FC = () => {
     }, [items, currentGroup]);
 
     const handleProductClick = (item: MenuItem | MenuGroup) => {
-        // Es un Grupo
         if ('level' in item) { 
             const group = item as MenuGroup;
-            if (group.rules_ref) {
-                openCustomModal(group); // Es producto personalizable (Arma tu...)
-            } else {
-                navigateToGroup(group); // Es categoría, navegar
-            }
-        } 
-        // Es un Item
-        else { 
+            if (group.rules_ref) openCustomModal(group);
+            else navigateToGroup(group);
+        } else { 
             const menuItem = item as MenuItem;
             const isVariant = 'variants' in menuItem;
             const hasModifiers = menuItem.modifierGroups && menuItem.modifierGroups.length > 0;
 
-            if (isVariant || hasModifiers) {
-                openVariantModal(menuItem);
-            } else {
-                // Item simple directo
+            if (isVariant || hasModifiers) openVariantModal(menuItem);
+            else {
                 addItem({
                     id: Date.now().toString(),
                     baseName: menuItem.name,
-                    finalPrice: menuItem.price || 0, // FixedPriceItem tiene price
+                    finalPrice: menuItem.price || 0,
                     type: 'FIXED',
                     details: { itemId: menuItem.id, selectedModifiers: [] }
                 });
@@ -221,7 +227,6 @@ const TicketScreen: React.FC = () => {
                 <div className="badge badge-primary badge-outline mb-2">Pedido en curso</div>
                 <h2 className="text-3xl font-black text-base-content">#{String(orderNumber).padStart(3, '0')}</h2>
             </div>
-            
             <div className="flex flex-col gap-3 mb-6 min-h-[300px]">
                 {items.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full py-10 opacity-50">
@@ -247,57 +252,35 @@ const BottomBar: React.FC = () => {
     if (items.length === 0 && view !== 'ticket') return null;
 
     const handleMainAction = async () => {
-        // Usamos el servicio en lugar de lógica hardcodeada
         try {
             await orderService.createOrder(items, total, orderMode, orderNumber);
-            
-            // Feedback al usuario
             const actionName = orderMode === 'Para Llevar' ? 'cobrada' : 'enviada a cocina';
             alert(`¡Orden #${orderNumber} ${actionName} con éxito!`);
-            
-            // Limpieza
             incrementOrderNumber();
             clearTicket();
-            
             if (view === 'ticket') setView('menu');
-            
         } catch (error) {
-            alert("Hubo un error al procesar la orden. Revisa la consola.");
+            alert("Hubo un error al procesar la orden.");
         }
     };
 
-    // Lógica Visual del Botón
-    const getButtonLabel = () => {
-        if (orderMode === 'Para Llevar') return 'Cobrar y Finalizar';
-        return 'Enviar a Cocina'; // Para Mesas
-    };
-
-    const getButtonColor = () => {
-        if (orderMode === 'Para Llevar') return 'btn-success text-white'; // Verde para cobrar
-        return 'btn-warning text-black'; // Amarillo para cocina (pendiente)
-    };
+    const getButtonColor = () => orderMode === 'Para Llevar' ? 'btn-success text-white' : 'btn-warning text-black';
+    const getButtonLabel = () => orderMode === 'Para Llevar' ? 'Cobrar y Finalizar' : 'Enviar a Cocina';
 
     return (
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-base-100/95 backdrop-blur-xl border-t border-base-200 shadow-lg pb-[env(safe-area-inset-bottom)]">
             <div className="max-w-5xl mx-auto p-4 flex gap-4 items-center">
                 <div className="flex-1 pl-2">
-                    <div className="text-xs text-base-content/60 font-medium uppercase">
-                        Total ({orderMode})
-                    </div>
+                    <div className="text-xs text-base-content/60 font-medium uppercase">Total ({orderMode})</div>
                     <div className="text-2xl font-black text-primary">${total.toFixed(2)}</div>
                 </div>
-
                 {view === 'menu' ? (
                     <button onClick={() => setView('ticket')} className="btn btn-primary rounded-box shadow-lg px-8">
                         Ver Ticket ({items.length})
                     </button>
                 ) : (
-                    <button 
-                        onClick={handleMainAction} 
-                        className={`btn ${getButtonColor()} rounded-box shadow-lg px-8`} 
-                        disabled={items.length === 0}
-                    >
-                        {getButtonLabel()} <IconCheck />
+                    <button onClick={handleMainAction} className={`btn ${getButtonColor()} rounded-box shadow-lg px-8`} disabled={items.length === 0}>
+                        {getButtonLabel()} <IconCheckSVG />
                     </button>
                 )}
             </div>
