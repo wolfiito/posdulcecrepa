@@ -31,26 +31,32 @@ export const printService = {
       }
 
     } else if (isAndroid) {
+      // --- ESTRATEGIA ANDROID OFFLINE (Web Share API) ---
       try {
-          console.log("🤖 Android: Generando Intent...");
-          
-          // 1. Obtener el String formateado con <BAF>
-          const receiptText = buildReceiptString(order);
-          
-          // 2. Codificar URL (Vital para que funcionen los símbolos como $ y acentos)
-          const encodedText = encodeURIComponent(receiptText);
-          
-          // 3. Crear el esquema Intent
-          // package=mate.bluetoothprint asegura que abra ESA app y no otra
-          const intentUrl = `intent:#Intent;action=android.intent.action.SEND;type=text/plain;S.android.intent.extra.TEXT=${encodedText};package=mate.bluetoothprint;end`;
-          
-          // 4. Lanzar
-          window.location.href = intentUrl;
-  
+        console.log("🤖 Android: Intentando compartir texto nativo...");
+        
+        const receiptText = buildReceiptString(order);
+
+        // Verificamos si el navegador soporta compartir
+        if (navigator.share) {
+            await navigator.share({
+                title: `Ticket #${order.orderNumber}`,
+                text: receiptText, // Aquí va el string con etiquetas <BAF>
+            });
+            console.log("Menú de compartir abierto con éxito");
+        } else {
+            // Fallback por si el navegador es muy viejo (raro hoy en día)
+            alert("Tu navegador no soporta la impresión nativa directa. Intenta usar Chrome actualizado.");
+        }
+
       } catch (error) {
-          console.error("Error Android intent:", error);
-          alert("No se pudo abrir la app de impresión.");
+        // El usuario canceló el menú de compartir o hubo error
+        if ((error as any).name !== 'AbortError') {
+             console.error("Error al compartir:", error);
+             alert("Error al intentar abrir el menú de impresión.");
+        }
       }
+
     } else {
       // --- ESTRATEGIA PC (Nativa) ---
       console.log("💻 PC: Impresión nativa");
