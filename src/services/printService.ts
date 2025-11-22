@@ -1,46 +1,39 @@
 // src/services/printService.ts
 import { useUIStore } from '../store/useUIStore';
 import type { Order } from './orderService';
-import { storage, ref, uploadString, getDownloadURL } from '../firebase';
 import { buildReceiptJSON } from '../utils/bluetoothPrintBuilder';
 
 export const printService = {
-  printReceipt: async (order: Order) => {
+  printReceipt: (order: Order) => {
     // Detectar si es iOS
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
     if (isIOS) {
-      // --- ESTRATEGIA IPHONE (App Bluetooth Print) ---
+      // --- ESTRATEGIA IPHONE (Thermer Directo) ---
       try {
-        console.log("🍎 iOS detectado: Generando ticket para App Externa...");
+        console.log("🍎 iOS detectado: Enviando datos a Thermer...");
         
-        // 1. Construir JSON
-        const jsonContent = buildReceiptJSON(order);
+        // 1. Construir el JSON (Ahora en formato Objeto correcto)
+        const jsonString = buildReceiptJSON(order);
         
-        // 2. Subir a Firebase Storage
-        // Nombre único para evitar caché
-        const fileName = `receipts/order_${order.orderNumber}_${Date.now()}.json`;
-        const storageRef = ref(storage, fileName);
+        // 2. Codificar para URL (Vital para que no se rompa el link)
+        const encodedData = encodeURIComponent(jsonString);
         
-        // Subir cadena JSON
-        await uploadString(storageRef, jsonContent, 'raw', { contentType: 'application/json' });
+        // 3. Construir el Link Mágico
+        // Usamos el esquema que vimos en el código Swift: thermer://?data=...
+        const deepLink = `thermer://?data=${encodedData}`;
         
-        // 3. Obtener URL pública
-        const downloadUrl = await getDownloadURL(storageRef);
-        console.log("Ticket URL:", downloadUrl);
-
-        // 4. Abrir App Bluetooth Print
-        // Esto saca al usuario de Safari y abre la App de impresión
-        window.location.href = `bprint://${downloadUrl}`;
+        // 4. Abrir la App
+        window.location.href = deepLink;
         
       } catch (error) {
-        console.error("Error generando ticket iOS:", error);
-        alert("Error al preparar la impresión. Verifica tu conexión.");
+        console.error("Error impresión iOS:", error);
+        alert("Error al generar datos para Thermer.");
       }
 
     } else {
-      // --- ESTRATEGIA ANDROID / PC (Nativa) ---
-      console.log("🤖 Android/PC: Usando impresión del navegador");
+      // --- ESTRATEGIA ANDROID / PC ---
+      console.log("🤖 Android/PC: Impresión nativa");
       useUIStore.getState().setOrderToPrint(order);
       setTimeout(() => {
         window.print();
