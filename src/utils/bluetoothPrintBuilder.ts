@@ -57,7 +57,7 @@ export const buildReceiptJSON = (order: Order) => {
     add({ type: 0, content: `Fecha: ${date}`, bold: 0, align: 0, format: 0 });
     add({ type: 0, content: `Hora: ${time}`, bolde: 0, align: 0, format: 0 });
     add({ type: 0, content: `Atendió: Cajero #1`, bold: 0, align: 0, format: 0 });
-    add({ type: 0, content: "________________________________", bold: 1, align: 1, format: 0 });
+    add({ type: 0, content: "--------------------------------", bold: 1, align: 1, format: 0 });
   
     // --- 2. PRODUCTOS ---
     order.items.forEach(item => {
@@ -65,6 +65,7 @@ export const buildReceiptJSON = (order: Order) => {
       const nameFull = `${item.baseName} ${variant}`;
       const priceStr = `$${item.finalPrice.toFixed(2)}`;
   
+      add({ type: 0, content: "---------------", bold: 1, align: 1, format: 0 });
       // Nombre y Precio en la misma línea (Negritas)
       add({ 
           type: 0, 
@@ -82,15 +83,15 @@ export const buildReceiptJSON = (order: Order) => {
          });
       }
     });
-  
-    add({ type: 0, content: "________________________________", bold: 1, align: 1, format: 0 });
-  
+    
+    
+    add({ type: 0, content: "--------------------------------", bold: 1, align: 1, format: 0 });
     // --- 3. TOTALES ---
     const totalStr = `$${order.total.toFixed(2)}`;
     // Total Grande (Format 2) y a la derecha
     add({ type: 0, content: `Total: ${totalStr}`, bold: 1, align: 2, format: 2 });
     
-    add({ type: 0, content: "________________________________", bold: 1, align: 1, format: 0 });
+    add({ type: 0, content: "--------------------------------", bold: 1, align: 1, format: 0 });
   
     // --- 4. PIE ---
     add({ type: 0, content: " ", bold: 0, align: 0, format: 0 });
