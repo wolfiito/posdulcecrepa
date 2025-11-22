@@ -54,7 +54,8 @@ export const buildReceiptJSON = (order: Order) => {
     // Format 2 = Doble Ancho y Alto (Gigante)
     add({ type: 0, content: "DULCE CREPA", bold: 1, align: 1, format: 2 }); 
     add({ type: 0, content: "Sucursal: Centro", bold: 0, align: 0, format: 0 });
-    add({ type: 0, content: `Fecha: ${date}  Hora: ${time}`, bold: 0, align: 0, format: 0 });
+    add({ type: 0, content: `Fecha: ${date}`, bold: 0, align: 0, format: 0 });
+    add({ type: 0, content: `Hora: ${time}`, bolde: 0, align: 0, format: 0 });
     add({ type: 0, content: `Atendió: Cajero #1`, bold: 0, align: 0, format: 0 });
     add({ type: 0, content: "________________________________", bold: 1, align: 1, format: 0 });
   
@@ -94,9 +95,9 @@ export const buildReceiptJSON = (order: Order) => {
     // --- 4. PIE ---
     add({ type: 0, content: " ", bold: 0, align: 0, format: 0 });
     add({ type: 0, content: "¡Gracias por su compra!", bold: 1, align: 1, format: 0 });
-    add({ type: 0, content: "Wifi: DulceCrepa_Invitados", bold: 0, align: 1, format: 0 });
     
     // Espacios finales para corte
+    add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
     add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
     add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
   
@@ -115,7 +116,8 @@ export const buildReceiptString = (order: Order) => {
   // Encabezado
   str += "<112>DULCE CREPA\n"; // Negrita, Centro, Doble Alto+Ancho
   str += "<010>Sucursal: Centro\n";
-  str += `<000>Fecha: ${date}  Hora: ${time}\n`;
+  str += `<000>Fecha: ${date}\n`;
+  str += `<000>Hora: ${time}\n`;
   str += "<000>Atendió: Cajero #1\n";
   str += "<110>________________________________\n";
 
@@ -150,6 +152,7 @@ export const buildReceiptString = (order: Order) => {
   str += "<010>\n"; // Espacio
   str += "<010>¡Gracias por su compra!\n";
   str += "\n\n"; // Corte de papel
-
+  str += "\n\n";
+  str += "\n\n";
   return str;
 };
