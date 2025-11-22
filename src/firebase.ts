@@ -17,6 +17,8 @@ import {
   type QueryDocumentSnapshot 
 } from "firebase/firestore";
 
+import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
+
 // Tu configuración (No cambies tus claves)
 const firebaseConfig = {
   apiKey: "AIzaSyA_H_rGtLHa_WKzn2DvduS2m6L69C5xCYs",
@@ -37,8 +39,9 @@ export const db = initializeFirestore(app, {
   })
 });
 
-// Exporta las funciones que usaremos
-export { collection, addDoc, serverTimestamp, runTransaction, doc, getDocs };
+export const storage = getStorage(app); 
+
+export { collection, addDoc, serverTimestamp, runTransaction, doc, getDocs, ref, uploadString, getDownloadURL };
 
 // Exporta los TIPOS que usaremos
 export type { Transaction, DocumentData, QueryDocumentSnapshot };

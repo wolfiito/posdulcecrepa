@@ -1,56 +1,68 @@
 // src/services/printService.ts
 import { useUIStore } from '../store/useUIStore';
 import type { Order } from './orderService';
+import { storage, ref, uploadString, getDownloadURL } from '../firebase';
 import { buildReceiptJSON } from '../utils/bluetoothPrintBuilder';
 
 export const printService = {
-  printReceipt: (order: Order) => {
+  printReceipt: async (order: Order) => {
     const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
     
-    // Detección robusta de SO
+    // Detección de Sistema Operativo
+    // (Nota: iPad/iPhone se detectan como iOS, el resto asumimos Android o PC)
     const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream;
     const isAndroid = /android/i.test(userAgent);
 
-    // ESTRATEGIA MÓVIL (App Externa Directa)
-    if (isIOS || isAndroid) {
+    if (isIOS) {
+      // --- ESTRATEGIA IPHONE (Directa - Thermer) ---
       try {
-        console.log(`📱 ${isIOS ? 'iOS' : 'Android'} detectado: Generando enlace directo...`);
-        
-        // 1. Construir el JSON del ticket
+        console.log("🍎 iOS: Enviando datos directos...");
         const jsonString = buildReceiptJSON(order);
-        
-        // 2. Codificarlo para URL (Indispensable)
         const encodedData = encodeURIComponent(jsonString);
+        const deepLink = `thermer://?data=${encodedData}`;
         
-        // 3. Seleccionar el esquema correcto según la App instalada
-        let deepLink = '';
-        
-        if (isIOS) {
-            // Para iPhone (App Thermer) - Ya validaste que este funciona
-            deepLink = `thermer://?data=${encodedData}`;
-        } else {
-            // Para Android (App Bluetooth Print)
-            // Usamos el esquema de la documentación, pero con el método de datos directo
-            deepLink = `my.bluetoothprint.scheme://?data=${encodedData}`;
-        }
-        
-        // 4. Lanzar la App
-        console.log("Abriendo App de impresión:", deepLink);
         window.location.href = deepLink;
         
-        // Hack para recuperar el foco si el usuario regresa al navegador
-        setTimeout(() => {
-            window.focus();
-        }, 1000);
+        setTimeout(() => { window.focus(); }, 1000);
 
       } catch (error) {
-        console.error("Error generando link móvil:", error);
-        alert("Error al intentar abrir la App de impresión.");
+        console.error("Error iOS:", error);
+        alert("Error al abrir Thermer.");
+      }
+
+    } else if (isAndroid) {
+      // --- ESTRATEGIA ANDROID (Nube - Bluetooth Print) ---
+      try {
+        console.log("🤖 Android: Subiendo ticket para compatibilidad...");
+        
+        // 1. Generar JSON
+        const jsonContent = buildReceiptJSON(order);
+        
+        // 2. Subir a Firebase Storage (Necesario según docs de Android)
+        const fileName = `receipts/order_${order.orderNumber}_${Date.now()}.json`;
+        const storageRef = ref(storage, fileName);
+        
+        // Subimos el archivo
+        await uploadString(storageRef, jsonContent, 'raw', { contentType: 'application/json' });
+        
+        // 3. Obtener URL
+        const downloadUrl = await getDownloadURL(storageRef);
+        
+        // 4. Construir esquema para Android
+        // Documentación: my.bluetoothprint.scheme://<URL>
+        const deepLink = `my.bluetoothprint.scheme://${downloadUrl}`;
+        
+        console.log("Abriendo:", deepLink);
+        window.location.href = deepLink;
+
+      } catch (error) {
+        console.error("Error Android:", error);
+        alert("Error: No se pudo subir el ticket. Revisa tu internet.");
       }
 
     } else {
-      // ESTRATEGIA PC/LAPTOP (Nativa)
-      console.log("💻 PC detectada: Impresión nativa del navegador");
+      // --- ESTRATEGIA PC (Nativa) ---
+      console.log("💻 PC: Impresión nativa");
       useUIStore.getState().setOrderToPrint(order);
       setTimeout(() => {
         window.print();
