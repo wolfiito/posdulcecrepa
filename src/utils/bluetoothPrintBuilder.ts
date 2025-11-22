@@ -10,7 +10,7 @@ const CARD_FEE_PERCENT = 0.035;
  */
 const formatLine = (leftText: string, rightText: string): string => {
     const spaceNeeded = MAX_CHARS - (leftText.length + rightText.length);
-    if (spaceNeeded < 1) return `${leftText} ${rightText}`; 
+    if (spaceNeeded < 1) return `${leftText.substring(0, MAX_CHARS - rightText.length - 1)} ${rightText}`;
     const spaces = " ".repeat(spaceNeeded);
     return `${leftText}${spaces}${rightText}`;
   };
@@ -102,7 +102,7 @@ export const buildReceiptJSON = (order: Order) => {
         add({ type: 0, content: formatLine("Subtotal:", `$${order.total.toFixed(2)}`), bold: 0, align: 2, format: 0 });
         
         // Calcular Comisión
-        const fee = order.total * CARD_FEE_PERCENT;
+        const fee = order.payment.cardFee || (order.total * 0.035);
         add({ type: 0, content: formatLine(`Comisión (${(CARD_FEE_PERCENT*100)}%):`, `$${fee.toFixed(2)}`), bold: 0, align: 2, format: 0 });
         
         // Nuevo Gran Total
@@ -110,6 +110,8 @@ export const buildReceiptJSON = (order: Order) => {
         add({ type: 0, content: formatLine("TOTAL:", `$${grandTotal.toFixed(2)}`), bold: 1, align: 2, format: 1 });
         
         add({ type: 0, content: "[PAGO CON TARJETA]", bold: 1, align: 1, format: 0 });
+        add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
+        add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
 
     } else if (order.payment?.method === 'cash') {
         // Efectivo: Total normal
@@ -122,11 +124,16 @@ export const buildReceiptJSON = (order: Order) => {
         add({ type: 0, content: formatLine("Su Pago:", `$${paid.toFixed(2)}`), bold: 0, align: 2, format: 0 });
         add({ type: 0, content: formatLine("Cambio:", `$${change.toFixed(2)}`), bold: 1, align: 2, format: 0 });
         add({ type: 0, content: "[PAGO EN EFECTIVO]", bold: 1, align: 1, format: 0 });
+        add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
+        add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
+        add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
 
     } else if (order.payment?.method === 'transfer') {
         // Transferencia
         add({ type: 0, content: formatLine("TOTAL:", `$${order.total.toFixed(2)}`), bold: 1, align: 2, format: 1 });
         add({ type: 0, content: "[TRANSFERENCIA]", bold: 1, align: 1, format: 0 });
+        add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
+        add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
 
     } else {
         // Caso "Pending" o sin datos de pago (ej. Mesa abierta)
