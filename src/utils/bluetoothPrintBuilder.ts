@@ -58,14 +58,14 @@ export const buildReceiptJSON = (order: Order) => {
     add({ type: 0, content: `Hora: ${time}`, bolde: 0, align: 0, format: 0 });
     add({ type: 0, content: `Atendió: Cajero #1`, bold: 0, align: 0, format: 0 });
     add({ type: 0, content: "--------------------------------", bold: 1, align: 1, format: 0 });
-  
+    add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
+    add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
     // --- 2. PRODUCTOS ---
     order.items.forEach(item => {
       const variant = item.details?.variantName ? `(${item.details.variantName})` : '';
       const nameFull = `${item.baseName} ${variant}`;
       const priceStr = `$${item.finalPrice.toFixed(2)}`;
   
-      add({ type: 0, content: "---------------", bold: 1, align: 1, format: 0 });
       // Nombre y Precio en la misma línea (Negritas)
       add({ 
           type: 0, 
@@ -74,6 +74,7 @@ export const buildReceiptJSON = (order: Order) => {
           align: 0, 
           format: 0 
       });
+      add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
   
       // Extras (Con signo + en negrita)
       if (item.details?.selectedModifiers) {
@@ -82,9 +83,11 @@ export const buildReceiptJSON = (order: Order) => {
              add({ type: 0, content: ` + ${mod.name}`, bold: 1, align: 0, format: 0 }); 
          });
       }
+      add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
     });
     
-    
+    add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
+    add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
     add({ type: 0, content: "--------------------------------", bold: 1, align: 1, format: 0 });
     // --- 3. TOTALES ---
     const totalStr = `$${order.total.toFixed(2)}`;
