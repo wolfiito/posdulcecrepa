@@ -1,34 +1,40 @@
 // src/services/printService.ts
 import { useUIStore } from '../store/useUIStore';
 import type { Order } from './orderService';
+import { storage, ref, uploadString, getDownloadURL } from '../firebase';
 import { buildReceiptJSON } from '../utils/bluetoothPrintBuilder';
 
 export const printService = {
-  printReceipt: (order: Order) => {
-    // Detectar si es iOS
+  printReceipt: async (order: Order) => {
+    // Detectar iOS (iPhone/iPad)
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
     if (isIOS) {
-      // --- ESTRATEGIA IPHONE (Thermer Directo) ---
+      // --- ESTRATEGIA IPHONE (bprint:// + URL) ---
       try {
-        console.log("🍎 iOS detectado: Enviando datos a Thermer...");
+        console.log("🍎 iOS detectado: Subiendo ticket a la nube...");
         
-        // 1. Construir el JSON (Ahora en formato Objeto correcto)
-        const jsonString = buildReceiptJSON(order);
+        // 1. Generar JSON
+        const jsonContent = buildReceiptJSON(order);
         
-        // 2. Codificar para URL (Vital para que no se rompa el link)
-        const encodedData = encodeURIComponent(jsonString);
+        // 2. Subir a Firebase Storage
+        // Usamos un nombre único
+        const fileName = `receipts/order_${order.orderNumber}_${Date.now()}.json`;
+        const storageRef = ref(storage, fileName);
         
-        // 3. Construir el Link Mágico
-        // Usamos el esquema que vimos en el código Swift: thermer://?data=...
-        const deepLink = `thermer://?data=${encodedData}`;
+        await uploadString(storageRef, jsonContent, 'raw', { contentType: 'application/json' });
         
-        // 4. Abrir la App
-        window.location.href = deepLink;
+        // 3. Obtener URL Pública
+        const downloadUrl = await getDownloadURL(storageRef);
+        console.log("Ticket URL:", downloadUrl);
+
+        // 4. Llamar a la App con el esquema bprint://
+        // Las instrucciones dicen: bprint://<RESPONSEURL>
+        window.location.href = `bprint://${downloadUrl}`;
         
       } catch (error) {
         console.error("Error impresión iOS:", error);
-        alert("Error al generar datos para Thermer.");
+        alert("Error al generar ticket móvil. Verifica tu internet.");
       }
 
     } else {
