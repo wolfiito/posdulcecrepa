@@ -1,5 +1,7 @@
 // src/components/ReceiptTemplate.tsx
 import React from 'react';
+// Importamos createPortal para "teletransportar" el ticket fuera de la App
+import { createPortal } from 'react-dom';
 import type { Order } from '../services/orderService';
 
 interface Props {
@@ -9,12 +11,13 @@ interface Props {
 export const ReceiptTemplate: React.FC<Props> = ({ order }) => {
   if (!order) return null;
 
-  // Formato de fecha simple
   const date = order.createdAt?.toDate 
     ? order.createdAt.toDate().toLocaleString('es-MX') 
     : new Date().toLocaleString('es-MX');
 
-  return (
+  // Usamos un Portal para renderizar esto directamente en el body del navegador
+  // Esto lo "saca" de tu diseño principal de React
+  return createPortal(
     <div id="receipt-print-area" className="hidden print:block bg-white text-black">
       
       {/* Encabezado */}
@@ -42,7 +45,6 @@ export const ReceiptTemplate: React.FC<Props> = ({ order }) => {
               <span>${item.finalPrice.toFixed(2)}</span>
             </div>
             
-            {/* Modificadores (Ingredientes extra) */}
             {item.details?.selectedModifiers && item.details.selectedModifiers.length > 0 && (
               <div className="pl-2 text-[10px] leading-tight mt-1">
                 {item.details.selectedModifiers.map((mod, idx) => (
@@ -75,8 +77,8 @@ export const ReceiptTemplate: React.FC<Props> = ({ order }) => {
         <p className="mt-1">Wifi: DulceCrepa_Invitados</p>
       </div>
       
-      {/* Espacio final para el corte */}
       <br/><br/>
-    </div>
+    </div>,
+    document.body // <--- Aquí está la magia: Lo mandamos directo al body
   );
 };
