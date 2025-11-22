@@ -1,133 +1,151 @@
 // src/utils/bluetoothPrintBuilder.ts
 import type { Order } from '../services/orderService';
 
+// CONFIGURACIÓN DE ANCHO (58mm suele ser 32 caracteres con fuente normal)
+const MAX_CHARS = 32;
+
+/**
+ * Ayuda a crear una línea con texto a la izquierda y a la derecha
+ * Ejemplo: "Crepa Dulce ........... $55.00"
+ */
+const formatLine = (leftText: string, rightText: string): string => {
+  const spaceNeeded = MAX_CHARS - (leftText.length + rightText.length);
+  if (spaceNeeded < 1) {
+    // Si no cabe, cortamos o dejamos un solo espacio
+    // Opción: Dejar que haga salto de línea natural, pero aquí forzamos espacio
+    return `${leftText} ${rightText}`; 
+  }
+  const spaces = " ".repeat(spaceNeeded);
+  return `${leftText}${spaces}${rightText}`;
+};
+
+const getFormattedDate = (order: Order) => {
+    try {
+        if (order.createdAt?.toDate) {
+            const d = order.createdAt.toDate();
+            return {
+                date: d.toLocaleDateString('es-MX'),
+                time: d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+            };
+        }
+        const d = new Date();
+        return {
+            date: d.toLocaleDateString('es-MX'),
+            time: d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+        };
+    } catch (e) { return { date: "--/--/--", time: "--:--" }; }
+};
+
+// ==========================================
+// 1. CONSTRUCTOR PARA IPHONE (JSON Thermer)
+// ==========================================
 export const buildReceiptJSON = (order: Order) => {
-  // IMPORTANTE: Usamos un Objeto ("Record"), no un Array.
-  // Esto genera: { "0": {...}, "1": {...} } que es lo que Thermer pide.
   const data: Record<string, any> = {};
   let index = 0;
-  
-  const add = (item: any) => {
-    data[`${index}`] = item;
-    index++;
-  };
+  const add = (item: any) => { data[`${index}`] = item; index++; };
+  const { date, time } = getFormattedDate(order);
 
-  // Formato de fecha
-  let dateStr = "";
-  try {
-      if (order.createdAt?.toDate) {
-          dateStr = order.createdAt.toDate().toLocaleString('es-MX');
-      } else {
-          dateStr = new Date().toLocaleString('es-MX');
-      }
-  } catch (e) { dateStr = new Date().toLocaleString('es-MX'); }
+  // --- ENCABEZADO ---
+  // <113> equiv en JSON: bold:1, align:1, format:3 (Double Width) o 1 (Double Height)
+  add({ type: 0, content: "DULCE CREPA", bold: 1, align: 1, format: 2 }); // Doble Alto y Ancho
+  add({ type: 0, content: "Sucursal: Centro", bold: 0, align: 0, format: 0 });
+  add({ type: 0, content: `Fecha: ${date}  Hora: ${time}`, bold: 0, align: 0, format: 0 });
+  add({ type: 0, content: `Atendió: Cajero #1`, bold: 0, align: 0, format: 0 }); // Puedes pasar el nombre si lo tienes
+  add({ type: 0, content: "________________________________", bold: 1, align: 1, format: 0 });
 
-  // --- TICKET ---
-  add({ type: 0, content: "DULCE CREPA", bold: 1, align: 1, format: 3 }); 
-  add({ type: 0, content: "Ticket de Venta", bold: 0, align: 1, format: 0 });
-  add({ type: 0, content: dateStr, bold: 0, align: 1, format: 4 });
-  add({ type: 0, content: `Orden #${order.orderNumber}`, bold: 1, align: 1, format: 0 });
-  add({ type: 0, content: `[${order.mode}]`, bold: 1, align: 1, format: 0 });
-  
-  add({ type: 0, content: "--------------------------------", bold: 0, align: 1, format: 0 });
-
+  // --- PRODUCTOS ---
   order.items.forEach(item => {
     const variant = item.details?.variantName ? `(${item.details.variantName})` : '';
-    add({ type: 0, content: `${item.baseName} ${variant}`, bold: 1, align: 0, format: 0 });
-    
+    const nameFull = `${item.baseName} ${variant}`;
+    const priceStr = `$${item.finalPrice.toFixed(2)}`;
+
+    // Línea Principal: Nombre ... Precio (Negrita)
+    add({ 
+        type: 0, 
+        content: formatLine(nameFull, priceStr), 
+        bold: 1, 
+        align: 0, 
+        format: 0 
+    });
+
+    // Extras / Modificadores
     if (item.details?.selectedModifiers) {
        item.details.selectedModifiers.forEach(mod => {
-           add({ type: 0, content: ` + ${mod.name}`, bold: 0, align: 0, format: 4 });
+           // Símbolo + en negrita (Toda la línea en este caso para que resalte)
+           // Format: 4 es "Small" en Thermer
+           add({ type: 0, content: ` + ${mod.name}`, bold: 1, align: 0, format: 0 }); 
        });
     }
-    
-    add({ type: 0, content: `$${item.finalPrice.toFixed(2)}`, bold: 1, align: 2, format: 0 });
-    add({ type: 0, content: " ", bold: 0, align: 0, format: 4 });
+    // Separador sutil entre items (opcional)
+    // add({ type: 0, content: " ", bold: 0, align: 0, format: 4 }); 
   });
 
-  add({ type: 0, content: "--------------------------------", bold: 0, align: 1, format: 0 });
+  add({ type: 0, content: "________________________________", bold: 1, align: 1, format: 0 });
 
-  add({ type: 0, content: `TOTAL: $${order.total.toFixed(2)}`, bold: 1, align: 2, format: 1 });
+  // --- TOTAL ---
+  const totalStr = `$${order.total.toFixed(2)}`;
+  // Alineado a la derecha, Negrita, Doble Alto (Format 1)
+  add({ type: 0, content: `Total: ${totalStr}`, bold: 1, align: 2, format: 1 });
   
-  const statusText = order.status === 'paid' ? 'PAGADO' : 'PENDIENTE';
-  add({ type: 0, content: statusText, bold: 1, align: 2, format: 0 });
+  add({ type: 0, content: "________________________________", bold: 1, align: 1, format: 0 });
 
+  // --- PIE ---
   add({ type: 0, content: " ", bold: 0, align: 0, format: 0 });
-  add({ type: 0, content: "Gracias por su preferencia", bold: 0, align: 1, format: 0 });
+  add({ type: 0, content: "¡Gracias por su compra!", bold: 0, align: 1, format: 0 });
   add({ type: 0, content: "Wifi: DulceCrepa_Invitados", bold: 0, align: 1, format: 0 });
-  add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
-  add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
+  add({ type: 0, content: "\n\n", bold: 0, align: 0, format: 0 });
 
   return JSON.stringify(data);
 };
 
-// --- VERSIÓN CORREGIDA PARA ANDROID (INTENT) ---
-export const buildReceiptString = (order: Order): string => {
-    let str = "";
-    
-    // LEYENDA <BAF>:
-    // B (Bold): 0=No, 1=Sí
-    // A (Align): 0=Izquierda, 1=Centro, 2=Derecha
-    // F (Format): 0=Normal, 1=Doble Alto, 2=Alto+Ancho, 3=Doble Ancho
-    
-    // 1. FECHA
-    let dateStr = "";
-    try {
-        if (order.createdAt?.toDate) {
-            dateStr = order.createdAt.toDate().toLocaleString('es-MX');
-        } else {
-            dateStr = new Date().toLocaleString('es-MX');
-        }
-    } catch (e) { dateStr = new Date().toLocaleString('es-MX'); }
+// ==========================================
+// 2. CONSTRUCTOR PARA ANDROID (String con Tags)
+// ==========================================
+export const buildReceiptString = (order: Order) => {
+  let str = "";
+  const { date, time } = getFormattedDate(order);
 
-    // 2. CABECERA
-    // <113>: Negrita, Centro, Doble Ancho (Para que se vea grande como el título)
-    str += "<113>DULCE CREPA\n"; 
-    str += "<010>Ticket de Venta\n";
-    str += `<010>${dateStr}\n`;
-    str += `<110>Orden #${order.orderNumber}\n`;
-    str += `<110>[${order.mode}]\n`;
-    
-    str += "<010>--------------------------------\n";
-    
-    // 3. PRODUCTOS
-    order.items.forEach(item => {
-        // Variante (si existe)
-        const variant = item.details?.variantName ? `(${item.details.variantName})` : '';
-        const fullName = `${item.baseName} ${variant}`;
+  // Tags: <BAF> -> B:Bold(0/1), A:Align(0L,1C,2R), F:Font(0N,1DH,2DHW,3DW)
+  
+  // Encabezado
+  str += "<112>DULCE CREPA\n"; // Negrita, Centro, Doble Alto+Ancho
+  str += "<010>Sucursal: Centro\n";
+  str += `<000>Fecha: ${date}  Hora: ${time}\n`;
+  str += "<000>Atendió: Cajero #1\n";
+  str += "<110>________________________________\n";
 
-        // Nombre del producto (Negrita, Izquierda)
-        str += `<100>${fullName}\n`;
+  // Productos
+  order.items.forEach(item => {
+    const variant = item.details?.variantName ? `(${item.details.variantName})` : '';
+    const nameFull = `${item.baseName} ${variant}`;
+    const priceStr = `$${item.finalPrice.toFixed(2)}`;
+    
+    // Usamos la función formatLine para alinear los precios a la derecha
+    // <100> = Negrita, Izquierda, Normal
+    str += `<100>${formatLine(nameFull, priceStr)}\n`;
 
-        // Modificadores (Normal, Izquierda, con un pequeño 'tab' visual)
-        if (item.details?.selectedModifiers) {
-             item.details.selectedModifiers.forEach(mod => {
-                 str += `<000>  + ${mod.name}\n`;
-             });
-        }
-        
-        // Precio (Negrita, Derecha)
-        // Nota: En modo texto, alinear a la derecha a veces salta de línea. 
-        // Si quieres que quede en la misma línea del nombre es complejo en modo texto puro.
-        // Lo pondremos debajo alineado a la derecha para asegurar que se lea bien.
-        str += `<120>$${item.finalPrice.toFixed(2)}\n`;
-        
-        // Espacio pequeño entre items
-        str += "<000> \n"; 
-    });
-    
-    str += "<010>--------------------------------\n";
-    
-    // 4. TOTALES
-    str += `<121>TOTAL: $${order.total.toFixed(2)}\n`; // <121> Negrita, Der, Doble Alto
-    
-    const statusText = order.status === 'paid' ? 'PAGADO' : 'PENDIENTE';
-    str += `<120>${statusText}\n`;
-    
-    str += "<000> \n";
-    str += "<010>Gracias por su preferencia\n";
-    str += "<010>Wifi: DulceCrepa_Invitados\n";
-    str += "<000>\n\n"; // Saltos finales para cortar papel
+    // Extras
+    if (item.details?.selectedModifiers) {
+        item.details.selectedModifiers.forEach(mod => {
+            // <100> = Negrita para el "+" y el nombre
+            str += `<100>  + ${mod.name}\n`;
+        });
+    }
+  });
 
-    return str;
+  str += "<110>________________________________\n";
+
+  // Total (Alineado Derecha, Doble Alto)
+  // <121> = Negrita, Derecha, Doble Alto
+  str += `<121>Total: $${order.total.toFixed(2)}\n`;
+
+  str += "<110>________________________________\n";
+
+  // Pie
+  str += "<010>\n"; // Espacio
+  str += "<010>¡Gracias por su compra!\n";
+  str += "<010>Wifi: DulceCrepa_Invitados\n";
+  str += "\n\n"; // Corte de papel
+
+  return str;
 };

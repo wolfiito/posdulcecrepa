@@ -1,9 +1,7 @@
 // src/services/printService.ts
 import { useUIStore } from '../store/useUIStore';
 import type { Order } from './orderService';
-import { storage, ref, uploadString, getDownloadURL } from '../firebase';
-import { buildReceiptJSON } from '../utils/bluetoothPrintBuilder';
-import { buildReceiptString } from '../utils/bluetoothPrintBuilder';
+import { buildReceiptJSON, buildReceiptString } from '../utils/bluetoothPrintBuilder';
 export const printService = {
   printReceipt: async (order: Order) => {
     const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
