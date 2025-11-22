@@ -39,5 +39,7 @@ export const db = initializeFirestore(app, {
   })
 });
 
+export const storage = getStorage(app);
+
 export { collection, addDoc, serverTimestamp, runTransaction, doc, getDocs, ref, uploadString, getDownloadURL };
 export type { Transaction, DocumentData, QueryDocumentSnapshot };
