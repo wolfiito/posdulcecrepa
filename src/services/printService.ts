@@ -29,14 +29,14 @@ export const printService = {
     // Detección de SO
     const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream;
     const isAndroid = /android/i.test(userAgent);
-
+    const jsonString = buildReceiptJSON(order);
     // --- ESTRATEGIA MÓVIL (App Externa) ---
     if (isIOS || isAndroid) {
       try {
         console.log(`📱 ${isIOS ? 'iOS' : 'Android'} detectado en PWA...`);
         
         // 1. Construir el JSON
-        const jsonString = buildReceiptJSON(order);
+        // const jsonString = buildReceiptJSON(order);
 
         if (isIOS) {
             // --- IPHONE (Directo) ---
@@ -74,11 +74,11 @@ export const printService = {
 
     } else {
       // --- ESTRATEGIA PC (Nativa) ---
-      console.log("💻 PC: Impresión nativa");
-      useUIStore.getState().setOrderToPrint(order);
-      setTimeout(() => {
-        window.print();
-      }, 500);
+      const encodedData = encodeURIComponent(jsonString);
+      const deepLink = `thermer://?data=${encodedData}`;
+      
+      console.log("Abriendo Thermer...");
+      openDeepLink(deepLink); // <--- USAMOS EL NUEVO MÉTODO
     }
   }
 };
