@@ -1,58 +1,75 @@
 // src/services/printService.ts
 import { useUIStore } from '../store/useUIStore';
 import type { Order } from './orderService';
-import { buildReceiptJSON, buildReceiptString } from '../utils/bluetoothPrintBuilder';
+import { storage, ref, uploadString, getDownloadURL } from '../firebase';
+import { buildReceiptJSON } from '../utils/bluetoothPrintBuilder';
+
+// --- TRUCO PARA PWA (Pantalla de Inicio) ---
+// En modo Standalone, window.location.href suele fallar.
+// Creamos un enlace invisible y le damos "clic" programáticamente.
+const openDeepLink = (url: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_top'; // Ayuda a "romper" el marco de la PWA si es necesario
+    link.style.display = 'none';
+    
+    document.body.appendChild(link);
+    link.click();
+    
+    // Limpieza
+    setTimeout(() => {
+        document.body.removeChild(link);
+    }, 500);
+};
+
 export const printService = {
   printReceipt: async (order: Order) => {
     const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
     
-    // Detección de Sistema Operativo
-    // (Nota: iPad/iPhone se detectan como iOS, el resto asumimos Android o PC)
+    // Detección de SO
     const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream;
     const isAndroid = /android/i.test(userAgent);
 
-    if (isIOS) {
-      // --- ESTRATEGIA IPHONE (Directa - Thermer) ---
+    // --- ESTRATEGIA MÓVIL (App Externa) ---
+    if (isIOS || isAndroid) {
       try {
-        console.log("🍎 iOS: Enviando datos directos...");
+        console.log(`📱 ${isIOS ? 'iOS' : 'Android'} detectado en PWA...`);
+        
+        // 1. Construir el JSON
         const jsonString = buildReceiptJSON(order);
-        const encodedData = encodeURIComponent(jsonString);
-        const deepLink = `thermer://?data=${encodedData}`;
-        
-        window.location.href = deepLink;
-        
+
+        if (isIOS) {
+            // --- IPHONE (Directo) ---
+            const encodedData = encodeURIComponent(jsonString);
+            const deepLink = `thermer://?data=${encodedData}`;
+            
+            console.log("Abriendo Thermer...");
+            openDeepLink(deepLink); // <--- USAMOS EL NUEVO MÉTODO
+
+        } else {
+            // --- ANDROID (Nube) ---
+            // 2. Subir a Firebase
+            const fileName = `receipts/order_${order.orderNumber}_${Date.now()}.json`;
+            const storageRef = ref(storage, fileName);
+            
+            await uploadString(storageRef, jsonString, 'raw', { contentType: 'application/json' });
+            
+            // 3. Obtener URL
+            const downloadUrl = await getDownloadURL(storageRef);
+            
+            // 4. Esquema Android
+            const deepLink = `my.bluetoothprint.scheme://${downloadUrl}`;
+            
+            console.log("Abriendo Bluetooth Print...");
+            openDeepLink(deepLink); // <--- USAMOS EL NUEVO MÉTODO
+        }
+
+        // Hack para recuperar foco en la PWA
         setTimeout(() => { window.focus(); }, 1000);
 
       } catch (error) {
-        console.error("Error iOS:", error);
-        alert("Error al abrir Thermer.");
-      }
-
-    } else if (isAndroid) {
-      // --- ESTRATEGIA ANDROID OFFLINE (Web Share API) ---
-      try {
-        console.log("🤖 Android: Intentando compartir texto nativo...");
-        
-        const receiptText = buildReceiptString(order);
-
-        // Verificamos si el navegador soporta compartir
-        if (navigator.share) {
-            await navigator.share({
-                title: `Ticket #${order.orderNumber}`,
-                text: receiptText, // Aquí va el string con etiquetas <BAF>
-            });
-            console.log("Menú de compartir abierto con éxito");
-        } else {
-            // Fallback por si el navegador es muy viejo (raro hoy en día)
-            alert("Tu navegador no soporta la impresión nativa directa. Intenta usar Chrome actualizado.");
-        }
-
-      } catch (error) {
-        // El usuario canceló el menú de compartir o hubo error
-        if ((error as any).name !== 'AbortError') {
-             console.error("Error al compartir:", error);
-             alert("Error al intentar abrir el menú de impresión.");
-        }
+        console.error("Error impresión móvil:", error);
+        alert("Error al abrir la App de impresión. Intenta de nuevo.");
       }
 
     } else {

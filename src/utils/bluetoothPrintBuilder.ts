@@ -92,7 +92,7 @@ export const buildReceiptJSON = (order: Order) => {
     });
     
     add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
-    add({ type: 0, content: "________________________________", bold: 1, align: 1, format: 0 });
+    add({ type: 0, content: "--------------------------------", bold: 1, align: 1, format: 0 });
 
   // --- 3. TOTALES Y PAGOS (LÓGICA MEJORADA) ---
   
@@ -159,7 +159,7 @@ export const buildReceiptString = (order: Order) => {
   str += `<000>Fecha: ${date}\n`;
   str += `<000>Hora: ${time}\n`;
   str += "<000>Atendió: Cajero #1\n";
-  str += "<110>________________________________\n";
+  str += "<110>--------------------------------\n";
 
   // Productos
   order.items.forEach(item => {
@@ -180,13 +180,13 @@ export const buildReceiptString = (order: Order) => {
     }
   });
 
-  str += "<110>________________________________\n";
+  str += "<110>--------------------------------\n";
 
   // Total (Alineado Derecha, Doble Alto)
   // <121> = Negrita, Derecha, Doble Alto
   str += `<121>Total: $${order.total.toFixed(2)}\n`;
 
-  str += "<110>________________________________\n";
+  str += "<110>--------------------------------\n";
 
   // Pie
   str += "<010>\n"; // Espacio
