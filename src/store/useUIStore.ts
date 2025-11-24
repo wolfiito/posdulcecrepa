@@ -12,9 +12,10 @@ interface UIState {
   currentGroup: MenuGroup | null;
 
   // Estado de Modales
-  activeModal: 'none' | 'custom_crepe' | 'variant_select';
+  activeModal: 'none' | 'custom_crepe' | 'variant_select' | 'daily_report';
   groupToCustomize: MenuGroup | null;
   itemToSelectVariant: MenuItem | null;
+  orderToPrint: any | null;
 
   // Acciones
   setView: (view: ViewType) => void;
@@ -24,9 +25,10 @@ interface UIState {
   
   openCustomModal: (group: MenuGroup) => void;
   openVariantModal: (item: MenuItem) => void;
+  openReportModal: () => void;
+
   closeModals: () => void;
 
-  orderToPrint: any | null;
   setOrderToPrint: (order: any | null) => void;
 }
 
@@ -37,6 +39,7 @@ export const useUIStore = create<UIState>((set) => ({
   activeModal: 'none',
   groupToCustomize: null,
   itemToSelectVariant: null,
+  orderToPrint: null,
 
   setView: (view) => set({ view }),
 
@@ -64,13 +67,16 @@ export const useUIStore = create<UIState>((set) => ({
     itemToSelectVariant: item 
   }),
 
+  openReportModal: () => set({ 
+    activeModal: 'daily_report' 
+  }),
+
   closeModals: () => set({ 
     activeModal: 'none', 
     groupToCustomize: null, 
     itemToSelectVariant: null 
   }),
-
-  orderToPrint: null,
+  
   setOrderToPrint: (order) => set({ orderToPrint: order }),
 
 }));

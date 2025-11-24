@@ -14,7 +14,11 @@ import {
   // Importamos los TIPOS que necesitamos
   type Transaction, 
   type DocumentData,
-  type QueryDocumentSnapshot 
+  type QueryDocumentSnapshot,
+  query,
+  where,
+  orderBy,
+  Timestamp
 } from "firebase/firestore";
 
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
@@ -41,7 +45,21 @@ export const db = initializeFirestore(app, {
 
 export const storage = getStorage(app); 
 
-export { collection, addDoc, serverTimestamp, runTransaction, doc, getDocs, ref, uploadString, getDownloadURL };
+export { 
+  collection, 
+  addDoc, 
+  serverTimestamp, 
+  runTransaction, 
+  doc, 
+  getDocs, 
+  ref, 
+  uploadString, 
+  getDownloadURL,
+  query,
+  where,
+  orderBy,
+  Timestamp
+};
 
 // Exporta los TIPOS que usaremos
 export type { Transaction, DocumentData, QueryDocumentSnapshot };

@@ -12,6 +12,7 @@ import { CustomizeVariantModal } from './components/CustomizeVariantModal';
 import { ProductCard } from './components/ProductCard';
 import { TicketItemCard } from './components/TicketItemCard';
 import type { MenuItem, MenuGroup, TicketItem } from './types/menu';
+import { DailyReportModal } from './components/DailyReportModal';
 
 // --- Iconos SVG ---
 const IconMoon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>;
@@ -126,6 +127,15 @@ function App() {
                                 <input type="checkbox" className="toggle toggle-sm toggle-primary" checked={theme === 'dulce-dark'} onChange={toggleTheme} />
                             </label>
                         </li>
+                        <li>
+                            <a onClick={() => {
+                                // Cerramos el dropdown (truco de blur)
+                                (document.activeElement as HTMLElement)?.blur();
+                                useUIStore.getState().openReportModal();
+                            }} className="active:bg-primary active:text-white">
+                                💰 Corte de Caja
+                            </a>
+                        </li>
                     </ul>
                 </div>
             )}
@@ -177,6 +187,7 @@ function App() {
         />
       )}
 
+
       {/* COMPONENTE DE IMPRESIÓN - Ahora conectado al Store Correcto */}
       {/* Modal de Pago */}
       <PaymentModal 
@@ -186,6 +197,10 @@ function App() {
         onConfirm={handleFinalizeOrder} 
       />
       <ReceiptTemplate order={orderToPrint} />
+      <DailyReportModal 
+        isOpen={activeModal === 'daily_report'} 
+        onClose={closeModals} 
+      />
     </div>
   );
 }
