@@ -1,10 +1,17 @@
+// src/store/useUIStore.ts
 import { create } from 'zustand';
 import type { MenuGroup, MenuItem } from '../types/menu';
 
+// Definimos las secciones principales de la App
+export type AppSection = 'pos' | 'orders' | 'shifts' | 'movements' | 'reports' | 'users';
 type ViewType = 'menu' | 'ticket';
 type ThemeType = 'dulce-light' | 'dulce-dark';
 
 interface UIState {
+  // Estado Global de Navegación
+  activeSection: AppSection;
+  
+  // Estado del POS
   view: ViewType;
   theme: ThemeType;
   
@@ -12,12 +19,13 @@ interface UIState {
   currentGroup: MenuGroup | null;
 
   // Estado de Modales
-  activeModal: 'none' | 'custom_crepe' | 'variant_select' | 'daily_report';
+  activeModal: 'none' | 'custom_crepe' | 'variant_select' | 'daily_report' | 'shift_control';
   groupToCustomize: MenuGroup | null;
   itemToSelectVariant: MenuItem | null;
   orderToPrint: any | null;
 
   // Acciones
+  setSection: (section: AppSection) => void; // <--- NUEVA ACCIÓN
   setView: (view: ViewType) => void;
   toggleTheme: () => void;
   setTheme: (theme: ThemeType) => void;
@@ -26,6 +34,7 @@ interface UIState {
   openCustomModal: (group: MenuGroup) => void;
   openVariantModal: (item: MenuItem) => void;
   openReportModal: () => void;
+  openShiftModal: () => void;
 
   closeModals: () => void;
 
@@ -33,13 +42,17 @@ interface UIState {
 }
 
 export const useUIStore = create<UIState>((set) => ({
+  activeSection: 'pos', // Por defecto entramos al Punto de Venta
   view: 'menu',
   theme: 'dulce-light',
   currentGroup: null,
   activeModal: 'none',
   groupToCustomize: null,
   itemToSelectVariant: null,
+  openShiftModal: () => set({ activeModal: 'shift_control' }),
   orderToPrint: null,
+
+  setSection: (section) => set({ activeSection: section }), // <--- Implementación
 
   setView: (view) => set({ view }),
 
@@ -78,5 +91,4 @@ export const useUIStore = create<UIState>((set) => ({
   }),
   
   setOrderToPrint: (order) => set({ orderToPrint: order }),
-
 }));

@@ -1,0 +1,195 @@
+// src/components/MovementsScreen.tsx
+import React, { useEffect, useState } from 'react';
+import { movementService, type Movement, type MovementCategory } from '../services/movementService';
+
+// Quitamos 'FONDO_EXTRA' de las opciones visibles
+const EXPENSE_CATEGORIES: Record<string, string> = {
+    INSUMO: '🛒 Insumos (Coca, Hielo...)',
+    SERVICIO: '💡 Servicios (Luz, Gas...)',
+    NOMINA: '👷 Nómina / Sueldos',
+    MANTENIMIENTO: '🛠️ Mantenimiento',
+    RETIRO: '💸 Retiro de Efectivo',
+    OTRO: '📝 Otro'
+};
+
+export const MovementsScreen: React.FC = () => {
+    const [movements, setMovements] = useState<Movement[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+
+    // Formulario simplificado (Solo Gastos)
+    const [category, setCategory] = useState<MovementCategory>('INSUMO');
+    const [amount, setAmount] = useState('');
+    const [description, setDescription] = useState('');
+
+    const loadData = () => {
+        setLoading(true);
+        movementService.getDailyMovements()
+            .then(data => {
+                // Filtramos visualmente solo las salidas por seguridad
+                setMovements(data.filter(m => m.type === 'OUT'));
+            })
+            .finally(() => setLoading(false));
+    };
+
+    useEffect(() => {
+        loadData();
+    }, []);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!amount || !description) return;
+
+        setSubmitting(true);
+        try {
+            // Siempre enviamos 'OUT' (Salida)
+            await movementService.addMovement('OUT', category, parseFloat(amount), description);
+            setAmount('');
+            setDescription('');
+            loadData();
+        } catch (err) {
+            alert("Error al guardar");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleDelete = async (id: string) => {
+        if(!confirm("¿Eliminar este gasto?")) return;
+        await movementService.deleteMovement(id);
+        loadData();
+    };
+
+    const totalGastos = movements.reduce((acc, m) => acc + m.amount, 0);
+
+    return (
+        <div className="animate-fade-in max-w-4xl mx-auto">
+            <h2 className="text-2xl font-black mb-6 flex items-center gap-2 text-error">
+                <span>💸</span> Registro de Gastos
+            </h2>
+
+            <div className="grid md:grid-cols-3 gap-6">
+                
+                {/* COLUMNA 1: FORMULARIO DE GASTOS */}
+                <div className="card bg-base-100 shadow-lg border border-base-200 h-fit">
+                    <div className="card-body p-5">
+                        <h3 className="card-title text-sm uppercase opacity-70 mb-2">Nuevo Gasto</h3>
+                        <form onSubmit={handleSubmit} className="space-y-3">
+                            
+                            {/* Categoría */}
+                            <div className="form-control">
+                                <label className="label py-1"><span className="label-text text-xs font-bold">Categoría</span></label>
+                                <select 
+                                    className="select select-bordered select-sm w-full" 
+                                    value={category} 
+                                    onChange={e => setCategory(e.target.value as MovementCategory)}
+                                >
+                                    {Object.entries(EXPENSE_CATEGORIES).map(([key, label]) => (
+                                        <option key={key} value={key}>{label}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Monto */}
+                            <div className="form-control">
+                                <label className="label py-1"><span className="label-text text-xs font-bold">Monto</span></label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1.5 opacity-50">$</span>
+                                    <input 
+                                        type="number" 
+                                        className="input input-bordered input-sm w-full pl-6 font-mono font-bold text-error" 
+                                        placeholder="0.00"
+                                        value={amount}
+                                        onChange={e => setAmount(e.target.value)}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Descripción */}
+                            <div className="form-control">
+                                <label className="label py-1"><span className="label-text text-xs font-bold">Descripción</span></label>
+                                <input 
+                                    type="text" 
+                                    className="input input-bordered input-sm w-full" 
+                                    placeholder="Ej. Pago de Hielo"
+                                    value={description}
+                                    onChange={e => setDescription(e.target.value)}
+                                    required
+                                />
+                            </div>
+
+                            <button 
+                                type="submit" 
+                                disabled={submitting || !amount} 
+                                className="btn btn-block mt-2 btn-error text-white"
+                            >
+                                {submitting ? 'Guardando...' : 'Registrar Salida'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                {/* COLUMNA 2: LISTADO DE GASTOS */}
+                <div className="md:col-span-2 space-y-4">
+                    <div className="stats shadow w-full bg-base-100 border border-base-200">
+                        <div className="stat py-4">
+                            <div className="stat-title text-sm font-bold uppercase">Total Gastado Hoy</div>
+                            <div className="stat-value text-error text-3xl">-${totalGastos.toFixed(2)}</div>
+                            <div className="stat-desc">Se restará del corte final</div>
+                        </div>
+                    </div>
+
+                    <div className="bg-base-100 rounded-box shadow-sm border border-base-200 overflow-hidden">
+                        {loading ? (
+                            <div className="p-10 text-center"><span className="loading loading-spinner"></span></div>
+                        ) : movements.length === 0 ? (
+                            <div className="p-10 text-center opacity-50 italic">No hay gastos registrados hoy.</div>
+                        ) : (
+                            <div className="overflow-x-auto h-[400px]">
+                                <table className="table table-sm table-pin-rows">
+                                    <thead className="bg-base-200">
+                                        <tr>
+                                            <th>Hora</th>
+                                            <th>Descripción</th>
+                                            <th>Categoría</th>
+                                            <th className="text-right">Monto</th>
+                                            <th className="w-10"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {movements.map(mov => (
+                                            <tr key={mov.id} className="hover:bg-base-200/50">
+                                                <td className="text-xs opacity-60 font-mono">
+                                                    {mov.createdAt?.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                                </td>
+                                                <td className="font-bold">{mov.description}</td>
+                                                <td>
+                                                    <span className="badge badge-ghost badge-xs text-[10px]">
+                                                        {EXPENSE_CATEGORIES[mov.category] || mov.category}
+                                                    </span>
+                                                </td>
+                                                <td className="text-right font-bold font-mono text-error">
+                                                    -${mov.amount.toFixed(2)}
+                                                </td>
+                                                <td>
+                                                    <button 
+                                                        onClick={() => handleDelete(mov.id)}
+                                                        className="btn btn-ghost btn-xs text-error opacity-50 hover:opacity-100"
+                                                        title="Eliminar"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};

@@ -20,7 +20,7 @@ interface Props {
   onAddItem: (item: TicketItem) => void;
 }
 
-const initialVariant = { name: '', price: 0 };
+const initialVariant = { name: '', price: 0, cost: 0 };
 
 function isVariantPrice(item: MenuItem): item is VariantPriceItem {
   return 'variants' in item;
@@ -60,10 +60,15 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
         };
     }, [allModifiers, allowedModifierGroups]);
     
-    const { price: currentPrice } = useMemo(() => {
+    const { price: currentPrice, cost: currentCost } = useMemo(() => {
         const variantPrice = isVariantPrice(item) ? selectedVariant.price : item.price;
-        const extra = Array.from(selectedModifiers.values()).reduce((sum, mod) => sum + mod.price, 0);
-        return { price: variantPrice + extra };
+        const extraPrice = Array.from(selectedModifiers.values()).reduce((sum, mod) => sum + mod.price, 0);
+        const baseCost = isVariantPrice(item) ? (selectedVariant.cost || 0) : (item.cost || 0);
+        const extraCost = Array.from(selectedModifiers.values()).reduce((sum, mod) => sum + (mod.cost || 0), 0);
+        return { 
+            price: variantPrice + extraPrice,
+            cost: baseCost + extraCost 
+        };
     }, [item, selectedVariant, selectedModifiers]);
 
     const steps = useMemo(() => {
@@ -110,6 +115,7 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
             id: Date.now().toString(),
             baseName: item.name,
             finalPrice: currentPrice,
+            finalCost: currentCost, // <--- ¡GUARDADO!
             type: 'VARIANT',
             details: {
                 itemId: item.id,

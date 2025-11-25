@@ -2,6 +2,7 @@
 import { db, collection, addDoc, serverTimestamp } from '../firebase';
 import { printService } from './printService';
 import type { TicketItem } from '../types/menu';
+import { useAuthStore } from '../store/useAuthStore'; 
 
 export type PaymentMethod = 'cash' | 'card' | 'transfer';
 
@@ -13,6 +14,7 @@ export interface PaymentDetails {
 }
 
 export interface Order {
+  id?: string;
   items: TicketItem[];
   total: number;
   mode: 'Mesa 1' | 'Mesa 2' | 'Para Llevar';
@@ -20,10 +22,10 @@ export interface Order {
   orderNumber: number;
   createdAt: any;
   payment?: PaymentDetails;
+  cashier?: string;
 }
 
 export const orderService = {
-  // Quitamos el "Promise<string>" porque no vamos a esperar el ID para imprimir
   async createOrder(
     items: TicketItem[], 
     total: number, 
@@ -32,48 +34,47 @@ export const orderService = {
     payment?: PaymentDetails 
   ): Promise<void> {
     
-    const initialStatus = mode === 'Para Llevar' ? 'paid' : 'pending';
+    const initialStatus = payment ? 'paid' : 'pending';
 
-    // 1. Preparamos la orden
-    // Usamos "new Date()" para la impresión inmediata (Firebase reemplazará con serverTimestamp al guardar)
+    const currentUser = useAuthStore.getState().currentUser;
+    const cashierName = currentUser ? currentUser.name : 'Cajero';
+
+    // Objeto para imprimir (Local)
     const printOrderData: Order = {
       items,
       total,
       mode,
       status: initialStatus,
       orderNumber,
-      createdAt: { toDate: () => new Date() }, // Truco para que el ticket tenga fecha ya
-      payment
+      createdAt: { toDate: () => new Date() },
+      payment, // Aquí no importa si es undefined
+      cashier: cashierName
     };
 
+    // Objeto para Firebase (Nube)
+    // Usamos spread condicional para evitar campos undefined
     const firebaseOrderData = {
-      ...printOrderData,
-      createdAt: serverTimestamp() // Para la BD usamos el del servidor
+      items,
+      total,
+      mode,
+      status: initialStatus,
+      orderNumber,
+      createdAt: serverTimestamp(),
+      cashier: cashierName,
+      // TRUCO: Solo agregamos la propiedad 'payment' si tiene valor.
+      // Si es undefined, no se agrega nada al objeto.
+      ...(payment && { payment }) 
     };
 
-    // 2. ¡IMPRIMIR PRIMERO! (Crítico para iOS)
-    // Lanzamos la impresión inmediatamente mientras tenemos el "permiso" del clic
-    if (initialStatus === 'paid') {
-      console.log("🚀 Imprimiendo ticket inmediatamente...");
-      // No usamos await aquí para que sea instantáneo
-      printService.printReceipt(printOrderData);
-    } else {
-      // Si es para cocina, también imprimimos ya
-      printService.printReceipt(printOrderData); 
-    }
+    // 1. Imprimir Ticket
+    printService.printReceipt(printOrderData);
 
-    // 3. GUARDAR EN FIREBASE (En segundo plano)
-    // Como tenemos persistencia offline, esto es seguro. Si no hay red, se guarda local y se sube luego.
+    // 2. Guardar en BD
     try {
-      addDoc(collection(db, "orders"), firebaseOrderData)
-        .then((docRef) => console.log("Orden guardada con ID:", docRef.id))
-        .catch((err) => console.error("Error guardando en background:", err));
-      
-      // No hacemos "await" para no bloquear la UI
+      await addDoc(collection(db, "orders"), firebaseOrderData);
     } catch (error) {
-      console.error("Error al iniciar guardado:", error);
-      // Incluso si falla el inicio del guardado, el ticket ya salió.
-      // En un POS real, esto es preferible a cobrar y no dar ticket.
+      console.error("Error al guardar orden:", error);
+      alert("Error crítico al guardar la orden. Revisa la consola.");
     }
   }
 };

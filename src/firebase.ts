@@ -18,6 +18,9 @@ import {
   query,
   where,
   orderBy,
+  limit,
+  updateDoc, 
+  deleteDoc,
   Timestamp
 } from "firebase/firestore";
 
@@ -58,7 +61,10 @@ export {
   query,
   where,
   orderBy,
-  Timestamp
+  Timestamp,
+  limit,
+  updateDoc,   // <--- NUEVO
+  deleteDoc
 };
 
 // Exporta los TIPOS que usaremos

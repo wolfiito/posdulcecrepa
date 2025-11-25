@@ -4,6 +4,7 @@ import type { MenuGroup, Modifier, PriceRule } from '../types/menu';
 
 interface PriceResult {
   price: number;
+  cost: number; // <--- Nuevo output
   ruleDescription: string;
   isValid: boolean;
 }
@@ -14,25 +15,35 @@ export const calculateCustomItemPrice = (
   priceRule?: PriceRule
 ): PriceResult => {
   // 1. Validación básica
-  if (!group) return { price: 0, ruleDescription: 'Error', isValid: false };
+  if (!group) return { price: 0, cost: 0, ruleDescription: 'Error', isValid: false };
 
-  // 2. Contar ingredientes base y sumar extras
+  // 2. Contar ingredientes base, sumar extras y sumar COSTOS
   let baseIngredientCount = 0;
-  let extraCost = 0;
+  let extraPrice = 0;
+  
+  // Costo Base del Grupo (ej. Masa + Gas + Plato)
+  // Si no está definido en el JSON, asumimos 0 por ahora.
+  let totalCost = group.cost || 0; 
 
   selectedModifiers.forEach(mod => {
+    // Lógica de Precio (Venta)
     if (mod.group === group.base_group) baseIngredientCount++;
-    if (mod.price > 0) extraCost += mod.price;
+    if (mod.price > 0) extraPrice += mod.price;
+
+    // Lógica de Costo (Insumos) - SIEMPRE se suma
+    if (mod.cost && mod.cost > 0) {
+        totalCost += mod.cost;
+    }
   });
 
-  // 3. Determinar Precio Base y Regla
+  // 3. Determinar Precio Base de Venta
   let basePrice = 0;
   let isValid = true;
   let ruleDescription = '';
 
   const isBaseExclusive = group.base_group ? EXCLUSIVE_BASE_GROUPS.includes(group.base_group) : false;
 
-  // CASO A: Grupos Exclusivos (Bebidas, Frappes) - Precio fijo del grupo
+  // LÓGICA DE REGLAS (Sin cambios, solo determinan el precio de venta)
   if (isBaseExclusive) {
     ruleDescription = group.rules_ref === "regla_precio_fijo" ? group.name : 'Sabor Base';
     if (baseIngredientCount !== 1) {
@@ -41,27 +52,22 @@ export const calculateCustomItemPrice = (
     }
     basePrice = group.price || 0;
   }
-  // CASO B: Licuados (Lógica especial 1 o 2 ingredientes)
   else if (group.id.includes('licuados')) {
     const requiredCount = group.id.includes('sencillo') ? 1 : 2;
     ruleDescription = `${baseIngredientCount}/${requiredCount} Ingredientes`;
-    
     if (baseIngredientCount !== requiredCount) {
       isValid = false;
       ruleDescription = `Elija ${requiredCount} ingrediente(s)`;
     }
-    // Buscamos el precio en la regla (si existe) o usamos 0
     const matchedRule = priceRule?.basePrices.find(r => r.count === requiredCount);
     basePrice = matchedRule?.price || 0;
   }
-  // CASO C: Crepas y Waffles (Precio por escala de ingredientes)
   else if (group.base_group === MODIFIER_GROUPS.CREPA_DULCE_BASE || group.base_group === MODIFIER_GROUPS.CREPA_SALADA_BASE) {
     ruleDescription = `${baseIngredientCount} Ingredientes`;
     if (baseIngredientCount === 0) {
       isValid = false;
       ruleDescription = 'Elija ingredientes base';
     }
-    // Buscamos el precio que corresponda al conteo (o el máximo disponible si se pasa)
     if (priceRule) {
         const matchedRule = [...priceRule.basePrices]
             .sort((a, b) => b.count - a.count)
@@ -69,17 +75,14 @@ export const calculateCustomItemPrice = (
         basePrice = matchedRule?.price || 0;
     }
   }
-  // CASO D: Precio Fijo Genérico
   else {
       ruleDescription = group.name;
       basePrice = group.price || 0;
   }
 
-  // 4. Validaciones de Dependencias (Ej. Leche)
+  // 4. Validaciones
   if (group.extra_groups?.includes(MODIFIER_GROUPS.BEBIDA_LECHE)) {
     const hasMilk = selectedModifiers.some(m => m.group === MODIFIER_GROUPS.BEBIDA_LECHE);
-    // Si seleccionó un sabor base que NO sea 'agua' (o lógica similar), exigir leche.
-    // Por simplicidad, si el grupo pide leche, exigimos que seleccione una opción de leche.
     if (!hasMilk) {
       isValid = false;
       ruleDescription = 'Seleccione tipo de leche';
@@ -87,7 +90,8 @@ export const calculateCustomItemPrice = (
   }
 
   return {
-    price: basePrice + extraCost,
+    price: basePrice + extraPrice,
+    cost: totalCost, // <--- Retornamos el costo calculado
     ruleDescription,
     isValid
   };

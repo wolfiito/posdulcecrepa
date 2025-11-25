@@ -76,8 +76,8 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
   }, [currentStepInfo, allModifiers]);
 
   // --- USO DE LA NUEVA UTILIDAD DE PRECIOS ---
-  const { price: currentPrice, ruleDescription: currentRule, isValid } = useMemo(() => {
-      if (!group) return { price: 0, ruleDescription: '', isValid: false };
+  const { price: currentPrice, cost: currentCost, ruleDescription: currentRule, isValid } = useMemo(() => {
+      if (!group) return { price: 0, cost: 0, ruleDescription: '', isValid: false };
       const modsList = Array.from(selectedModifiers.values());
       return calculateCustomItemPrice(group, modsList, priceRule);
   }, [group, selectedModifiers, priceRule]);
@@ -107,6 +107,7 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
       id: Date.now().toString(),
       baseName: group.name.split('(')[0].trim(), 
       finalPrice: currentPrice,
+      finalCost: currentCost,
       type: 'CUSTOM',
       details: {
         baseRuleId: group.rules_ref,
