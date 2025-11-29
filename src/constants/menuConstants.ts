@@ -7,7 +7,7 @@ export const MODIFIER_GROUPS = {
     CREPA_TOPPING_SALSA: "crepa_topping_salsa",
     CREPA_TOPPING_SECO: "crepa_topping_seco",
   } as const;
-  
+
   export const EXCLUSIVE_BASE_GROUPS = [
     "frappe_sabores", 
     "malteada_sabores", 

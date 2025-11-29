@@ -21,7 +21,9 @@ import {
   limit,
   updateDoc, 
   deleteDoc,
-  Timestamp
+  Timestamp,
+  setDoc,
+  onSnapshot
 } from "firebase/firestore";
 
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
@@ -64,7 +66,9 @@ export {
   Timestamp,
   limit,
   updateDoc,   // <--- NUEVO
-  deleteDoc
+  deleteDoc,
+  setDoc,
+  onSnapshot
 };
 
 // Exporta los TIPOS que usaremos

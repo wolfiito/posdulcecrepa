@@ -1,24 +1,12 @@
-// src/components/admin/ProductsManager.tsx
 import React, { useState, useEffect } from 'react';
 import { db, collection, getDocs, addDoc, updateDoc, doc, deleteDoc } from '../../firebase';
-import type { MenuItem, VariantPriceItem, FixedPriceItem } from '../../types/menu';
-
-// Lista de grupos conocidos para facilitar la selección
-// (Podrías mover esto a una constante global si crece mucho)
-const KNOWN_MODIFIER_GROUPS = [
-  { id: 'leche_opciones', label: '🥛 Tipo de Leche' },
-  { id: 'crepa_dulce_base', label: '🥞 Ingredientes Dulces' },
-  { id: 'crepa_dulce_extra', label: '🍫 Extras Dulces' },
-  { id: 'crepa_salada_base', label: '🧀 Ingredientes Salados' },
-  { id: 'crepa_salada_extra', label: '🍗 Extras Salados' },
-  { id: 'bebida_topping_general', label: '🥤 Topping Bebidas' },
-  { id: 'sabor_tisana', label: '🍵 Sabores Tisana' },
-  { id: 'sabor_te', label: '🌿 Sabores Té' },
-  { id: 'frappe_sabores', label: '🍧 Sabores Frappé' },
-];
+import type { MenuItem, FixedPriceItem } from '../../types/menu';
 
 export const ProductsManager: React.FC = () => {
   const [products, setProducts] = useState<MenuItem[]>([]);
+  // Estado para los grupos disponibles (leídos de la BD)
+  const [availableGroups, setAvailableGroups] = useState<{id: string, name: string}[]>([]);
+  
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -33,23 +21,32 @@ export const ProductsManager: React.FC = () => {
   
   // Lógica de Precios
   const [hasVariants, setHasVariants] = useState(false);
-  const [price, setPrice] = useState<number>(0); // Para precio fijo
-  const [variants, setVariants] = useState<{name: string, price: number}[]>([{name: '', price: 0}]); // Para variantes
+  const [price, setPrice] = useState<number>(0); 
+  const [variants, setVariants] = useState<{name: string, price: number}[]>([{name: '', price: 0}]); 
 
   // --- CARGA DE DATOS ---
   useEffect(() => {
-    loadProducts();
+    loadData();
   }, []);
 
-  const loadProducts = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      const snap = await getDocs(collection(db, 'menu_items'));
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as MenuItem));
-      // Ordenamos alfabéticamente para facilitar búsqueda
-      setProducts(data.sort((a, b) => a.name.localeCompare(b.name)));
+      // 1. Cargar Productos
+      const itemsSnap = await getDocs(collection(db, 'menu_items'));
+      const itemsData = itemsSnap.docs.map(d => ({ id: d.id, ...d.data() } as MenuItem));
+      setProducts(itemsData.sort((a, b) => a.name.localeCompare(b.name)));
+
+      // 2. Cargar Grupos de Opciones (Dinámicos)
+      const groupsSnap = await getDocs(collection(db, 'modifier_groups'));
+      const groupsData = groupsSnap.docs.map(d => ({ 
+          id: d.id, 
+          name: d.data().name || d.id 
+      }));
+      setAvailableGroups(groupsData);
+
     } catch (error) {
-      console.error("Error cargando productos:", error);
+      console.error("Error cargando datos:", error);
     } finally {
       setLoading(false);
     }
@@ -89,20 +86,13 @@ export const ProductsManager: React.FC = () => {
     e.preventDefault();
     setSubmitting(true);
 
-    // Construir el objeto a guardar
-    const commonData = {
-      name,
-      category,
-      description,
-      modifierGroups
-    };
+    const commonData = { name, category, description, modifierGroups };
 
     let itemData: any;
     if (hasVariants) {
-      // Filtrar variantes vacías
       const validVariants = variants.filter(v => v.name.trim() !== '');
       if (validVariants.length === 0) {
-        alert("Debes agregar al menos una variante válida.");
+        alert("Agrega al menos una variante.");
         setSubmitting(false);
         return;
       }
@@ -113,17 +103,11 @@ export const ProductsManager: React.FC = () => {
 
     try {
       if (editingId) {
-        // Actualizar en Firebase
         await updateDoc(doc(db, 'menu_items', editingId), itemData);
-        
-        // Actualizar localmente (Optimistic Update)
         setProducts(prev => prev.map(p => p.id === editingId ? { ...itemData, id: editingId } : p));
         alert("Producto actualizado");
       } else {
-        // Crear en Firebase
         const docRef = await addDoc(collection(db, 'menu_items'), itemData);
-        
-        // Agregar localmente
         setProducts(prev => [...prev, { ...itemData, id: docRef.id }].sort((a, b) => a.name.localeCompare(b.name)));
         alert("Producto creado");
       }
@@ -141,34 +125,27 @@ export const ProductsManager: React.FC = () => {
     try {
       await deleteDoc(doc(db, 'menu_items', id));
       setProducts(prev => prev.filter(p => p.id !== id));
-    } catch (error) {
-      alert("Error al eliminar");
-    }
+    } catch (error) { alert("Error al eliminar"); }
   };
 
-  // Helpers para Variantes
+  // Helpers
   const addVariantRow = () => setVariants([...variants, { name: '', price: 0 }]);
   const updateVariant = (index: number, field: 'name' | 'price', value: any) => {
     const newVars = [...variants];
     newVars[index] = { ...newVars[index], [field]: value };
     setVariants(newVars);
   };
-  const removeVariant = (index: number) => {
-    setVariants(variants.filter((_, i) => i !== index));
-  };
-
-  // Toggle de Grupos
+  const removeVariant = (index: number) => setVariants(variants.filter((_, i) => i !== index));
+  
   const toggleGroup = (groupId: string) => {
-    setModifierGroups(prev => 
-      prev.includes(groupId) ? prev.filter(g => g !== groupId) : [...prev, groupId]
-    );
+    setModifierGroups(prev => prev.includes(groupId) ? prev.filter(g => g !== groupId) : [...prev, groupId]);
   };
 
   return (
-    <div className="grid lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
+    <div className="grid lg:grid-cols-3 gap-6 h-[calc(100vh-250px)]">
       
       {/* --- PANEL IZQUIERDO: FORMULARIO --- */}
-      <div className="card bg-base-200 h-full overflow-y-auto shadow-inner">
+      <div className="card bg-base-200 h-full overflow-y-auto shadow-inner border border-base-300">
         <div className="card-body p-4">
           <div className="flex justify-between items-center">
             <h3 className="font-black text-lg">{editingId ? '✏️ Editando' : '✨ Nuevo Producto'}</h3>
@@ -177,29 +154,27 @@ export const ProductsManager: React.FC = () => {
 
           <form onSubmit={handleSave} className="space-y-4 mt-2">
             
-            {/* Datos Básicos */}
             <div className="form-control">
               <label className="label-text text-xs font-bold mb-1">Nombre del Producto</label>
-              <input type="text" className="input input-sm input-bordered w-full font-bold" required value={name} onChange={e => setName(e.target.value)} placeholder="Ej. Crepa Hawaiana" />
+              <input type="text" className="input input-sm input-bordered w-full font-bold" required value={name} onChange={e => setName(e.target.value)} placeholder="Ej. Soda Italiana" />
             </div>
 
             <div className="form-control">
-              <label className="label-text text-xs font-bold mb-1">Categoría (Etiqueta)</label>
-              <input type="text" className="input input-sm input-bordered w-full" required value={category} onChange={e => setCategory(e.target.value)} placeholder="Ej. Crepas Saladas" />
-              <span className="text-[10px] opacity-60 mt-1">Texto que aparece en el ticket</span>
+              <label className="label-text text-xs font-bold mb-1">Categoría (Ticket)</label>
+              <input type="text" className="input input-sm input-bordered w-full" required value={category} onChange={e => setCategory(e.target.value)} placeholder="Ej. Bebidas" />
             </div>
 
             <div className="form-control">
               <label className="label-text text-xs font-bold mb-1">Descripción</label>
-              <textarea className="textarea textarea-sm textarea-bordered w-full" rows={2} value={description} onChange={e => setDescription(e.target.value)} placeholder="Ingredientes, detalles..." />
+              <textarea className="textarea textarea-sm textarea-bordered w-full" rows={2} value={description} onChange={e => setDescription(e.target.value)} placeholder="Detalles opcionales..." />
             </div>
 
             <div className="divider my-1"></div>
 
-            {/* Configuración de Precios */}
+            {/* PRECIO FIJO O VARIANTES */}
             <div className="form-control">
-              <label className="label cursor-pointer justify-start gap-4">
-                <span className="label-text font-bold">¿Tiene tamaños/variantes?</span> 
+              <label className="label cursor-pointer justify-start gap-4 bg-base-100 p-2 rounded-lg border border-base-300">
+                <span className="label-text font-bold">¿Tiene tamaños diferentes?</span> 
                 <input type="checkbox" className="toggle toggle-primary toggle-sm" checked={hasVariants} onChange={e => setHasVariants(e.target.checked)} />
               </label>
             </div>
@@ -207,43 +182,48 @@ export const ProductsManager: React.FC = () => {
             {!hasVariants ? (
               <div className="form-control animate-fade-in">
                 <label className="label-text text-xs font-bold mb-1">Precio Fijo ($)</label>
-                <input type="number" className="input input-bordered w-full font-mono text-lg font-bold text-primary" value={price} onChange={e => setPrice(parseFloat(e.target.value) || 0)} onFocus={e => e.target.select()} />
+                <input type="number" className="input input-bordered w-full font-mono text-lg font-bold text-primary" value={price} onChange={e => setPrice(parseFloat(e.target.value) || 0)} />
               </div>
             ) : (
               <div className="space-y-2 animate-fade-in bg-base-100 p-2 rounded-box border border-base-300">
-                <label className="label-text text-xs font-bold block mb-1">Lista de Variantes</label>
+                <label className="label-text text-xs font-bold block mb-1">Lista de Tamaños</label>
                 {variants.map((v, idx) => (
                   <div key={idx} className="flex gap-2 items-center">
-                    <input type="text" placeholder="Ej. Chico" className="input input-xs input-bordered flex-1" value={v.name} onChange={e => updateVariant(idx, 'name', e.target.value)} required />
-                    <input type="number" placeholder="$0" className="input input-xs input-bordered w-20 font-mono" value={v.price} onChange={e => updateVariant(idx, 'price', parseFloat(e.target.value) || 0)} required />
+                    <input type="text" placeholder="Ej. Chico" className="input input-xs input-bordered flex-1" value={v.name} onChange={e => updateVariant(idx, 'name', e.target.value)} />
+                    <input type="number" placeholder="$0" className="input input-xs input-bordered w-20 font-mono" value={v.price} onChange={e => updateVariant(idx, 'price', parseFloat(e.target.value) || 0)} />
                     <button type="button" onClick={() => removeVariant(idx)} className="btn btn-xs btn-square btn-ghost text-error">✕</button>
                   </div>
                 ))}
-                <button type="button" onClick={addVariantRow} className="btn btn-xs btn-outline btn-block border-dashed">+ Agregar Tamaño</button>
+                <button type="button" onClick={addVariantRow} className="btn btn-xs btn-outline btn-block border-dashed border-base-300">+ Agregar Tamaño</button>
               </div>
             )}
 
             <div className="divider my-1"></div>
 
-            {/* Grupos de Modificadores */}
+            {/* GRUPOS DINÁMICOS */}
             <div className="form-control">
-              <label className="label-text text-xs font-bold mb-2">Grupos de Ingredientes (Modifiers)</label>
+              <label className="label-text text-xs font-bold mb-2">
+                  Grupos de Ingredientes (Modifiers)
+                  <span className="block font-normal text-[10px] opacity-60">Selecciona qué opciones salen al vender este producto</span>
+              </label>
+              
               <div className="h-40 overflow-y-auto border border-base-300 rounded-box p-2 bg-base-100 grid grid-cols-1 gap-1">
-                {KNOWN_MODIFIER_GROUPS.map(g => (
-                  <label key={g.id} className="label cursor-pointer justify-start gap-3 hover:bg-base-200 rounded p-1 py-0">
+                {availableGroups.length === 0 && <p className="text-xs opacity-50 p-2 text-center">No hay grupos creados.<br/>Ve a la pestaña "Eq Grupos Opc."</p>}
+                
+                {availableGroups.map(g => (
+                  <label key={g.id} className="label cursor-pointer justify-start gap-3 hover:bg-base-200 rounded p-1 py-0 border border-transparent hover:border-base-300 transition-colors">
                     <input 
                       type="checkbox" 
                       className="checkbox checkbox-xs checkbox-primary" 
                       checked={modifierGroups.includes(g.id)} 
                       onChange={() => toggleGroup(g.id)}
                     />
-                    <span className="label-text text-xs">{g.label}</span>
+                    <div className="flex flex-col">
+                        <span className="label-text text-xs font-bold">{g.name}</span>
+                        <span className="label-text text-[9px] opacity-40 font-mono">{g.id}</span>
+                    </div>
                   </label>
                 ))}
-                {/* Opción para agregar manual si falta alguno */}
-                <div className="p-1 mt-2">
-                   <p className="text-[10px] opacity-50 text-center">¿Falta un grupo? Agregalo en el código.</p>
-                </div>
               </div>
             </div>
 
@@ -256,14 +236,9 @@ export const ProductsManager: React.FC = () => {
 
       {/* --- PANEL DERECHO: LISTA --- */}
       <div className="lg:col-span-2 bg-base-100 rounded-box border border-base-200 flex flex-col overflow-hidden shadow-sm h-full">
-        {/* Buscador simple */}
-        <div className="p-3 border-b border-base-200 bg-base-100">
-            <input type="text" placeholder="Buscar producto..." className="input input-sm input-bordered w-full max-w-xs" onChange={(e) => {
-                const term = e.target.value.toLowerCase();
-                // Filtrado simple en cliente (ya tenemos todo en memoria)
-                // Nota: Esto es solo visual, el estado 'products' tiene todo.
-                // Para implementar búsqueda real, crea un estado 'searchTerm' y filtra el map de abajo.
-            }} />
+        {/* Header simple */}
+        <div className="p-3 border-b border-base-200 bg-base-100 flex justify-between items-center">
+            <span className="text-xs font-bold opacity-50 uppercase">{products.length} Productos registrados</span>
         </div>
 
         <div className="flex-1 overflow-y-auto p-0">
@@ -289,9 +264,11 @@ export const ProductsManager: React.FC = () => {
                         <div className="text-[10px] opacity-50">{p.category}</div>
                         {p.modifierGroups && p.modifierGroups.length > 0 && (
                             <div className="flex gap-1 mt-1 flex-wrap">
-                                {p.modifierGroups.map(g => (
-                                    <span key={g} className="badge badge-xs badge-ghost text-[9px]">{g}</span>
-                                ))}
+                                {p.modifierGroups.map(gid => {
+                                    // Intentamos mostrar el nombre bonito si lo tenemos, si no el ID
+                                    const groupName = availableGroups.find(ag => ag.id === gid)?.name || gid;
+                                    return <span key={gid} className="badge badge-xs badge-ghost text-[9px] border-base-300">{groupName}</span>;
+                                })}
                             </div>
                         )}
                       </td>
@@ -308,7 +285,7 @@ export const ProductsManager: React.FC = () => {
                       </td>
                       <td className="text-center">
                         <div className="join">
-                          <button onClick={() => handleEdit(p)} className="btn btn-xs join-item btn-ghost">✏️</button>
+                          <button onClick={() => handleEdit(p)} className="btn btn-xs join-item btn-ghost text-primary">✏️</button>
                           <button onClick={() => handleDelete(p.id)} className="btn btn-xs join-item btn-ghost text-error">🗑️</button>
                         </div>
                       </td>

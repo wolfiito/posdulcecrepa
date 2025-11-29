@@ -1,6 +1,7 @@
 // src/services/reportService.ts
 import { db, collection, query, where, orderBy, getDocs, serverTimestamp, addDoc } from '../firebase';
 import type { Order } from './orderService';
+import type { Modifier } from '../types/menu';
 
 export interface ProductSummary {
   name: string;
@@ -158,5 +159,24 @@ export const reportService = {
     end.setHours(23, 59, 59, 999); // Forzar fin del día
 
     return this.getReportByDateRange(start, end);
+  },
+  
+  async getInventoryReport(): Promise<Modifier[]> {
+    try {
+      // Pedimos solo los que tienen control de stock activado
+      const q = query(collection(db, "modifiers"), where("trackStock", "==", true));
+      const snapshot = await getDocs(q);
+      
+      const items = snapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data() 
+      } as Modifier));
+
+      // Ordenamos: Primero los que tienen MENOS stock (los urgentes arriba)
+      return items.sort((a, b) => (a.currentStock || 0) - (b.currentStock || 0));
+    } catch (error) {
+      console.error("Error obteniendo inventario:", error);
+      return [];
+    }
   }
 };

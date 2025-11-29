@@ -6,6 +6,7 @@ import type { Modifier } from '../../types/menu';
 export const ModifiersManager: React.FC = () => {
   const [modifiers, setModifiers] = useState<Modifier[]>([]);
   const [loading, setLoading] = useState(false);
+  const [availableGroups, setAvailableGroups] = useState<{id: string, name: string}[]>([]);
   
   // Formulario
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -22,6 +23,10 @@ export const ModifiersManager: React.FC = () => {
     setLoading(true);
     const snap = await getDocs(collection(db, 'modifiers'));
     setModifiers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Modifier)));
+
+    const groupsSnap = await getDocs(collection(db, 'modifier_groups'));
+    setAvailableGroups(groupsSnap.docs.map(d => ({ id: d.id, name: d.data().name })));
+
     setLoading(false);
   };
 
@@ -86,14 +91,12 @@ export const ModifiersManager: React.FC = () => {
             <div>
               <label className="label-text text-xs font-bold">Grupo</label>
               <select className="select select-sm select-bordered w-full" value={formData.group} onChange={e => setFormData({...formData, group: e.target.value})}>
-                <option value="crepa_dulce_base">Crepa Dulce Base</option>
-                <option value="crepa_dulce_extra">Crepa Dulce Extra</option>
-                <option value="crepa_salada_base">Crepa Salada Base</option>
-                <option value="crepa_salada_extra">Crepa Salada Extra</option>
-                <option value="bebida_topping_general">Topping Bebidas</option>
-                <option value="leche_opciones">Tipos de Leche</option>
-                {/* Agrega más si necesitas */}
+              <option value="">-- Selecciona un Grupo --</option>
+                {availableGroups.map(g => (
+                    <option key={g.id} value={g.id}>{g.name} ({g.id})</option>
+                ))}
               </select>
+              {availableGroups.length === 0 && <span className="text-[10px] text-error">¡Crea grupos en la pestaña "Grupos de Opciones" primero!</span>} 
             </div>
 
             <div className="divider my-1 text-xs opacity-50">INVENTARIO</div>

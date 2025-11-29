@@ -1,7 +1,7 @@
 // src/store/useMenuStore.ts
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware'; // <--- 1. Importar persistencia
-import { db, collection, getDocs } from '../firebase';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { db, collection, onSnapshot, query } from '../firebase'; // <--- Usamos onSnapshot
 import type { MenuGroup, MenuItem, Modifier, PriceRule } from '../types/menu';
 
 interface MenuState {
@@ -9,71 +9,84 @@ interface MenuState {
   items: MenuItem[];
   modifiers: Modifier[];
   rules: PriceRule[];
+  
   isLoading: boolean;
   error: string | null;
-  lastUpdated: number; // <--- 2. Para saber cuándo fue la última descarga
   
   // Acciones
-  fetchMenuData: (force?: boolean) => Promise<void>; // <--- Opción para forzar
+  startListening: () => () => void; // Retorna una función para cancelar la suscripción
 }
 
 export const useMenuStore = create<MenuState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       groups: [],
       items: [],
       modifiers: [],
       rules: [],
       isLoading: false,
       error: null,
-      lastUpdated: 0,
 
-      fetchMenuData: async (force = false) => {
-        const now = Date.now();
-        const CACHE_DURATION = 1000 * 60 * 60 * 24; // 24 Horas en milisegundos
-        const { lastUpdated, items } = get();
+      startListening: () => {
+        set({ isLoading: true });
+        console.log("📡 Conectando a actualizaciones en tiempo real...");
 
-        // 3. SI NO ES FORZADO Y LA DATA ES RECIENTE (< 24h) Y YA TENEMOS ITEMS... ¡NO HACEMOS NADA!
-        if (!force && items.length > 0 && (now - lastUpdated < CACHE_DURATION)) {
-            console.log("📦 Usando menú en caché (Sin lecturas a Firebase)");
-            return;
-        }
+        // Escuchar Grupos
+        const unsubGroups = onSnapshot(
+            collection(db, "menu_groups"), 
+            (snap) => set({ groups: snap.docs.map(d => ({ id: d.id, ...d.data() } as MenuGroup)) }),
+            (err) => console.error("Error groups:", err)
+        );
 
-        console.log("🔥 Descargando menú de Firebase (Generando lecturas)...");
-        set({ isLoading: true, error: null });
-        
-        try {
-          const [groupsSnap, itemsSnap, modsSnap, rulesSnap] = await Promise.all([
-            getDocs(collection(db, "menu_groups")),
-            getDocs(collection(db, "menu_items")),
-            getDocs(collection(db, "modifiers")),
-            getDocs(collection(db, "price_rules")),
-          ]);
+        // Escuchar Items
+        const unsubItems = onSnapshot(
+            collection(db, "menu_items"),
+            (snap) => set({ items: snap.docs.map(d => ({ id: d.id, ...d.data() } as MenuItem)) }),
+            (err) => console.error("Error items:", err)
+        );
 
-          set({
-            groups: groupsSnap.docs.map(d => ({ id: d.id, ...d.data() } as MenuGroup)),
-            items: itemsSnap.docs.map(d => ({ id: d.id, ...d.data() } as MenuItem)),
-            modifiers: modsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Modifier)),
-            rules: rulesSnap.docs.map(d => ({ id: d.id, ...d.data() } as PriceRule)),
-            isLoading: false,
-            lastUpdated: now // <--- Actualizamos la marca de tiempo
-          });
-        } catch (err) {
-          console.error("Error cargando menú:", err);
-          set({ error: "Error al cargar datos del menú", isLoading: false });
-        }
+        // Escuchar Modificadores
+        const unsubModifiers = onSnapshot(
+            collection(db, "modifiers"),
+            (snap) => set({ modifiers: snap.docs.map(d => ({ id: d.id, ...d.data() } as Modifier)) }),
+            (err) => console.error("Error modifiers:", err)
+        );
+
+        // Escuchar Reglas
+        const unsubRules = onSnapshot(
+            collection(db, "price_rules"),
+            (snap) => {
+                set({ 
+                    rules: snap.docs.map(d => ({ id: d.id, ...d.data() } as PriceRule)),
+                    isLoading: false // Asumimos que al cargar esto ya tenemos "algo"
+                });
+            },
+            (err) => { 
+                console.error("Error rules:", err);
+                set({ error: "Error de conexión", isLoading: false });
+            }
+        );
+
+        // Retornamos una función que limpia todo cuando se cierra la app (cleanup)
+        return () => {
+            console.log("🔕 Desconectando listeners...");
+            unsubGroups();
+            unsubItems();
+            unsubModifiers();
+            unsubRules();
+        };
       }
     }),
     {
-      name: 'dulcecrepa-menu-storage', // Nombre en localStorage
-      storage: createJSONStorage(() => localStorage), // Guardar en el navegador
-      // Solo guardamos los datos, no el estado de carga o error
+      name: 'dulcecrepa-menu-storage',
+      storage: createJSONStorage(() => localStorage),
+      // Guardamos todo en local para que al abrir la app se vea algo INMEDIATAMENTE
+      // mientras se conecta a internet.
       partialize: (state) => ({ 
         groups: state.groups, 
         items: state.items, 
         modifiers: state.modifiers, 
-        rules: state.rules,
-        lastUpdated: state.lastUpdated
+        rules: state.rules
       }),
     }
   )

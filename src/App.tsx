@@ -42,7 +42,7 @@ const IconSun = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height=
 const IconMoon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>;
 
 function App() {
-  const { fetchMenuData, isLoading, modifiers, rules } = useMenuStore();
+  const { startListening, isLoading, modifiers, rules } = useMenuStore();
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const { currentUser, logout } = useAuthStore();
   const { currentShift } = useShiftStore();
@@ -57,9 +57,11 @@ function App() {
   const { addItem, orderMode, setOrderMode } = useTicketStore();
 
   useEffect(() => {
-    fetchMenuData();
+    const unsubscribe = startListening();
     const savedTheme = localStorage.getItem('theme') as 'dulce-light' | 'dulce-dark';
     if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+
+    return () => unsubscribe();
   }, []);
 
   const handleAddItem = (item: TicketItem) => {

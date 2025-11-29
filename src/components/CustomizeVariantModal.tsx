@@ -1,14 +1,8 @@
 // src/components/CustomizeVariantModal.tsx
-
 import { useState, useMemo, useEffect } from 'react';
 import Modal from 'react-modal';
 import type { VariantPriceItem, FixedPriceItem, Modifier, TicketItem, MenuItem } from '../types/menu'; 
-
-// --- CONSTANTES ---
-const BEBIDA_LECHE_GRUPO = "leche_opciones";
-const BEBIDA_SABOR_GRUPO = "sabor_te";
-const SABOR_TISANA_GRUPO = "sabor_tisana";
-const TOPPING_GRUPOS_TODOS = ["bebida_topping_general", "bublee_topping"];
+import { EXCLUSIVE_GROUPS } from '../constants/menuConstants'; // Usamos tu lista maestra de exclusividad
 
 Modal.setAppElement('#root');
 
@@ -26,13 +20,10 @@ function isVariantPrice(item: MenuItem): item is VariantPriceItem {
   return 'variants' in item;
 }
 
-type WizardStep = {
-    name: string;
-    options: (Modifier | {name: string, price: number})[]; 
-    isExclusive: boolean;
-    isRequired: boolean;
-    group: string;
-}
+// Función para limpiar nombres de grupos (ej. "soda_sabores" -> "Soda Sabores")
+const formatGroupName = (str: string) => {
+    return str.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
 
 export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onAddItem }: Props) {
     if (!item) return null;
@@ -49,62 +40,99 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
         }
     }, [isOpen, item]);
 
-    const allowedModifierGroups = item.modifierGroups || [];
-
-    const { milkOptions, flavorOptions, toppingOptions } = useMemo(() => { 
-        const relevantMods = allModifiers.filter(mod => allowedModifierGroups.includes(mod.group));
-        return {
-            milkOptions: relevantMods.filter(mod => mod.group === BEBIDA_LECHE_GRUPO),
-            flavorOptions: relevantMods.filter(mod => mod.group === BEBIDA_SABOR_GRUPO || mod.group === SABOR_TISANA_GRUPO),
-            toppingOptions: relevantMods.filter(mod => TOPPING_GRUPOS_TODOS.includes(mod.group)),
-        };
-    }, [allModifiers, allowedModifierGroups]);
-    
+    // --- CÁLCULO DE PRECIOS ---
     const { price: currentPrice, cost: currentCost } = useMemo(() => {
         const variantPrice = isVariantPrice(item) ? selectedVariant.price : item.price;
-        const extraPrice = Array.from(selectedModifiers.values()).reduce((sum, mod) => sum + mod.price, 0);
         const baseCost = isVariantPrice(item) ? (selectedVariant.cost || 0) : (item.cost || 0);
+        
+        const extraPrice = Array.from(selectedModifiers.values()).reduce((sum, mod) => sum + mod.price, 0);
         const extraCost = Array.from(selectedModifiers.values()).reduce((sum, mod) => sum + (mod.cost || 0), 0);
+        
         return { 
             price: variantPrice + extraPrice,
             cost: baseCost + extraCost 
         };
     }, [item, selectedVariant, selectedModifiers]);
 
+    // --- GENERACIÓN DINÁMICA DE PASOS (WIZARD) ---
     const steps = useMemo(() => {
-        const stepList: WizardStep[] = [];
+        const stepList = [];
+
+        // 1. Paso de Tamaño (Si tiene variantes)
         if (isVariantPrice(item)) {
             stepList.push({ 
+                id: 'variants',
                 name: 'Tamaño', 
                 options: item.variants, 
-                isRequired: true, 
-                group: 'variants',
-                isExclusive: true
+                isExclusive: true,
+                isRequired: true,
+                type: 'variant_selector'
             });
         }
-        if (milkOptions.length > 0) stepList.push({ name: 'Leche', options: milkOptions, isExclusive: true, isRequired: true, group: BEBIDA_LECHE_GRUPO });
-        if (flavorOptions.length > 0) stepList.push({ name: 'Sabor', options: flavorOptions, isExclusive: true, isRequired: true, group: (item.id.includes('tisana') ? SABOR_TISANA_GRUPO : BEBIDA_SABOR_GRUPO) });
-        if (toppingOptions.length > 0) stepList.push({ name: 'Toppings', options: toppingOptions, isExclusive: false, isRequired: false, group: 'toppings' });
+
+        // 2. Pasos de Modificadores (Dinámicos)
+        // Recorremos los grupos que tiene asignados el producto (ej. ["soda_sabores"])
+        const productGroups = item.modifierGroups || [];
+        
+        productGroups.forEach(groupId => {
+            // Buscamos los ingredientes que pertenecen a este grupo
+            const options = allModifiers.filter(mod => mod.group === groupId);
+            
+            if (options.length > 0) {
+                // Determinamos si es selección única (Radio) o múltiple (Checkbox)
+                // Usando tu constante EXCLUSIVE_GROUPS
+                const isExclusive = EXCLUSIVE_GROUPS.includes(groupId);
+                
+                stepList.push({
+                    id: groupId,
+                    name: formatGroupName(groupId), // "soda_sabores" -> "Soda Sabores"
+                    options: options,
+                    isExclusive: isExclusive,
+                    isRequired: isExclusive, // Si es exclusivo (ej. sabor), solemos obligar a elegir uno
+                    type: 'modifier_selector'
+                });
+            }
+        });
+
         return stepList;
-    }, [item, milkOptions, flavorOptions, toppingOptions]);
+    }, [item, allModifiers]);
 
     const currentStep = steps[step];
     const isLastStep = step === steps.length - 1;
 
+    // --- VALIDACIÓN ---
     const isStepValid = useMemo(() => {
-        if (!currentStep || !currentStep.isRequired) return true;
-        if (currentStep.group === 'variants') return selectedVariant.price > 0;
-        return Array.from(selectedModifiers.values()).some(mod => mod.group === currentStep.group);
+        if (!currentStep) return true;
+        if (!currentStep.isRequired) return true;
+
+        if (currentStep.type === 'variant_selector') {
+            return selectedVariant.price > 0; // Debe tener variante seleccionada
+        }
+        
+        // Verificar si hay al menos un modificador seleccionado para este grupo
+        return Array.from(selectedModifiers.values()).some(mod => mod.group === currentStep.id);
     }, [currentStep, selectedModifiers, selectedVariant]);
 
+    // --- HANDLERS ---
     const handleModifierChange = (modifier: Modifier, isExclusive: boolean) => {
         setSelectedModifiers(prev => {
             const newMap = new Map(prev);
+            
             if (isExclusive) { 
-                allModifiers.filter(mod => mod.group === modifier.group).forEach(mod => newMap.delete(mod.id));
+                // Si es exclusivo, borramos cualquier otro del mismo grupo antes de agregar este
+                allModifiers
+                    .filter(mod => mod.group === modifier.group)
+                    .forEach(mod => newMap.delete(mod.id));
             }
-            if (newMap.has(modifier.id)) newMap.delete(modifier.id);
-            else newMap.set(modifier.id, modifier);
+            
+            // Toggle lógico
+            if (newMap.has(modifier.id)) {
+                // Si ya estaba y es requerido/exclusivo, no dejamos desmarcar (UX decision)
+                // O dejamos desmarcar solo si no es requerido.
+                if (!isExclusive) newMap.delete(modifier.id);
+            } else {
+                newMap.set(modifier.id, modifier);
+            }
             return newMap;
         });
     };
@@ -115,8 +143,8 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
             id: Date.now().toString(),
             baseName: item.name,
             finalPrice: currentPrice,
-            finalCost: currentCost, // <--- ¡GUARDADO!
-            type: 'VARIANT',
+            finalCost: currentCost,
+            type: isVariantPrice(item) ? 'VARIANT' : 'FIXED',
             details: {
                 itemId: item.id,
                 variantName: isVariantPrice(item) ? selectedVariant.name : '',
@@ -128,11 +156,12 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
     const handleNext = () => { if (isStepValid) setStep(s => s + 1); };
     const handlePrev = () => setStep(s => s - 1);
 
+    if (!currentStep) return null;
+
     return (
         <Modal
             isOpen={isOpen}
             onRequestClose={onClose}
-            // CORRECCIÓN: rounded-box para consistencia con el tema
             className="bg-base-100 w-full max-w-lg max-h-[90dvh] rounded-box shadow-2xl flex flex-col overflow-hidden outline-none animate-pop-in border border-base-200"
             overlayClassName="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
         >
@@ -143,7 +172,7 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
                 {/* Steps Indicator */}
                 <div className="flex gap-1 justify-center my-3 h-1.5 w-full max-w-xs mx-auto">
                     {steps.map((s, index) => (
-                        <div key={s.name} className={`flex-1 rounded-full transition-colors duration-300 ${index <= step ? 'bg-primary' : 'bg-base-300'}`} />
+                        <div key={s.id} className={`flex-1 rounded-full transition-colors duration-300 ${index <= step ? 'bg-primary' : 'bg-base-300'}`} />
                     ))}
                 </div>
                 
@@ -153,66 +182,58 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
                 </div>
             </div>
             
-            {/* Contenido */}
-            {currentStep && (
-                 <div className="flex-1 overflow-y-auto p-4 bg-base-200/50">
-                    <h4 className="text-sm font-bold uppercase tracking-wide opacity-70 mb-3 flex justify-between">
-                        {currentStep.name} 
-                        {currentStep.isRequired && !isStepValid && <span className="text-error text-xs font-bold">Requerido</span>}
-                    </h4>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        
-                        {/* Renderizado de Variantes (Tamaños) */}
-                        {currentStep.group === 'variants' && (currentStep.options as {name: string, price: number}[]).map(variant => {
-                            const isSelected = selectedVariant.name === variant.name;
-                            return (
-                                <button
-                                    key={variant.name}
-                                    onClick={() => setSelectedVariant(variant)}
-                                    // CORRECCIÓN: Estilos unificados con el modal de crepas
-                                    className={`
-                                        btn h-auto min-h-[3.5rem] py-2 px-3 flex flex-col leading-tight normal-case border
-                                        ${isSelected 
-                                            ? 'btn-primary border-primary shadow-md scale-[1.02]' 
-                                            : 'btn-ghost bg-base-100 border-base-300 hover:border-primary/50'
-                                        }
-                                    `}
-                                >
-                                    <span className="text-sm font-semibold">{variant.name}</span>
+            {/* Contenido Dinámico */}
+            <div className="flex-1 overflow-y-auto p-4 bg-base-200/50">
+                <h4 className="text-sm font-bold uppercase tracking-wide opacity-70 mb-3 flex justify-between">
+                    {currentStep.name} 
+                    {currentStep.isRequired && !isStepValid && <span className="text-error text-xs font-bold">Requerido</span>}
+                </h4>
+                
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    
+                    {/* CASO 1: SELECCIONAR TAMAÑO (VARIANTE) */}
+                    {currentStep.type === 'variant_selector' && (currentStep.options as any[]).map(variant => {
+                        const isSelected = selectedVariant.name === variant.name;
+                        return (
+                            <button
+                                key={variant.name}
+                                onClick={() => setSelectedVariant(variant)}
+                                className={`
+                                    btn h-auto min-h-[3.5rem] py-2 px-3 flex flex-col leading-tight normal-case border
+                                    ${isSelected ? 'btn-primary border-primary shadow-md scale-[1.02]' : 'btn-ghost bg-base-100 border-base-300 hover:border-primary/50'}
+                                `}
+                            >
+                                <span className="text-sm font-semibold">{variant.name}</span>
+                                <span className={`text-xs font-normal mt-1 ${isSelected ? 'text-primary-content/90' : 'text-base-content/60'}`}>
+                                    ${variant.price.toFixed(2)}
+                                </span>
+                            </button>
+                        )
+                    })}
+                    
+                    {/* CASO 2: SELECCIONAR MODIFICADORES (SABORES, LECHES, ETC) */}
+                    {currentStep.type === 'modifier_selector' && (currentStep.options as Modifier[]).map(mod => {
+                        const isSelected = selectedModifiers.has(mod.id);
+                        return (
+                            <button
+                                key={mod.id}
+                                onClick={() => handleModifierChange(mod, currentStep.isExclusive)}
+                                className={`
+                                    btn h-auto min-h-[3.5rem] py-2 px-3 flex flex-col leading-tight normal-case border
+                                    ${isSelected ? 'btn-primary border-primary shadow-md scale-[1.02]' : 'btn-ghost bg-base-100 border-base-300 hover:border-primary/50'}
+                                `}
+                            >
+                                <span className="text-sm font-semibold">{mod.name}</span> 
+                                {mod.price > 0 && (
                                     <span className={`text-xs font-normal mt-1 ${isSelected ? 'text-primary-content/90' : 'text-base-content/60'}`}>
-                                        ${variant.price.toFixed(2)}
+                                        +${mod.price.toFixed(2)}
                                     </span>
-                                </button>
-                            )
-                        })}
-                        
-                        {/* Renderizado de Modificadores Normales */}
-                        {currentStep.group !== 'variants' && (currentStep.options as Modifier[]).map(mod => {
-                            const isSelected = selectedModifiers.has(mod.id);
-                            return (
-                                <button
-                                    key={mod.id}
-                                    onClick={() => handleModifierChange(mod, currentStep.isExclusive)}
-                                    className={`
-                                        btn h-auto min-h-[3.5rem] py-2 px-3 flex flex-col leading-tight normal-case border
-                                        ${isSelected 
-                                            ? 'btn-primary border-primary shadow-md scale-[1.02]' 
-                                            : 'btn-ghost bg-base-100 border-base-300 hover:border-primary/50'
-                                        }
-                                    `}
-                                >
-                                    <span className="text-sm font-semibold">{mod.name}</span> 
-                                    {mod.price > 0 && (
-                                        <span className={`text-xs font-normal mt-1 ${isSelected ? 'text-primary-content/90' : 'text-base-content/60'}`}>
-                                            +${mod.price.toFixed(2)}
-                                        </span>
-                                    )}
-                                </button>
-                            )
-                        })}
-                    </div>
+                                )}
+                            </button>
+                        )
+                    })}
                 </div>
-            )}
+            </div>
             
             {/* Footer */}
             <div className="p-4 border-t border-base-200 bg-base-100 flex gap-3">
@@ -221,11 +242,7 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
                 </button>
 
                 {isLastStep ? (
-                    <button 
-                        onClick={handleAddToTicket} 
-                        disabled={!isStepValid}
-                        className="btn btn-primary flex-1 shadow-lg shadow-primary/20"
-                    >
+                    <button onClick={handleAddToTicket} disabled={!isStepValid} className="btn btn-primary flex-1 shadow-lg shadow-primary/20">
                         Agregar ${currentPrice.toFixed(2)}
                     </button>
                 ) : (
