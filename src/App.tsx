@@ -17,6 +17,7 @@ import { ProductCard } from './components/ProductCard';
 import { TicketItemCard } from './components/TicketItemCard';
 import { LoginScreen } from './components/LoginScreen';
 import { DailyReportModal } from './components/DailyReportModal';
+import { AdminMenuScreen } from './components/AdminMenuScreen';
 
 // Pantallas Nuevas
 import { ShiftsScreen } from './components/ShiftsScreen';
@@ -152,6 +153,7 @@ function App() {
             {activeSection === 'movements' && <MovementsScreen />}
             {activeSection === 'reports' && <ReportsScreen />}
             {activeSection === 'users' && <UsersScreen />}
+            {activeSection === 'admin_menu' && <AdminMenuScreen />}
         </main>
 
         {activeSection === 'pos' && <BottomBar onAction={handleMainBtnClick} />}
@@ -240,6 +242,17 @@ function App() {
                 <li>
                     <a className={activeSection === 'users' ? 'active font-bold' : ''} onClick={() => { setSection('users'); document.getElementById('main-drawer')?.click(); }}>
                         <IconUsers /> Usuarios
+                    </a>
+                </li>
+                <li>
+                    <a className={activeSection === 'users' ? 'active font-bold' : ''} onClick={() => { setSection('users'); document.getElementById('main-drawer')?.click(); }}>
+                        <IconUsers /> Usuarios
+                    </a>
+                </li>
+                    {/* --- NUEVO BOTÓN --- */}
+                <li>
+                    <a className={activeSection === 'admin_menu' ? 'active font-bold' : ''} onClick={() => { setSection('admin_menu'); document.getElementById('main-drawer')?.click(); }}>
+                        <span className="text-xl">🛠️</span> Editar de Menú
                     </a>
                 </li>
             </>

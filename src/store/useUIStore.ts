@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import type { MenuGroup, MenuItem } from '../types/menu';
 
 // Definimos las secciones principales de la App
-export type AppSection = 'pos' | 'orders' | 'shifts' | 'movements' | 'reports' | 'users';
+export type AppSection = 'pos' | 'orders' | 'shifts' | 'movements' | 'reports' | 'users' | 'admin_menu';
 type ViewType = 'menu' | 'ticket';
 type ThemeType = 'dulce-light' | 'dulce-dark';
 

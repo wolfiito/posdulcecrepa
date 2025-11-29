@@ -13,6 +13,7 @@ export interface FixedPriceItem {
     id: string;
     name: string;
     category: string;
+    description?: string;
     variants: {
       name: string;
       price: number;
@@ -29,6 +30,8 @@ export interface FixedPriceItem {
     price: number;
     cost?: number;
     group: string; 
+    trackStock?: boolean;  // ¿Controlamos stock de esto?
+    currentStock?: number;
   }
   
   export interface PriceRule {
