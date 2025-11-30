@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useMenuStore } from './store/useMenuStore';
 import { useTicketStore } from './store/useTicketStore';
 import { useUIStore } from './store/useUIStore';
-import { useAuthStore } from './store/useAuthStore'; // Store de Auth
+import { useAuthStore } from './store/useAuthStore';
 import { orderService } from './services/orderService';
 import { useShiftStore } from './store/useShiftStore';
 import Modal from 'react-modal';
@@ -17,14 +17,14 @@ import { ProductCard } from './components/ProductCard';
 import { TicketItemCard } from './components/TicketItemCard';
 import { LoginScreen } from './components/LoginScreen';
 import { DailyReportModal } from './components/DailyReportModal';
-import { AdminMenuScreen } from './components/AdminMenuScreen';
 
-// Pantallas Nuevas
+// Pantallas
 import { ShiftsScreen } from './components/ShiftsScreen';
 import { MovementsScreen } from './components/MovementsScreen';
 import { ReportsScreen } from './components/ReportsScreen';
 import { UsersScreen } from './components/UsersScreen';
 import { OrdersScreen } from './components/OrdersScreen';
+import { AdminMenuScreen } from './components/AdminMenuScreen'; // Importación del Editor
 
 import type { MenuItem, MenuGroup, TicketItem } from './types/menu';
 
@@ -38,11 +38,11 @@ const IconWallet = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" heig
 const IconCheck = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>;
 const IconTicket = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>;
 const IconUsers = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>;
-const IconSun = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>;
-const IconMoon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>;
+const IconSun = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>;
+const IconMoon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>;
 
 function App() {
-  const { startListening, isLoading, modifiers, rules } = useMenuStore();
+  const { startListening, modifiers, rules } = useMenuStore();
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const { currentUser, logout } = useAuthStore();
   const { currentShift } = useShiftStore();
@@ -50,17 +50,17 @@ function App() {
   const { 
     view, theme, toggleTheme, setView, 
     activeModal, groupToCustomize, itemToSelectVariant, closeModals, 
-    currentGroup, navigateToGroup, orderToPrint,
+    navigateToGroup, orderToPrint,
     activeSection, setSection , openShiftModal
   } = useUIStore();
 
   const { addItem, orderMode, setOrderMode } = useTicketStore();
 
   useEffect(() => {
+    // Iniciar escucha en tiempo real
     const unsubscribe = startListening();
     const savedTheme = localStorage.getItem('theme') as 'dulce-light' | 'dulce-dark';
     if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
-
     return () => unsubscribe();
   }, []);
 
@@ -71,15 +71,10 @@ function App() {
     navigateToGroup(null);
   };
 
-  // --- LÓGICA BLINDADA PARA MESEROS ---
   const handleMainBtnClick = () => {
-      const { items, orderMode } = useTicketStore.getState();
+      const { items } = useTicketStore.getState();
       if (items.length === 0) return;
-
       const isMesero = currentUser?.role === 'MESERO';
-
-      // Si es Para Llevar Y NO ES MESERO, cobramos.
-      // Si es Mesero, SIEMPRE enviamos a caja (sin pago).
       if (orderMode === 'Para Llevar' && !isMesero) {
             if (!currentShift) {
                 openShiftModal();
@@ -87,7 +82,6 @@ function App() {
             }
           setIsPaymentModalOpen(true); 
       } else {
-          // Envío directo (Mesa o Mesero para llevar)
           handleFinalizeOrder(undefined); 
       }
   };
@@ -97,21 +91,17 @@ function App() {
       try {
           setIsPaymentModalOpen(false); 
           await orderService.createOrder(items, getTotal(), orderMode, orderNumber, paymentDetails);
-          
           const actionMsg = (orderMode === 'Para Llevar' && paymentDetails) ? 'cobrada' : 'enviada a caja/cocina';
           alert(`¡Orden #${orderNumber} ${actionMsg} con éxito!`);
-          
           incrementOrderNumber();
           clearTicket();
           useUIStore.getState().setView('menu');
       } catch (e) {
           console.error("Error:", e);
-          alert("Error al procesar la orden.");
       }
   };
 
   if (!currentUser) return <LoginScreen />;
-  if (isLoading) return <div className="flex justify-center items-center h-screen bg-base-200"><span className="loading loading-spinner loading-lg text-primary"></span></div>;
 
   return (
     <div className="drawer">
@@ -160,7 +150,7 @@ function App() {
 
         {activeSection === 'pos' && <BottomBar onAction={handleMainBtnClick} />}
 
-        {/* Modales Globales */}
+        {/* Modales */}
         {activeModal === 'custom_crepe' && groupToCustomize && (
             <CustomizeCrepeModal isOpen={true} onClose={closeModals} group={groupToCustomize} allModifiers={modifiers} allPriceRules={rules} onAddItem={handleAddItem} />
         )}
@@ -171,6 +161,7 @@ function App() {
         <ReceiptTemplate order={orderToPrint} />
         <DailyReportModal isOpen={activeModal === 'daily_report'} onClose={closeModals} />
       </div>
+
       <Modal 
         isOpen={activeModal === 'shift_control'} 
         onRequestClose={closeModals}
@@ -180,10 +171,10 @@ function App() {
           <div className="flex justify-end mb-2">
               <button onClick={closeModals} className="btn btn-sm btn-circle btn-ghost">✕</button>
           </div>
-          {/* Reutilizamos la pantalla completa dentro del modal */}
           <ShiftsScreen />
       </Modal>
-      {/* SIDEBAR CON ROLES */}
+
+      {/* SIDEBAR */}
       <div className="drawer-side z-50">
         <label htmlFor="main-drawer" aria-label="close sidebar" className="drawer-overlay"></label>
         <ul className="menu p-4 w-80 min-h-full bg-base-100 text-base-content gap-2">
@@ -191,19 +182,17 @@ function App() {
           <li className="mb-4 border-b border-base-200 pb-4">
              <div className="flex flex-col gap-1 items-start pointer-events-none">
                 <span className="font-black text-2xl text-primary">Dulce Crepa</span>
-                <span className="text-xs font-bold">{currentUser.name}</span>
+                <span className="text-xs font-bold">{currentUser.name || 'Usuario'}</span>
                 <span className="badge badge-sm badge-ghost">{currentUser.role}</span>
              </div>
           </li>
           
-          {/* 1. POS (Todos) */}
+          {/* Menú General */}
           <li>
             <a className={activeSection === 'pos' ? 'active font-bold' : ''} onClick={() => { setSection('pos'); document.getElementById('main-drawer')?.click(); }}>
                 <IconPOS /> Punto de Venta
             </a>
           </li>
-
-          {/* 2. ÓRDENES: Cajero, Gerente, Admin (Mesero NO la ve para no confundirse/cobrar) */}
           {['CAJERO', 'GERENTE', 'ADMIN'].includes(currentUser.role) && (
             <li>
                 <a className={activeSection === 'orders' ? 'active font-bold' : ''} onClick={() => { setSection('orders'); document.getElementById('main-drawer')?.click(); }}>
@@ -214,8 +203,8 @@ function App() {
 
           <div className="divider my-1"></div>
 
-          {/* 3. CAJA Y GASTOS: Gerente y Admin */}
-          {['CAJERO'].includes(currentUser.role) && (
+          {/* Menú Operativo */}
+          {['CAJERO', 'GERENTE', 'ADMIN'].includes(currentUser.role) && (
             <>
                 <li>
                     <a className={activeSection === 'shifts' ? 'active font-bold' : ''} onClick={() => { setSection('shifts'); document.getElementById('main-drawer')?.click(); }}>
@@ -232,7 +221,7 @@ function App() {
 
           <div className="divider my-1"></div>
 
-          {/* 4. ADMIN */}
+          {/* Menú Admin */}
           {currentUser.role === 'ADMIN' && (
             <>
                 <li className="menu-title opacity-50">Administración</li>
@@ -247,20 +236,23 @@ function App() {
                     </a>
                 </li>
                 <li>
-                    <a className={activeSection === 'users' ? 'active font-bold' : ''} onClick={() => { setSection('users'); document.getElementById('main-drawer')?.click(); }}>
-                        <IconUsers /> Usuarios
-                    </a>
-                </li>
-                    {/* --- NUEVO BOTÓN --- */}
-                <li>
                     <a className={activeSection === 'admin_menu' ? 'active font-bold' : ''} onClick={() => { setSection('admin_menu'); document.getElementById('main-drawer')?.click(); }}>
-                        <span className="text-xl">🛠️</span> Editar de Menú
+                        <span className="text-xl">🛠️</span> Editor de Menú
                     </a>
                 </li>
             </>
           )}
 
           <div className="mt-auto"></div>
+          
+          {/* Botón de Tema */}
+          <li>
+            <button onClick={toggleTheme} className="flex justify-between bg-base-200">
+              <span className="text-xs font-bold">Modo Oscuro</span>
+              {theme === 'dulce-dark' ? <IconMoon /> : <IconSun />}
+            </button>
+          </li>
+
           <li>
               <button 
                   onClick={() => { logout(); document.getElementById('main-drawer')?.click(); }} 
@@ -276,7 +268,9 @@ function App() {
   );
 }
 
-// --- SUB-COMPONENTES ---
+// --- SUB-COMPONENTES (MenuScreen, TicketScreen, BottomBar) ---
+// (Déjalos igual que antes, no cambian)
+// ... (Copia el resto de tu App.tsx original desde "const MenuScreen = ..." hasta el final)
 
 const MenuScreen: React.FC = () => {
     const { groups, items } = useMenuStore();
@@ -364,11 +358,10 @@ const TicketScreen: React.FC = () => {
     );
 };
 
-// --- BARRA INFERIOR INTELIGENTE ---
 const BottomBar: React.FC<{ onAction: () => void }> = ({ onAction }) => {
     const { items, getTotal, orderMode } = useTicketStore();
     const { view, setView } = useUIStore();
-    const { currentUser } = useAuthStore(); // Verificamos rol aquí también visualmente
+    const { currentUser } = useAuthStore();
     const total = getTotal();
 
     if (items.length === 0 && view !== 'ticket') return null;
