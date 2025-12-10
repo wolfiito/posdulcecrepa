@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { BrowserRouter } from 'react-router-dom'
 import './index.css' // Solo mantenemos los estilos globales de Tailwind
 import App from './App.tsx'
 
@@ -7,9 +8,12 @@ import App from './App.tsx'
 const rootElement = document.getElementById('root');
 
 if (rootElement) {
-  createRoot(rootElement).render(
+  createRoot(rootElement).render( 
     <StrictMode>
-      <App />
+      {/* Envolver App con BrowserRouter */}
+      <BrowserRouter> 
+        <App />
+      </BrowserRouter>
     </StrictMode>,
   )
 } else {

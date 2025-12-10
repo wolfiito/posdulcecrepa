@@ -4,12 +4,14 @@ import { db, collection, query, where, orderBy, getDocs, updateDoc, doc, serverT
 import type { Order } from '../services/orderService';
 import { PaymentModal } from './PaymentModal';
 import { printService } from '../services/printService';
-import { useAuthStore } from '../store/useAuthStore'; // <--- 1. IMPORTAR STORE
+import { useAuthStore } from '../store/useAuthStore';
 import { useShiftStore } from '../store/useShiftStore';
 import { useUIStore } from '../store/useUIStore';
+import { toast } from 'sonner';
+import { CardSkeleton } from './Skeletons';
 
 export const OrdersScreen: React.FC = () => {
-  const { currentUser } = useAuthStore(); // <--- 2. OBTENER USUARIO
+  const { currentUser } = useAuthStore();
   const { openShiftModal } = useUIStore();
   const { currentShift } = useShiftStore();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -31,6 +33,7 @@ export const OrdersScreen: React.FC = () => {
         setOrders(loaded);
     } catch (e) {
         console.error(e);
+        toast.error("Error al cargar órdenes");
     } finally {
         setLoading(false);
     }
@@ -39,9 +42,17 @@ export const OrdersScreen: React.FC = () => {
   useEffect(() => { loadOrders(); }, []);
 
   const handlePay = async (paymentDetails: any) => {
+      // 1. Verificación de seguridad
       if (!selectedOrder || !selectedOrder.id) return;
-      try {
-          const orderRef = doc(db, "orders", selectedOrder.id);
+      
+      // 2. CAPTURA DE VARIABLES (Esto soluciona el error de TypeScript)
+      // Guardamos el ID en una constante local que nunca cambiará ni será undefined
+      const orderId = selectedOrder.id;
+      const orderNum = selectedOrder.orderNumber;
+
+      const payPromise = async () => {
+          // Usamos la variable 'orderId' que TS sabe que es string seguro
+          const orderRef = doc(db, "orders", orderId);
           await updateDoc(orderRef, {
               status: 'paid',
               payment: paymentDetails,
@@ -51,12 +62,15 @@ export const OrdersScreen: React.FC = () => {
           const finalOrder = { ...selectedOrder, status: 'paid', payment: paymentDetails } as Order;
           printService.printReceipt(finalOrder);
 
-          alert("Cobrado correctamente");
           setSelectedOrder(null);
           loadOrders();
-      } catch (error) {
-          alert("Error al cobrar");
-      }
+      };
+
+      toast.promise(payPromise(), {
+        loading: 'Procesando cobro...',
+        success: `Orden #${orderNum} cobrada correctamente`,
+        error: 'Error al procesar el cobro',
+      });
   };
 
   // Helper para saber si puede cobrar
@@ -71,73 +85,79 @@ export const OrdersScreen: React.FC = () => {
             <button onClick={loadOrders} className="btn btn-sm btn-ghost">🔄 Actualizar</button>
         </div>
 
-        {loading ? <div className="text-center"><span className="loading loading-spinner"></span></div> : 
-         orders.length === 0 ? (
-            <div className="text-center py-20 opacity-50 bg-base-100 rounded-box border border-base-200">
-                <p className="text-xl font-bold">No hay órdenes pendientes</p>
-                <p className="text-sm">Los meseros no han enviado nada aún.</p>
-            </div>
-         ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {orders.map((order: any) => (
-                    <div key={order.id} className="card bg-base-100 shadow-md border border-base-200 hover:border-primary transition-colors">
-                        <div className="card-body p-4">
-                            <div className="flex justify-between items-start mb-2">
-                                <span className="badge badge-lg badge-warning font-bold text-white">
-                                    #{order.orderNumber}
-                                </span>
-                                <span className="text-xs font-bold opacity-50 uppercase">{order.mode}</span>
-                            </div>
-                            
-                            <ul className="text-sm space-y-1 mb-4 min-h-[60px]">
-                                {order.items.map((item: any, idx: number) => (
-                                    <li key={idx} className="flex justify-between">
-                                        <span className="line-clamp-1">{item.baseName}</span>
-                                        <span className="opacity-50">x1</span>
-                                    </li>
-                                ))}
-                                {order.items.length > 3 && <li className="text-xs italic opacity-50">+ {order.items.length - 3} más...</li>}
-                            </ul>
+        {loading ? (
+           // ESTADO DE CARGA (SKELETONS)
+           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+               {[...Array(6)].map((_, i) => (
+                   <CardSkeleton key={i} />
+               ))}
+           </div>
+        ) : orders.length === 0 ? (
+           // ESTADO VACÍO
+           <div className="text-center py-20 opacity-50 bg-base-100 rounded-box border border-base-200">
+               <p className="text-xl font-bold">No hay órdenes pendientes</p>
+               <p className="text-sm">Los meseros no han enviado nada aún.</p>
+           </div>
+        ) : (
+           // LISTA DE ÓRDENES
+           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+               {orders.map((order: any) => (
+                   <div key={order.id} className="card bg-base-100 shadow-md border border-base-200 hover:border-primary transition-colors">
+                       <div className="card-body p-4">
+                           <div className="flex justify-between items-start mb-2">
+                               <span className="badge badge-lg badge-warning font-bold text-white">
+                                   #{order.orderNumber}
+                               </span>
+                               <span className="text-xs font-bold opacity-50 uppercase">{order.mode}</span>
+                           </div>
+                           
+                           <ul className="text-sm space-y-1 mb-4 min-h-[60px]">
+                               {order.items.map((item: any, idx: number) => (
+                                   <li key={idx} className="flex justify-between">
+                                       <span className="line-clamp-1">{item.baseName}</span>
+                                       <span className="opacity-50">x1</span>
+                                   </li>
+                               ))}
+                               {order.items.length > 3 && <li className="text-xs italic opacity-50">+ {order.items.length - 3} más...</li>}
+                           </ul>
 
-                            <div className="flex justify-between items-center border-t border-base-200 pt-3">
-                                <div className="text-xl font-black text-primary">${order.total.toFixed(2)}</div>
-                                
-                                {/* --- CORRECCIÓN AQUÍ: VALIDACIÓN DE ROL --- */}
-                                {canCharge ? (
-                                    <button 
-                                        onClick={() => {
-                                            // --- CANDADO DE CAJA ---
-                                            if (!currentShift) {
-                                                openShiftModal();
-                                                return;
-                                            }
-                                            setSelectedOrder(order);
-                                        }}
-                                        className="btn btn-sm btn-success text-white shadow-sm"
-                                    >
-                                        Cobrar
-                                    </button>
-                                ) : (
-                                    <span className="badge badge-ghost text-xs opacity-50">En Caja</span>
-                                )}
-                            </div>
-                            <div className="text-[10px] text-center mt-1 opacity-40">
-                                {order.createdAt?.toDate().toLocaleTimeString()} - {order.cashier || 'Mesero'}
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-         )}
+                           <div className="flex justify-between items-center border-t border-base-200 pt-3">
+                               <div className="text-xl font-black text-primary">${order.total.toFixed(2)}</div>
+                               
+                               {canCharge ? (
+                                   <button 
+                                       onClick={() => {
+                                           if (!currentShift) {
+                                               openShiftModal();
+                                               return;
+                                           }
+                                           setSelectedOrder(order);
+                                       }}
+                                       className="btn btn-sm btn-success text-white shadow-sm"
+                                   >
+                                       Cobrar
+                                   </button>
+                               ) : (
+                                   <span className="badge badge-ghost text-xs opacity-50">En Caja</span>
+                               )}
+                           </div>
+                           <div className="text-[10px] text-center mt-1 opacity-40">
+                               {order.createdAt?.toDate().toLocaleTimeString()} - {order.cashier || 'Mesero'}
+                           </div>
+                       </div>
+                   </div>
+               ))}
+           </div>
+        )}
 
-         {selectedOrder && (
-             <PaymentModal 
-                isOpen={true} 
-                onClose={() => setSelectedOrder(null)} 
-                total={selectedOrder.total} 
-                onConfirm={handlePay} 
-             />
-         )}
+        {selectedOrder && (
+            <PaymentModal 
+               isOpen={true} 
+               onClose={() => setSelectedOrder(null)} 
+               total={selectedOrder.total} 
+               onConfirm={handlePay} 
+            />
+        )}
     </div>
   );
 };

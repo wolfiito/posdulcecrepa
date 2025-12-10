@@ -1,6 +1,9 @@
+// src/components/admin/ProductsManager.tsx
 import React, { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { db, collection, getDocs, addDoc, updateDoc, doc, deleteDoc } from '../../firebase';
 import type { MenuItem, FixedPriceItem } from '../../types/menu';
+import { TableRowSkeleton } from '../../components/Skeletons';
 
 export const ProductsManager: React.FC = () => {
   const [products, setProducts] = useState<MenuItem[]>([]);
@@ -47,6 +50,7 @@ export const ProductsManager: React.FC = () => {
 
     } catch (error) {
       console.error("Error cargando datos:", error);
+      toast.error("Error al cargar productos");
     } finally {
       setLoading(false);
     }
@@ -92,7 +96,7 @@ export const ProductsManager: React.FC = () => {
     if (hasVariants) {
       const validVariants = variants.filter(v => v.name.trim() !== '');
       if (validVariants.length === 0) {
-        alert("Agrega al menos una variante.");
+        toast.error("Agrega al menos una variante válida."); 
         setSubmitting(false);
         return;
       }
@@ -101,31 +105,46 @@ export const ProductsManager: React.FC = () => {
       itemData = { ...commonData, price };
     }
 
-    try {
+    const savePromise = async () => {
       if (editingId) {
         await updateDoc(doc(db, 'menu_items', editingId), itemData);
         setProducts(prev => prev.map(p => p.id === editingId ? { ...itemData, id: editingId } : p));
-        alert("Producto actualizado");
       } else {
         const docRef = await addDoc(collection(db, 'menu_items'), itemData);
         setProducts(prev => [...prev, { ...itemData, id: docRef.id }].sort((a, b) => a.name.localeCompare(b.name)));
-        alert("Producto creado");
       }
       handleResetForm();
-    } catch (error) {
-      console.error(error);
-      alert("Error al guardar");
-    } finally {
-      setSubmitting(false);
-    }
+    }; 
+
+    toast.promise(savePromise(), {
+      loading: editingId ? 'Actualizando producto...' : 'Creando producto...',
+      success: '¡Producto guardado exitosamente!',
+      error: 'Error al guardar el producto',
+    });
+    
+    setSubmitting(false);
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("¿Eliminar este producto permanentemente?")) return;
-    try {
-      await deleteDoc(doc(db, 'menu_items', id));
-      setProducts(prev => prev.filter(p => p.id !== id));
-    } catch (error) { alert("Error al eliminar"); }
+    toast("¿Eliminar este producto permanentemente?", {
+      action: {
+        label: 'Eliminar',
+        onClick: async () => {
+          try {
+              await deleteDoc(doc(db, 'menu_items', id));
+              setProducts(prev => prev.filter(p => p.id !== id));
+              toast.success("Producto eliminado");
+          } catch (error) {
+              toast.error("Error al eliminar");
+          }
+        }
+      },
+      cancel: {
+        label: 'Cancelar',
+        onClick: () => {}, // <--- CORRECCIÓN AQUÍ: onClick vacío obligatorio
+      },
+      duration: 5000, 
+    });
   };
 
   // Helpers
@@ -234,7 +253,7 @@ export const ProductsManager: React.FC = () => {
         </div>
       </div>
 
-      {/* --- PANEL DERECHO: LISTA --- */}
+      {/* --- PANEL DERECHO: LISTA CON SKELETONS --- */}
       <div className="lg:col-span-2 bg-base-100 rounded-box border border-base-200 flex flex-col overflow-hidden shadow-sm h-full">
         {/* Header simple */}
         <div className="p-3 border-b border-base-200 bg-base-100 flex justify-between items-center">
@@ -242,20 +261,20 @@ export const ProductsManager: React.FC = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto p-0">
-          {loading ? (
-            <div className="flex justify-center p-10"><span className="loading loading-spinner text-primary"></span></div>
-          ) : (
-            <table className="table table-sm table-pin-rows w-full">
-              <thead className="bg-base-200 text-xs uppercase">
-                <tr>
-                  <th>Producto</th>
-                  <th>Tipo</th>
-                  <th className="text-right">Precio</th>
-                  <th className="text-center w-20">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {products.map(p => {
+          <table className="table table-sm table-pin-rows w-full">
+            <thead className="bg-base-200 text-xs uppercase">
+              <tr>
+                <th>Producto</th>
+                <th>Tipo</th>
+                <th className="text-right">Precio</th>
+                <th className="text-center w-20">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                [...Array(8)].map((_, i) => <TableRowSkeleton key={i} />)
+              ) : (
+                products.map(p => {
                   const isVar = 'variants' in p;
                   return (
                     <tr key={p.id} className="hover group transition-colors">
@@ -265,7 +284,6 @@ export const ProductsManager: React.FC = () => {
                         {p.modifierGroups && p.modifierGroups.length > 0 && (
                             <div className="flex gap-1 mt-1 flex-wrap">
                                 {p.modifierGroups.map(gid => {
-                                    // Intentamos mostrar el nombre bonito si lo tenemos, si no el ID
                                     const groupName = availableGroups.find(ag => ag.id === gid)?.name || gid;
                                     return <span key={gid} className="badge badge-xs badge-ghost text-[9px] border-base-300">{groupName}</span>;
                                 })}
@@ -291,9 +309,13 @@ export const ProductsManager: React.FC = () => {
                       </td>
                     </tr>
                   );
-                })}
-              </tbody>
-            </table>
+                })
+              )}
+            </tbody>
+          </table>
+          
+          {!loading && products.length === 0 && (
+            <div className="text-center p-10 opacity-50 text-sm">No hay productos. ¡Crea uno a la izquierda!</div>
           )}
         </div>
       </div>

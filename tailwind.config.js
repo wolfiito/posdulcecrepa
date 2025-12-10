@@ -1,42 +1,60 @@
-/** @type {import('tailwindcss').Config} */
+// tailwind.config.js
 import daisyui from "daisyui"
 
+/** @type {import('tailwindcss').Config} */
 export default {
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {
-      fontFamily: {
-        sans: ['"DM Sans"', 'sans-serif'],
-      },
-      animation: {
-        'fade-in': 'fadeIn 0.3s ease-out forwards',
-        'pop-in': 'popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
-        'slide-up': 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-      },
-      keyframes: {
-        fadeIn: {
-          '0%': { opacity: '0' },
-          '100%': { opacity: '1' },
-        },
-        popIn: {
-          '0%': { opacity: '0', transform: 'scale(0.95)' },
-          '100%': { opacity: '1', transform: 'scale(1)' },
-        },
-        slideUp: {
-          '0%': { transform: 'translateY(100%)' },
-          '100%': { transform: 'translateY(0)' },
-        },
-      },
-    },
+    extend: {},
   },
   plugins: [
     daisyui,
   ],
   daisyui: {
-    // Solo listamos los nombres para que DaisyUI sepa que existen
-    themes: ["light", "dark", "dulce-light", "dulce-dark"],
+    themes: [
+      {
+        "dulce-light": {
+          "primary": "#ec4899",          // Pink-500
+          "primary-content": "#ffffff",
+          "secondary": "#fbcfe8",        // Pink-200
+          "secondary-content": "#831843",
+          "accent": "#d946ef",
+          "accent-content": "#ffffff",
+          "neutral": "#374151",
+          "neutral-content": "#ffffff",
+          "base-100": "#fff1f2",         // Rose-50 (Fondo calido)
+          "base-200": "#ffe4e6",         // Rose-100
+          "base-300": "#fecdd3",
+          "base-content": "#881337",     // Texto Vino
+          "info": "#67e8f9",
+          "success": "#4ade80",
+          "warning": "#fde047",
+          "error": "#f43f5e",
+        },
+      },
+      {
+        "dulce-dark": {
+          "primary": "#f472b6",          // Pink-400
+          "primary-content": "#1f2937",
+          "secondary": "#831843",        // Pink-900
+          "secondary-content": "#fbcfe8",
+          "accent": "#c026d3",
+          "accent-content": "#ffffff",
+          "neutral": "#1f2937",
+          "neutral-content": "#f9fafb",
+          "base-100": "#1a1016",         // Negro-Vino profundo
+          "base-200": "#291520",
+          "base-300": "#451a2b",
+          "base-content": "#fce7f3",     // Texto rosa muy pálido
+          "info": "#22d3ee",
+          "success": "#22c55e",
+          "warning": "#facc15",
+          "error": "#e11d48",
+        },
+      },
+    ],
   },
 }

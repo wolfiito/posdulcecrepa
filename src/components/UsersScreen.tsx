@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { userService } from '../services/userService';
 import type { User, UserRole } from '../store/useAuthStore';
+import { toast } from 'sonner';
 
 export const UsersScreen: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -26,32 +27,39 @@ export const UsersScreen: React.FC = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !pin || pin.length < 4) return alert("Completa los datos correctamente.");
+    if (!name || !pin || pin.length < 4) return toast.warning("Completa el nombre y un PIN de 4 dígitos.");
 
     setIsSubmitting(true);
-    try {
-      await userService.createUser(name, pin, role);
-      setName('');
-      setPin('');
-      setRole('CAJERO'); // Reset a default
-      alert("Empleado creado con éxito");
-      loadUsers();
-    } catch (error: any) {
-      alert(error.message || "Error al crear usuario");
-    } finally {
-      setIsSubmitting(false);
-    }
+    toast.promise(userService.createUser(name, pin, role), {
+      loading: 'Creando usuario...',
+        success: () => {
+            setName('');
+            setPin('');
+            setRole('CAJERO');
+            loadUsers();
+            return "Empleado creado con éxito";
+        },
+        error: (err) => err.message || "Error al crear usuario"
+    });
+    setIsSubmitting(false);
   };
 
-  const handleDelete = async (id: string, userName: string) => {
-    if (!confirm(`¿Estás seguro de eliminar a ${userName}?`)) return;
-    try {
-      await userService.deleteUser(id);
-      loadUsers();
-    } catch (error) {
-      alert("Error al eliminar");
-    }
-  };
+  const handleDelete = (id: string, userName: string) => {
+    toast(`¿Eliminar a ${userName}?`, {
+        description: "Esta acción no se puede deshacer",
+        action: {
+            label: "Eliminar",
+            onClick: () => {
+                userService.deleteUser(id)
+                    .then(() => {
+                        toast.success("Usuario eliminado");
+                        loadUsers();
+                    })
+                    .catch(() => toast.error("Error al eliminar"));
+            }
+        }
+    });
+};
 
   return (
     <div className="animate-fade-in max-w-4xl mx-auto">
