@@ -1,5 +1,6 @@
 // src/utils/bluetoothPrintBuilder.ts
-import type { Order } from '../services/orderService';
+import { Timestamp } from '../firebase';
+import type { Order } from '../types/order';
 
 // CONFIGURACIÓN DE ANCHO (58mm suele ser 32 caracteres con fuente normal)
 const MAX_CHARS = 32;
@@ -16,21 +17,29 @@ const formatLine = (leftText: string, rightText: string): string => {
   };
   
   const getFormattedDate = (order: Order) => {
-      try {
-          if (order.createdAt?.toDate) {
-              const d = order.createdAt.toDate();
-              return {
-                  date: d.toLocaleDateString('es-MX'),
-                  time: d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
-              };
-          }
-          const d = new Date();
-          return {
-              date: d.toLocaleDateString('es-MX'),
-              time: d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
-          };
-      } catch (e) { return { date: "--/--/--", time: "--:--" }; }
-  };
+    try {
+        let d: Date;
+
+        // VERIFICACIÓN SEGURA DE TIPOS
+        if (order.createdAt instanceof Timestamp) {
+            // Si es Timestamp de Firebase, lo convertimos
+            d = order.createdAt.toDate();
+        } else if (order.createdAt instanceof Date) {
+            // Si ya es Date, lo usamos directo
+            d = order.createdAt;
+        } else {
+            // Si es FieldValue (aún no guardado) o null, usamos fecha actual
+            d = new Date();
+        }
+
+        return {
+            date: d.toLocaleDateString('es-MX'),
+            time: d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+        };
+    } catch (e) { 
+        return { date: "--/--/--", time: "--:--" }; 
+    }
+};
 
 // ==========================================
 // 1. CONSTRUCTOR PARA IPHONE (JSON Thermer)

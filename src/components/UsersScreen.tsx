@@ -1,7 +1,7 @@
 // src/components/UsersScreen.tsx
 import React, { useEffect, useState } from 'react';
 import { userService } from '../services/userService';
-import type { User, UserRole } from '../store/useAuthStore';
+import type { User, UserRole } from '../types/user';
 import { toast } from 'sonner';
 
 export const UsersScreen: React.FC = () => {

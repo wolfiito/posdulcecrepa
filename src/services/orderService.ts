@@ -1,63 +1,42 @@
 // src/services/orderService.ts
-import { db, collection, serverTimestamp, runTransaction, doc } from '../firebase'; // <--- IMPORTANTE: runTransaction y doc
+import { db, collection, serverTimestamp, runTransaction, doc } from '../firebase';
 import { printService } from './printService';
 import type { TicketItem } from '../types/menu';
-import { useAuthStore } from '../store/useAuthStore'; 
-
-export type PaymentMethod = 'cash' | 'card' | 'transfer';
-
-export interface PaymentDetails {
-  method: PaymentMethod;
-  amountPaid: number;
-  change: number;
-  cardFee?: number;
-}
-
-export interface Order {
-  id?: string;
-  items: TicketItem[];
-  total: number;
-  mode: 'Mesa 1' | 'Mesa 2' | 'Para Llevar';
-  status: 'pending' | 'paid' | 'cancelled';
-  orderNumber: number;
-  createdAt: any;
-  payment?: PaymentDetails;
-  cashier?: string;
-}
+// Importamos los nuevos tipos que acabamos de crear
+import type { Order, PaymentDetails, OrderMode } from '../types/order';
 
 export const orderService = {
   async createOrder(
     items: TicketItem[], 
     total: number, 
-    mode: 'Mesa 1' | 'Mesa 2' | 'Para Llevar', 
+    mode: OrderMode, 
     orderNumber: number,
+    cashierName: string, // <--- NUEVO: Recibimos el nombre del cajero aquí
     payment?: PaymentDetails 
   ): Promise<void> {
     
     const initialStatus = payment ? 'paid' : 'pending';
-    const currentUser = useAuthStore.getState().currentUser;
-    const cashierName = currentUser?.name || 'Cajero';
 
-    // Objeto para imprimir (Local)
+    // 1. Objeto para imprimir (Local - usa Date para que no falle la impresión)
     const printOrderData: Order = {
       items,
       total,
       mode,
       status: initialStatus,
       orderNumber,
-      createdAt: { toDate: () => new Date() },
+      createdAt: new Date(), // Fecha local para el ticket
       payment,
       cashier: cashierName
     };
 
-    // Objeto para Firebase
-    const firebaseOrderData = {
+    // 2. Objeto para Firebase (Base de Datos - usa serverTimestamp)
+    const firebaseOrderData: Order = {
       items,
       total,
       mode,
       status: initialStatus,
       orderNumber,
-      createdAt: serverTimestamp(),
+      createdAt: serverTimestamp(), // Marca de tiempo del servidor
       cashier: cashierName,
       ...(payment && { payment }) 
     };
@@ -66,8 +45,7 @@ export const orderService = {
       // --- INICIO DE TRANSACCIÓN DE INVENTARIO ---
       await runTransaction(db, async (transaction) => {
         
-        // 1. Identificar qué modificadores (ingredientes) se usaron
-        // Mapa: ID del modificador -> Cantidad a restar
+        // A. Identificar qué modificadores (ingredientes) se usaron
         const modifiersToDeduct = new Map<string, number>();
 
         items.forEach(item => {
@@ -79,7 +57,8 @@ export const orderService = {
             }
         });
 
-        // 2. Leer el stock actual de esos modificadores en la BD (Lectura atómica)
+        // B. Leer stocks y preparar actualizaciones
+        // Nota: Leemos todo antes de escribir nada (regla de Firestore)
         const updates = [];
         for (const [modId, qty] of modifiersToDeduct) {
             const modRef = doc(db, "modifiers", modId);
@@ -87,37 +66,35 @@ export const orderService = {
 
             if (modDoc.exists()) {
                 const data = modDoc.data();
-                // Solo descontamos si tiene la bandera trackStock activa
                 if (data.trackStock) {
                     const currentStock = data.currentStock || 0;
                     const newStock = currentStock - qty;
-                    // Preparamos la actualización (no la ejecutamos todavía)
                     updates.push({ ref: modRef, newStock });
                 }
             }
         }
 
-        // 3. Ejecutar todas las escrituras
-        
-        // A. Crear la Orden
-        const newOrderRef = doc(collection(db, "orders")); // Referencia nueva
+        // C. Ejecutar escrituras
+        // 1. Guardar la orden
+        const newOrderRef = doc(collection(db, "orders"));
         transaction.set(newOrderRef, firebaseOrderData);
 
-        // B. Actualizar Stocks
+        // 2. Actualizar inventario
         updates.forEach(update => {
             transaction.update(update.ref, { currentStock: update.newStock });
         });
-
       });
       // --- FIN DE TRANSACCIÓN ---
 
-      // 4. Imprimir Ticket (Solo si la transacción fue exitosa)
+      // 3. Imprimir Ticket solo si todo salió bien
+      // (Opcional: podrías poner esto en un try-catch separado si no quieres 
+      // que un fallo de impresora detenga el flujo, pero por ahora está bien aquí)
       printService.printReceipt(printOrderData);
 
     } catch (error) {
-      console.error("Error crítico al procesar orden e inventario:", error);
-      alert("Error al guardar la orden. Revisa tu conexión.");
-      throw error; // Re-lanzar para que la UI se entere
+      console.error("Error crítico al procesar orden:", error);
+      // YA NO hacemos alert() aquí. Lanzamos el error para que la UI lo maneje.
+      throw error; 
     }
   }
 };

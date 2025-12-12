@@ -2,7 +2,8 @@
 import React from 'react';
 // Importamos createPortal para "teletransportar" el ticket fuera de la App
 import { createPortal } from 'react-dom';
-import type { Order } from '../services/orderService';
+import type { Order } from '../types/order';
+import { Timestamp } from '../firebase';
 
 interface Props {
   order: Order | null;
@@ -11,9 +12,17 @@ interface Props {
 export const ReceiptTemplate: React.FC<Props> = ({ order }) => {
   if (!order) return null;
 
-  const date = order.createdAt?.toDate 
-    ? order.createdAt.toDate().toLocaleString('es-MX') 
-    : new Date().toLocaleString('es-MX');
+  // Lógica segura para obtener el string de fecha
+  let dateStr = '';
+  
+  if (order.createdAt instanceof Timestamp) {
+      dateStr = order.createdAt.toDate().toLocaleString('es-MX');
+  } else if (order.createdAt instanceof Date) {
+      dateStr = order.createdAt.toLocaleString('es-MX');
+  } else {
+      // Caso fallback (FieldValue o indefinido)
+      dateStr = new Date().toLocaleString('es-MX');
+  }
 
   // Usamos un Portal para renderizar esto directamente en el body del navegador
   // Esto lo "saca" de tu diseño principal de React
@@ -24,7 +33,7 @@ export const ReceiptTemplate: React.FC<Props> = ({ order }) => {
       <div className="print-text print-center mb-2">
         <h2 className="text-lg font-black uppercase mb-1">Dulce Crepa</h2>
         <p className="text-[10px]">Ticket de Venta</p>
-        <p className="text-[10px]">{date}</p>
+        <p className="text-[10px]">{dateStr}</p>
         <p className="text-sm font-bold my-1">Orden #{order.orderNumber}</p>
         <p className="text-xs uppercase font-bold mb-1">
           [{order.mode}]

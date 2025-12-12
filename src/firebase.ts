@@ -23,7 +23,8 @@ import {
   deleteDoc,
   Timestamp,
   setDoc,
-  onSnapshot
+  onSnapshot,
+  FieldValue
 } from "firebase/firestore";
 
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
@@ -68,7 +69,8 @@ export {
   updateDoc,   // <--- NUEVO
   deleteDoc,
   setDoc,
-  onSnapshot
+  onSnapshot,
+  FieldValue
 };
 
 // Exporta los TIPOS que usaremos

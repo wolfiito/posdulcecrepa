@@ -2,10 +2,11 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
+import type { UserRole } from '../types/user';
 
 interface Props {
   children: React.ReactNode;
-  allowedRoles: string[];
+  allowedRoles: UserRole[];
 }
 
 export const ProtectedRoute: React.FC<Props> = ({ children, allowedRoles }) => {

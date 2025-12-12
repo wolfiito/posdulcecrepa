@@ -1,6 +1,7 @@
 // src/services/userService.ts
 import { db, collection, getDocs, addDoc, deleteDoc, doc, query, orderBy, where } from '../firebase';
-import type { User, UserRole } from '../store/useAuthStore';
+// Importamos desde la nueva ubicación centralizada
+import type { User, UserRole } from '../types/user';
 
 export const userService = {
   // 1. Obtener todos los empleados
@@ -20,6 +21,7 @@ export const userService = {
     // Validar que el PIN no exista ya
     const q = query(collection(db, 'users'), where('pin', '==', pin));
     const snap = await getDocs(q);
+    
     if (!snap.empty) {
       throw new Error("Este PIN ya está en uso por otro empleado.");
     }

@@ -17,6 +17,7 @@ import { MovementsScreen } from './components/MovementsScreen';
 import { ReportsScreen } from './components/ReportsScreen';
 import { UsersScreen } from './components/UsersScreen';
 import { AdminMenuScreen } from './components/AdminMenuScreen';
+import type { UserRole } from './types/user';
 
 function App() {
   const { currentUser } = useAuthStore();
@@ -31,8 +32,8 @@ function App() {
   }
 
   // Definimos roles comunes para reutilizar
-  const STAFF_ROLES = ['CAJERO', 'GERENTE', 'ADMIN']; // Mesero NO está aquí
-  const ADMIN_ONLY = ['ADMIN'];
+  const STAFF_ROLES: UserRole[] = ['CAJERO', 'GERENTE', 'ADMIN']; 
+  const ADMIN_ONLY: UserRole[] = ['ADMIN'];
 
   return (
     <>

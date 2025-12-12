@@ -69,22 +69,37 @@ export const PosPage: React.FC = () => {
   };
 
   const handleFinalizeOrder = async (paymentDetails?: any) => {
-      const { items, getTotal, orderMode, orderNumber, incrementOrderNumber, clearTicket } = useTicketStore.getState();
-      
-      const createOrderPromise = async () => {
-          setIsPaymentModalOpen(false); 
-          await orderService.createOrder(items, getTotal(), orderMode, orderNumber, paymentDetails);
-          incrementOrderNumber();
-          clearTicket();
-          setView('menu');
-      };
+    // Obtenemos el estado actual
+    const { items, getTotal, orderMode, orderNumber, incrementOrderNumber, clearTicket } = useTicketStore.getState();
+    
+    // Obtenemos el nombre del cajero de forma segura
+    const cashierName = currentUser?.name || 'Cajero Genérico';
 
-      toast.promise(createOrderPromise(), {
-          loading: 'Procesando orden...',
-          success: `¡Orden #${orderNumber} ${paymentDetails ? 'cobrada' : 'enviada'} con éxito!`,
-          error: 'Error al procesar la orden',
-      });
-  };
+    const createOrderPromise = async () => {
+        setIsPaymentModalOpen(false); 
+        
+        // <--- AQUÍ ESTÁ EL CAMBIO PRINCIPAL:
+        // Ahora pasamos 'cashierName' como argumento.
+        await orderService.createOrder(
+            items, 
+            getTotal(), 
+            orderMode, 
+            orderNumber, 
+            cashierName, // Pasamos el nombre explícitamente
+            paymentDetails
+        );
+        
+        incrementOrderNumber();
+        clearTicket();
+        setView('menu');
+    };
+
+    toast.promise(createOrderPromise(), {
+        loading: 'Procesando orden...',
+        success: `¡Orden #${orderNumber} ${paymentDetails ? 'cobrada' : 'enviada'} con éxito!`,
+        error: 'Error al procesar la orden. Verifique conexión.', // Mensaje amigable
+    });
+};
 
   // Renderizado principal
   return (

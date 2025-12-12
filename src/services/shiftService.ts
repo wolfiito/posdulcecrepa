@@ -1,16 +1,14 @@
-// src/services/shiftService.ts
 import { db, collection, addDoc, updateDoc, getDocs, query, where, orderBy, limit, serverTimestamp, doc, Timestamp } from '../firebase';
-// Importamos el reporte
 import { reportService } from './reportService';
 
+// Interfaz corregida: Sin 'any'
 export interface Shift {
-  // ... (Mismos tipos que tenías, no cambies nada aquí)
   id: string;
   isOpen: boolean;
   openedBy: string;
-  openedAt: any; 
+  openedAt: Timestamp | Date; // <--- Tipado correcto
   initialFund: number;
-  closedAt?: any;
+  closedAt?: Timestamp | Date;
   finalCount?: number; 
   totalSalesCash?: number;
   totalExpenses?: number;
@@ -19,17 +17,20 @@ export interface Shift {
 }
 
 export const shiftService = {
-  // ... getCurrentShift y openShift quedan IGUAL ...
   async getCurrentShift(): Promise<Shift | null> {
     const q = query(collection(db, 'shifts'), where('isOpen', '==', true), orderBy('openedAt', 'desc'), limit(1));
     const snapshot = await getDocs(q);
+    
     if (snapshot.empty) return null;
+    
+    // Forzamos el tipado seguro al devolver
     return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Shift;
   },
 
-  async openShift(initialFund: number, user: string = 'Cajero #1'): Promise<string> {
+  async openShift(initialFund: number, user: string): Promise<string> {
     const current = await this.getCurrentShift();
     if (current) throw new Error("Ya hay un turno abierto.");
+    
     const docRef = await addDoc(collection(db, 'shifts'), {
       isOpen: true,
       openedBy: user,
@@ -39,18 +40,14 @@ export const shiftService = {
     return docRef.id;
   },
 
-  // --- AQUÍ ESTÁ EL CAMBIO CRÍTICO PARA LA MADRUGADA ---
   async getShiftMetrics(shift: Shift) {
-    // 1. Hora de Inicio Exacta (ej. 17:03 PM)
-    const startDate = shift.openedAt instanceof Timestamp ? shift.openedAt.toDate() : new Date();
-    
-    // 2. Hora de Fin Exacta (Ahora mismo)
+    // Manejo robusto de fechas: Si es Timestamp de Firebase lo convertimos, si es Date lo usamos
+    const startDate = shift.openedAt instanceof Timestamp ? shift.openedAt.toDate() : (shift.openedAt as Date);
     const endDate = new Date(); 
 
-    // 3. Pedimos reporte EXACTO entre esas dos horas (cruza días sin problema)
     const report = await reportService.getReportByDateRange(startDate, endDate); 
     
-    // Calculamos efectivo esperado
+    // Calculamos efectivo esperado: Caja Inicial + Ventas Efectivo - Gastos
     const expectedCash = shift.initialFund + report.cashTotal - report.totalExpenses;
     
     return {

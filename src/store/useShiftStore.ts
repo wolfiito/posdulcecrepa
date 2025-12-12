@@ -1,6 +1,7 @@
 // src/store/useShiftStore.ts
 import { create } from 'zustand';
 import { shiftService, type Shift } from '../services/shiftService';
+import { useAuthStore } from './useAuthStore';
 
 interface ShiftState {
   currentShift: Shift | null;
@@ -30,7 +31,9 @@ export const useShiftStore = create<ShiftState>((set, get) => ({
 
   openShift: async (amount) => {
     set({ isLoading: true });
-    await shiftService.openShift(amount);
+    const { currentUser } = useAuthStore.getState();
+    const userName = currentUser?.name || 'Cajero Genérico';
+    await shiftService.openShift(amount, userName);
     await get().checkCurrentShift(); // Recargar estado
     set({ isLoading: false });
   },
