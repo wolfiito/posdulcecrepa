@@ -7,6 +7,7 @@ import { useUIStore } from '../store/useUIStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useShiftStore } from '../store/useShiftStore';
 import { orderService } from '../services/orderService';
+import type { OrderMode } from '../types/order'; // Importamos el tipo
 
 // Componentes
 import { ReceiptTemplate } from '../components/ReceiptTemplate';
@@ -17,7 +18,7 @@ import { ProductCard } from '../components/ProductCard';
 import { TicketItemCard } from '../components/TicketItemCard';
 import { ShiftsScreen } from '../components/ShiftsScreen';
 
-// Iconos (Importados desde nuestro nuevo archivo)
+// Iconos
 import { IconCheck, IconTicket, IconBack } from '../components/Icons';
 
 // Tipos
@@ -36,13 +37,24 @@ export const PosPage: React.FC = () => {
     navigateToGroup, orderToPrint, openShiftModal
   } = useUIStore();
 
-  const { addItem, orderMode, setOrderMode } = useTicketStore();
+  const { addItem, orderMode, setOrderMode, customerName, setCustomerName } = useTicketStore();
 
-  // Escuchar cambios en el menú al montar este componente
   useEffect(() => {
     const unsubscribe = startListening();
     return () => unsubscribe();
   }, []);
+
+  // --- LÓGICA DE MESAS INTELIGENTE ---
+  const handleModeChange = (mode: OrderMode) => {
+      setOrderMode(mode);
+      if (mode !== 'Para Llevar') {
+          // Si es Mesa, el nombre ES la mesa (Automático)
+          setCustomerName(mode);
+      } else {
+          // Si es Para Llevar, limpiamos para que escriban el nombre
+          setCustomerName('');
+      }
+  };
 
   const handleAddItem = (item: TicketItem) => {
     addItem(item);
@@ -56,90 +68,116 @@ export const PosPage: React.FC = () => {
       if (items.length === 0) return;
       const isMesero = currentUser?.role === 'MESERO';
       
+      // VALIDACIÓN: Solo pedimos escribir nombre si es "Para Llevar"
+      if (orderMode === 'Para Llevar' && !customerName.trim()) {
+          toast.warning("⚠️ Escribe el nombre del cliente para llevar");
+          document.getElementById('customer-name-input')?.focus();
+          return;
+      }
+      
       if (orderMode === 'Para Llevar' && !isMesero) {
-            // Validar turno abierto para cobrar
             if (!currentShift) {
                 openShiftModal();
                 return;
             }
           setIsPaymentModalOpen(true); 
       } else {
+          // Si es Mesa o es Mesero, se envía directo (sin cobrar aun)
           handleFinalizeOrder(undefined); 
       }
   };
 
   const handleFinalizeOrder = async (paymentDetails?: any) => {
-    // Obtenemos el estado actual
-    const { items, getTotal, orderMode, orderNumber, incrementOrderNumber, clearTicket } = useTicketStore.getState();
-    
-    // Obtenemos el nombre del cajero de forma segura
-    const cashierName = currentUser?.name || 'Cajero Genérico';
+      const { items, getTotal, orderMode, clearTicket, customerName } = useTicketStore.getState();
+      const cashierName = currentUser?.name || 'Cajero';
+      
+      const createOrderPromise = async () => {
+          setIsPaymentModalOpen(false); 
+          
+          await orderService.createOrder(
+              items, 
+              getTotal(), 
+              orderMode, 
+              cashierName,
+              customerName, 
+              paymentDetails
+          );
+          
+          // Al limpiar, si es Mesa, mantenemos el nombre de la mesa para seguir pidiendo rápido
+          // Si es Para Llevar, limpiamos el nombre.
+          const currentMode = orderMode; // Guardamos ref
+          clearTicket();
+          
+          if (currentMode !== 'Para Llevar') {
+              setCustomerName(currentMode); // Restauramos "Mesa X"
+              setOrderMode(currentMode);
+          }
+          
+          setView('menu');
+      };
 
-    const createOrderPromise = async () => {
-        setIsPaymentModalOpen(false); 
-        
-        // <--- AQUÍ ESTÁ EL CAMBIO PRINCIPAL:
-        // Ahora pasamos 'cashierName' como argumento.
-        await orderService.createOrder(
-            items, 
-            getTotal(), 
-            orderMode, 
-            orderNumber, 
-            cashierName, // Pasamos el nombre explícitamente
-            paymentDetails
-        );
-        
-        incrementOrderNumber();
-        clearTicket();
-        setView('menu');
-    };
+      toast.promise(createOrderPromise(), {
+          loading: 'Enviando orden...',
+          success: `¡Orden enviada!`,
+          error: 'Error al procesar',
+      });
+  };
 
-    toast.promise(createOrderPromise(), {
-        loading: 'Procesando orden...',
-        success: `¡Orden #${orderNumber} ${paymentDetails ? 'cobrada' : 'enviada'} con éxito!`,
-        error: 'Error al procesar la orden. Verifique conexión.', // Mensaje amigable
-    });
-};
-
-  // Renderizado principal
   return (
     <>
-      {/* Selector de Modo (Mesa/Llevar) - Lo inyectamos aquí o en el Navbar (por ahora aquí arriba) */}
-      <div className="flex justify-end mb-2">
-         <div className="join shadow-sm border border-base-300 bg-base-100 p-1 rounded-btn">
+      {/* 1. BARRA SUPERIOR INTELIGENTE */}
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-2 gap-2 bg-base-100 p-2 rounded-box shadow-sm border border-base-200">
+         
+         {/* SELECTOR DE MODO (Ahora a la izquierda para jerarquía) */}
+         <div className="join shadow-sm border border-base-300 bg-base-200 p-0.5 rounded-btn">
             {(['Mesa 1', 'Mesa 2', 'Para Llevar'] as const).map((mode) => (
-                <button key={mode} onClick={() => setOrderMode(mode)} className={`join-item btn btn-xs sm:btn-sm border-none ${orderMode === mode ? 'bg-base-200 shadow-sm font-extrabold' : 'btn-ghost font-medium'}`}>
-                    {mode === 'Para Llevar' ? 'Llevar' : mode}
+                <button 
+                    key={mode} 
+                    onClick={() => handleModeChange(mode)} 
+                    className={`join-item btn btn-xs sm:btn-sm border-none transition-all ${orderMode === mode ? 'bg-white text-black shadow-sm font-extrabold' : 'btn-ghost font-medium text-base-content/60'}`}
+                >
+                    {mode === 'Para Llevar' ? 'Llevar 🛍️' : mode}
                 </button>
             ))}
         </div>
+
+         {/* INPUT DE NOMBRE (Solo visible/habilitado según el modo) */}
+         <div className="flex-1 w-full sm:w-auto text-right">
+            {orderMode === 'Para Llevar' ? (
+                <input 
+                    id="customer-name-input"
+                    type="text" 
+                    placeholder="Nombre del Cliente..." 
+                    className="input input-sm input-bordered w-full sm:max-w-xs font-bold text-primary"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    autoComplete="off"
+                />
+            ) : (
+                <div className="badge badge-lg badge-ghost font-bold opacity-50">
+                    {orderMode} (Cuenta Abierta)
+                </div>
+            )}
+         </div>
       </div>
 
-      {/* Contenido Principal: Menú o Ticket */}
+      {/* Contenido Principal */}
       {view === 'menu' ? <MenuScreen /> : <TicketScreen />}
 
-      {/* Barra Inferior Flotante */}
+      {/* Barra Inferior */}
       <BottomBar onAction={handleMainBtnClick} />
 
-      {/* --- MODALES --- */}
-      
-      {/* Modal de Personalización (Crepas) */}
+      {/* Modales (Sin cambios) */}
       {activeModal === 'custom_crepe' && groupToCustomize && (
           <CustomizeCrepeModal isOpen={true} onClose={closeModals} group={groupToCustomize} allModifiers={modifiers} allPriceRules={rules} onAddItem={handleAddItem} />
       )}
-      
-      {/* Modal de Variantes (Tamaños) */}
       {activeModal === 'variant_select' && itemToSelectVariant && (
           <CustomizeVariantModal isOpen={true} onClose={closeModals} item={itemToSelectVariant} allModifiers={modifiers} onAddItem={handleAddItem} />
       )}
       
-      {/* Modal de Pago */}
       <PaymentModal isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)} total={useTicketStore.getState().getTotal()} onConfirm={handleFinalizeOrder} />
-      
-      {/* Template de Impresión (Invisible) */}
       <ReceiptTemplate order={orderToPrint} />
 
-      {/* Modal de Control de Turno (Si intentan cobrar sin turno) */}
       <Modal 
         isOpen={activeModal === 'shift_control'} 
         onRequestClose={closeModals}
@@ -154,9 +192,6 @@ export const PosPage: React.FC = () => {
     </>
   );
 };
-
-// --- SUB-COMPONENTES LOCALES (MenuScreen, TicketScreen, BottomBar) ---
-// Nota de Sr Developer: En un futuro, estos deberían ir a src/components/pos/
 
 const MenuScreen: React.FC = () => {
     const { groups, items } = useMenuStore();
@@ -222,13 +257,14 @@ const MenuScreen: React.FC = () => {
 };
 
 const TicketScreen: React.FC = () => {
-    const { items, removeItem, orderNumber } = useTicketStore();
+    const { items, removeItem } = useTicketStore();
     const { setView } = useUIStore();
     return (
         <div className="bg-base-100 rounded-box shadow-xl p-6 max-w-md mx-auto border border-base-200">
             <div className="text-center mb-6">
                 <div className="badge badge-primary badge-outline mb-2">Pedido en curso</div>
-                <h2 className="text-3xl font-black text-base-content">#{String(orderNumber).padStart(3, '0')}</h2>
+                {/* Aquí quitamos el #101 fijo */}
+                <h2 className="text-2xl font-black text-base-content tracking-tight">Nueva Orden</h2>
             </div>
             <div className="flex flex-col gap-3 mb-6 min-h-[300px]">
                 {items.length === 0 ? (
@@ -257,7 +293,7 @@ const BottomBar: React.FC<{ onAction: () => void }> = ({ onAction }) => {
     const canPay = orderMode === 'Para Llevar' && !isMesero;
 
     const getButtonColor = () => canPay ? 'btn-success text-white' : 'btn-warning text-black';
-    const getButtonLabel = () => canPay ? 'Cobrar y Finalizar' : 'Enviar a Cocina/Caja';
+    const getButtonLabel = () => canPay ? 'Cobrar y Finalizar' : 'Enviar a Cocina';
 
     return (
         <div className="fixed bottom-0 left-0 right-0 z-30 bg-base-100/95 backdrop-blur-xl border-t border-base-200 shadow-lg pb-[env(safe-area-inset-bottom)]">

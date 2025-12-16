@@ -1,100 +1,124 @@
-// src/services/orderService.ts
-import { db, collection, serverTimestamp, runTransaction, doc } from '../firebase';
+import { db, collection, serverTimestamp, runTransaction, doc, writeBatch } from '../firebase';
 import { printService } from './printService';
 import type { TicketItem } from '../types/menu';
-// Importamos los nuevos tipos que acabamos de crear
-import type { Order, PaymentDetails, OrderMode } from '../types/order';
+import type { Order, PaymentDetails, OrderMode, KitchenStatus } from '../types/order';
 
 export const orderService = {
   async createOrder(
     items: TicketItem[], 
     total: number, 
     mode: OrderMode, 
-    orderNumber: number,
-    cashierName: string, // <--- NUEVO: Recibimos el nombre del cajero aquí
+    cashierName: string, 
+    customerName: string,
     payment?: PaymentDetails 
-  ): Promise<void> {
-    
+  ): Promise<number> {
+
     const initialStatus = payment ? 'paid' : 'pending';
-
-    // 1. Objeto para imprimir (Local - usa Date para que no falle la impresión)
-    const printOrderData: Order = {
-      items,
-      total,
-      mode,
-      status: initialStatus,
-      orderNumber,
-      createdAt: new Date(), // Fecha local para el ticket
-      payment,
-      cashier: cashierName
-    };
-
-    // 2. Objeto para Firebase (Base de Datos - usa serverTimestamp)
-    const firebaseOrderData: Order = {
-      items,
-      total,
-      mode,
-      status: initialStatus,
-      orderNumber,
-      createdAt: serverTimestamp(), // Marca de tiempo del servidor
-      cashier: cashierName,
-      ...(payment && { payment }) 
-    };
-
+    const initialKitchenStatus: KitchenStatus = 'queued';
     try {
-      // --- INICIO DE TRANSACCIÓN DE INVENTARIO ---
+      let finalOrderNumber = 0;
+
       await runTransaction(db, async (transaction) => {
-        
-        // A. Identificar qué modificadores (ingredientes) se usaron
+        // A. Lectura de Contador
+        const counterRef = doc(db, "counters", "orders");
+        const counterSnap = await transaction.get(counterRef);
+
+        // B. Lectura de Stocks (Para validar inventario)
         const modifiersToDeduct = new Map<string, number>();
+        const modRefsToRead = new Set<string>();
 
         items.forEach(item => {
             if (item.details?.selectedModifiers) {
                 item.details.selectedModifiers.forEach(mod => {
                     const currentQty = modifiersToDeduct.get(mod.id) || 0;
                     modifiersToDeduct.set(mod.id, currentQty + 1);
+                    modRefsToRead.add(mod.id);
                 });
             }
         });
 
-        // B. Leer stocks y preparar actualizaciones
-        // Nota: Leemos todo antes de escribir nada (regla de Firestore)
-        const updates = [];
-        for (const [modId, qty] of modifiersToDeduct) {
+        const updates: any[] = [];
+        for (const modId of Array.from(modRefsToRead)) {
             const modRef = doc(db, "modifiers", modId);
-            const modDoc = await transaction.get(modRef);
-
-            if (modDoc.exists()) {
-                const data = modDoc.data();
+            const snap = await transaction.get(modRef);
+            if (snap.exists()) {
+                const data = snap.data();
                 if (data.trackStock) {
-                    const currentStock = data.currentStock || 0;
-                    const newStock = currentStock - qty;
+                    const qty = modifiersToDeduct.get(modId) || 0;
+                    const newStock = (data.currentStock || 0) - qty;
                     updates.push({ ref: modRef, newStock });
                 }
             }
         }
 
-        // C. Ejecutar escrituras
-        // 1. Guardar la orden
-        const newOrderRef = doc(collection(db, "orders"));
-        transaction.set(newOrderRef, firebaseOrderData);
+        // C. Calcular Folio
+        let currentCount = 100;
+        if (counterSnap.exists()) currentCount = counterSnap.data().count || 100;
+        finalOrderNumber = currentCount + 1;
 
-        // 2. Actualizar inventario
+        // D. Preparar Datos
+        const firebaseOrderData: Order = {
+          items,
+          total,
+          mode,
+          status: initialStatus,
+          kitchenStatus: initialKitchenStatus,
+          orderNumber: finalOrderNumber,
+          customerName,
+          createdAt: serverTimestamp(),
+          cashier: cashierName,
+          ...(payment && { payment }) 
+        };
+
+        // E. Escrituras
+        const newOrderRef = doc(collection(db, "orders")); 
+        transaction.set(newOrderRef, firebaseOrderData);
+        transaction.set(counterRef, { count: finalOrderNumber }, { merge: true });
+        
         updates.forEach(update => {
             transaction.update(update.ref, { currentStock: update.newStock });
         });
       });
-      // --- FIN DE TRANSACCIÓN ---
 
-      // 3. Imprimir Ticket solo si todo salió bien
-      // (Opcional: podrías poner esto en un try-catch separado si no quieres 
-      // que un fallo de impresora detenga el flujo, pero por ahora está bien aquí)
-      printService.printReceipt(printOrderData);
+      // F. Impresión
+      printService.printReceipt({
+          items,
+          total,
+          mode,
+          status: initialStatus,
+          kitchenStatus: initialKitchenStatus,
+          orderNumber: finalOrderNumber,
+          customerName,
+          createdAt: new Date(),
+          payment,
+          cashier: cashierName
+      });
+
+      return finalOrderNumber;
 
     } catch (error) {
-      console.error("Error crítico al procesar orden:", error);
-      // YA NO hacemos alert() aquí. Lanzamos el error para que la UI lo maneje.
+      console.error("Error al crear orden:", error);
       throw error; 
     }
+  },
+
+  // 2. NUEVA FUNCIÓN: Cobrar múltiples órdenes a la vez
+  // Esto soluciona que "Juan" tenga 3 tickets separados pero pague una sola vez.
+  async payOrders(orders: Order[], payment: PaymentDetails) {
+      const batch = writeBatch(db);
+
+      orders.forEach(order => {
+          if (!order.id) return;
+          const ref = doc(db, "orders", order.id);
+          batch.update(ref, {
+              status: 'paid', // Cerramos la cuenta
+              payment: payment // Registramos cómo se pagó
+          });
+      });
+
+      await batch.commit();
+
+      // Imprimir un "Ticket de Pago Total" (Opcional, pero recomendado)
+      // Podrías sumar todo e imprimir un comprobante final aquí.
   }
 };

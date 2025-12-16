@@ -1,163 +1,153 @@
-// src/components/OrdersScreen.tsx
 import React, { useEffect, useState } from 'react';
-import { db, collection, query, where, orderBy, getDocs, updateDoc, doc, serverTimestamp } from '../firebase';
-import type { Order } from '../services/orderService';
+import { db, collection, query, where, orderBy, onSnapshot } from '../firebase';
+import { orderService } from '../services/orderService';
 import { PaymentModal } from './PaymentModal';
-import { printService } from '../services/printService';
-import { useAuthStore } from '../store/useAuthStore';
-import { useShiftStore } from '../store/useShiftStore';
-import { useUIStore } from '../store/useUIStore';
 import { toast } from 'sonner';
-import { CardSkeleton } from './Skeletons';
+import type { Order } from '../types/order';
+
+// Estructura para agrupar
+interface GroupedOrder {
+    customerName: string;
+    mode: string;
+    orders: Order[];
+    totalDebt: number;
+}
 
 export const OrdersScreen: React.FC = () => {
-  const { currentUser } = useAuthStore();
-  const { openShiftModal } = useUIStore();
-  const { currentShift } = useShiftStore();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [activeOrders, setActiveOrders] = useState<Order[]>([]);
+  const [groupedOrders, setGroupedOrders] = useState<GroupedOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  
+  // Para el pago
+  const [selectedGroup, setSelectedGroup] = useState<GroupedOrder | null>(null);
+  const [isPayModalOpen, setIsPayModalOpen] = useState(false);
 
-  const loadOrders = async () => {
-    setLoading(true);
-    try {
-        const start = new Date(); start.setHours(0,0,0,0);
-        const q = query(
-            collection(db, "orders"),
-            where("status", "==", "pending"),
-            where("createdAt", ">=", start),
-            orderBy("createdAt", "desc")
-        );
-        const snap = await getDocs(q);
-        const loaded = snap.docs.map(d => ({ ...d.data(), id: d.id } as any));
-        setOrders(loaded);
-    } catch (e) {
-        console.error(e);
-        toast.error("Error al cargar órdenes");
-    } finally {
-        setLoading(false);
-    }
-  };
+  useEffect(() => {
+    // ESTA ES LA CLAVE: Buscamos TODO lo que sea diferente a 'paid'
+    // Así no importa si KDS dice 'delivered', aquí sigue apareciendo.
+    const q = query(
+      collection(db, "orders"),
+      where("status", "!=", "paid"), 
+      orderBy("status", "asc"), // Requerido por Firestore cuando usas !=
+      orderBy("createdAt", "desc")
+    );
 
-  useEffect(() => { loadOrders(); }, []);
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Order));
+      setActiveOrders(docs);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error cargando órdenes activas:", error);
+      setLoading(false);
+    });
 
-  const handlePay = async (paymentDetails: any) => {
-      // 1. Verificación de seguridad
-      if (!selectedOrder || !selectedOrder.id) return;
-      
-      // 2. CAPTURA DE VARIABLES (Esto soluciona el error de TypeScript)
-      // Guardamos el ID en una constante local que nunca cambiará ni será undefined
-      const orderId = selectedOrder.id;
-      const orderNum = selectedOrder.orderNumber;
+    return () => unsubscribe();
+  }, []);
 
-      const payPromise = async () => {
-          // Usamos la variable 'orderId' que TS sabe que es string seguro
-          const orderRef = doc(db, "orders", orderId);
-          await updateDoc(orderRef, {
-              status: 'paid',
-              payment: paymentDetails,
-              closedAt: serverTimestamp()
-          });
+  // Agrupar órdenes por Cliente/Mesa
+  useEffect(() => {
+      const groups: Record<string, GroupedOrder> = {};
 
-          const finalOrder = { ...selectedOrder, status: 'paid', payment: paymentDetails } as Order;
-          printService.printReceipt(finalOrder);
-
-          setSelectedOrder(null);
-          loadOrders();
-      };
-
-      toast.promise(payPromise(), {
-        loading: 'Procesando cobro...',
-        success: `Orden #${orderNum} cobrada correctamente`,
-        error: 'Error al procesar el cobro',
+      activeOrders.forEach(order => {
+          // Clave única: Nombre + Modo (ej. "Juan - Para Llevar" o "Mesa 1 - Mesa 1")
+          const key = `${order.customerName || 'Anónimo'}-${order.mode}`;
+          
+          if (!groups[key]) {
+              groups[key] = {
+                  customerName: order.customerName || 'Cliente Anónimo',
+                  mode: order.mode,
+                  orders: [],
+                  totalDebt: 0
+              };
+          }
+          groups[key].orders.push(order);
+          groups[key].totalDebt += order.total;
       });
+
+      setGroupedOrders(Object.values(groups));
+  }, [activeOrders]);
+
+  const handlePayGroup = (group: GroupedOrder) => {
+      setSelectedGroup(group);
+      setIsPayModalOpen(true);
   };
 
-  // Helper para saber si puede cobrar
-  const canCharge = currentUser?.role !== 'MESERO';
+  const confirmPayment = async (paymentDetails: any) => {
+      if (!selectedGroup) return;
+
+      try {
+          setIsPayModalOpen(false);
+          await orderService.payOrders(selectedGroup.orders, paymentDetails);
+          toast.success(`¡Cuenta de ${selectedGroup.customerName} pagada!`);
+          setSelectedGroup(null);
+      } catch (error) {
+          toast.error("Error al procesar el pago");
+      }
+  };
 
   return (
-    <div className="animate-fade-in max-w-5xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-black flex items-center gap-2">
-                <span>🔔</span> Órdenes en Cocina / Pendientes
-            </h2>
-            <button onClick={loadOrders} className="btn btn-sm btn-ghost">🔄 Actualizar</button>
-        </div>
+    <div className="animate-fade-in max-w-5xl mx-auto pb-20 p-4">
+      <h2 className="text-2xl font-black mb-6 flex items-center gap-2">
+        🧾 Cuentas Abiertas
+      </h2>
 
-        {loading ? (
-           // ESTADO DE CARGA (SKELETONS)
-           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-               {[...Array(6)].map((_, i) => (
-                   <CardSkeleton key={i} />
-               ))}
-           </div>
-        ) : orders.length === 0 ? (
-           // ESTADO VACÍO
-           <div className="text-center py-20 opacity-50 bg-base-100 rounded-box border border-base-200">
-               <p className="text-xl font-bold">No hay órdenes pendientes</p>
-               <p className="text-sm">Los meseros no han enviado nada aún.</p>
-           </div>
-        ) : (
-           // LISTA DE ÓRDENES
-           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-               {orders.map((order: any) => (
-                   <div key={order.id} className="card bg-base-100 shadow-md border border-base-200 hover:border-primary transition-colors">
-                       <div className="card-body p-4">
-                           <div className="flex justify-between items-start mb-2">
-                               <span className="badge badge-lg badge-warning font-bold text-white">
-                                   #{order.orderNumber}
-                               </span>
-                               <span className="text-xs font-bold opacity-50 uppercase">{order.mode}</span>
-                           </div>
-                           
-                           <ul className="text-sm space-y-1 mb-4 min-h-[60px]">
-                               {order.items.map((item: any, idx: number) => (
-                                   <li key={idx} className="flex justify-between">
-                                       <span className="line-clamp-1">{item.baseName}</span>
-                                       <span className="opacity-50">x1</span>
-                                   </li>
-                               ))}
-                               {order.items.length > 3 && <li className="text-xs italic opacity-50">+ {order.items.length - 3} más...</li>}
-                           </ul>
+      {loading ? (
+          <div className="text-center py-10"><span className="loading loading-spinner"></span></div>
+      ) : groupedOrders.length === 0 ? (
+          <div className="text-center py-10 opacity-50 bg-base-200 rounded-box">
+              <p className="font-bold">¡Todo cobrado!</p>
+              <p className="text-sm">No hay cuentas pendientes.</p>
+          </div>
+      ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {groupedOrders.map((group) => (
+                  <div key={`${group.customerName}-${group.mode}`} className="card bg-base-100 shadow-lg border border-base-200 hover:border-primary transition-colors">
+                      <div className="card-body p-5">
+                          {/* Encabezado de la Tarjeta */}
+                          <div className="flex justify-between items-start mb-2">
+                              <div>
+                                  <h3 className="card-title text-lg">{group.customerName}</h3>
+                                  <div className="badge badge-ghost badge-sm">{group.mode}</div>
+                              </div>
+                              <div className="text-right">
+                                  <div className="text-2xl font-black text-error">
+                                      ${group.totalDebt.toFixed(2)}
+                                  </div>
+                                  <div className="text-xs opacity-60">{group.orders.length} ticket(s)</div>
+                              </div>
+                          </div>
 
-                           <div className="flex justify-between items-center border-t border-base-200 pt-3">
-                               <div className="text-xl font-black text-primary">${order.total.toFixed(2)}</div>
-                               
-                               {canCharge ? (
-                                   <button 
-                                       onClick={() => {
-                                           if (!currentShift) {
-                                               openShiftModal();
-                                               return;
-                                           }
-                                           setSelectedOrder(order);
-                                       }}
-                                       className="btn btn-sm btn-success text-white shadow-sm"
-                                   >
-                                       Cobrar
-                                   </button>
-                               ) : (
-                                   <span className="badge badge-ghost text-xs opacity-50">En Caja</span>
-                               )}
-                           </div>
-                           <div className="text-[10px] text-center mt-1 opacity-40">
-                               {order.createdAt?.toDate().toLocaleTimeString()} - {order.cashier || 'Mesero'}
-                           </div>
-                       </div>
-                   </div>
-               ))}
-           </div>
-        )}
+                          {/* Lista de Tickets dentro del grupo */}
+                          <div className="divider my-1 text-[10px] uppercase tracking-widest opacity-50">Detalle</div>
+                          <ul className="space-y-1 mb-4 max-h-32 overflow-y-auto pr-1">
+                              {group.orders.map(ord => (
+                                  <li key={ord.id} className="text-xs flex justify-between p-1 bg-base-200 rounded">
+                                      <span>#{ord.orderNumber} - {ord.items.length} prod.</span>
+                                      <span className="font-mono font-bold">${ord.total.toFixed(2)}</span>
+                                  </li>
+                              ))}
+                          </ul>
 
-        {selectedOrder && (
-            <PaymentModal 
-               isOpen={true} 
-               onClose={() => setSelectedOrder(null)} 
-               total={selectedOrder.total} 
-               onConfirm={handlePay} 
-            />
-        )}
+                          {/* Botón de Cobro */}
+                          <button 
+                              onClick={() => handlePayGroup(group)}
+                              className="btn btn-primary btn-block shadow-md text-white"
+                          >
+                              Cobrar Todo
+                          </button>
+                      </div>
+                  </div>
+              ))}
+          </div>
+      )}
+
+      {/* Modal de Pago Reutilizado */}
+      <PaymentModal 
+          isOpen={isPayModalOpen} 
+          onClose={() => setIsPayModalOpen(false)} 
+          total={selectedGroup?.totalDebt || 0} 
+          onConfirm={confirmPayment} 
+      />
     </div>
   );
 };

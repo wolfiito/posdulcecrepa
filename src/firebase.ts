@@ -24,7 +24,9 @@ import {
   Timestamp,
   setDoc,
   onSnapshot,
-  FieldValue
+  FieldValue,
+  writeBatch
+      // Podrías sumar todo e imprimir un comprobante final aquí.
 } from "firebase/firestore";
 
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
@@ -70,7 +72,9 @@ export {
   deleteDoc,
   setDoc,
   onSnapshot,
-  FieldValue
+  FieldValue,
+  writeBatch
+      // Podrías sumar todo e imprimir un comprobante final aquí.
 };
 
 // Exporta los TIPOS que usaremos
