@@ -1,33 +1,34 @@
 // src/components/ShiftsScreen.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react'; // Ya no necesitamos useEffect aquí
 import { useShiftStore } from '../store/useShiftStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { shiftService } from '../services/shiftService';
-import { PinPadModal } from './PinPadModal'; // <--- 1. IMPORTAR
+import { PinPadModal } from './PinPadModal';
+import { Timestamp } from '../firebase';
 
 export const ShiftsScreen: React.FC = () => {
-  const { currentShift, isLoading, checkCurrentShift, openShift, closeShift } = useShiftStore();
+  // 1. QUITAMOS 'checkCurrentShift' DEL DESTRUCTURING
+  // El store ya se actualiza solo gracias al listener en PosPage
+  const { currentShift, isLoading, openShift, closeShift } = useShiftStore();
+  const { currentUser } = useAuthStore();
+
   const [initialAmount, setInitialAmount] = useState('');
   const [finalCount, setFinalCount] = useState('');
   const [closingSummary, setClosingSummary] = useState<{salesCash: number, expenses: number, expectedCash: number} | null>(null);
-  
-  // Estado para el modal de PIN
   const [showAuth, setShowAuth] = useState(false);
 
-  useEffect(() => { checkCurrentShift(); }, []);
+  // 2. ELIMINAMOS EL USEEFFECT QUE LLAMABA A checkCurrentShift()
+  // useEffect(() => { checkCurrentShift(); }, []); <--- BORRAR ESTA LÍNEA
 
-  // 2. MODIFICAR EL HANDLER DE APERTURA
   const handleOpenClick = () => {
     if (!initialAmount) return;
-    setShowAuth(true); // En lugar de abrir directo, pedimos PIN
+    setShowAuth(true); 
   };
 
-  const handleAuthorizedOpen = (authorizerName: string) => {
-      // Aquí sí abrimos la caja
-      // Podríamos guardar 'authorizerName' en el turno si quisiéramos saber quién autorizó
+  const handleAuthorizedOpen = () => {
       openShift(parseFloat(initialAmount));
   };
 
-  // ... (El resto de funciones handlePreClose, handleConfirmClose quedan IGUAL) ...
   const handlePreClose = async () => {
     if (!currentShift) return;
     const metrics = await shiftService.getShiftMetrics(currentShift);
@@ -42,6 +43,14 @@ export const ShiftsScreen: React.FC = () => {
     setInitialAmount('');
   };
 
+  const formatShiftDate = (dateOrTimestamp: any) => {
+      if (!dateOrTimestamp) return '';
+      if (dateOrTimestamp instanceof Timestamp) {
+          return dateOrTimestamp.toDate().toLocaleTimeString();
+      }
+      return new Date(dateOrTimestamp).toLocaleTimeString();
+  };
+
   if (isLoading) return <div className="flex justify-center p-20"><span className="loading loading-spinner text-primary"></span></div>;
 
   // --- VISTA 1: CAJA CERRADA ---
@@ -52,7 +61,7 @@ export const ShiftsScreen: React.FC = () => {
           <div className="card-body items-center text-center">
             <div className="w-16 h-16 bg-error/10 text-error rounded-full flex items-center justify-center mb-2 text-3xl">🔒</div>
             <h2 className="card-title">Caja Cerrada</h2>
-            <p className="text-sm opacity-60">Se requiere autorización de Gerente para abrir.</p>
+            <p className="text-sm opacity-60">Se requiere autorización para abrir.</p>
             
             <div className="form-control w-full mt-4">
               <label className="label"><span className="label-text font-bold">Fondo Inicial</span></label>
@@ -67,22 +76,20 @@ export const ShiftsScreen: React.FC = () => {
             </button>
           </div>
         </div>
-
-        {/* MODAL DE PIN INTEGRADO */}
         <PinPadModal 
             isOpen={showAuth}
             onClose={() => setShowAuth(false)}
             onSuccess={handleAuthorizedOpen}
             title="Autorizar Apertura"
+            requireAdmin={true}
         />
+      
       </div>
     );
   }
 
-  // --- VISTA 2: CAJA ABIERTA (IGUAL QUE ANTES) ---
+  // --- VISTA 2: CAJA ABIERTA (Resumen de Cierre) ---
   if (closingSummary) {
-      // ... (Tu código existente de cierre de caja: handleConfirmClose, inputs, etc.) ...
-      // Copia y pega tu bloque de "closingSummary" aquí, no cambia nada
       const counted = parseFloat(finalCount) || 0;
       const difference = counted - closingSummary.expectedCash;
       return (
@@ -123,6 +130,7 @@ export const ShiftsScreen: React.FC = () => {
       );
   }
 
+  // --- VISTA 3: CAJA ABIERTA (Info General) ---
   return (
     <div className="max-w-4xl mx-auto mt-6 animate-fade-in">
         <div className="grid md:grid-cols-2 gap-6">
@@ -132,7 +140,7 @@ export const ShiftsScreen: React.FC = () => {
                         <div>
                             <h2 className="card-title text-success">🟢 Turno Abierto</h2>
                             <p className="text-xs opacity-60 mt-1">Abierto por: {currentShift.openedBy}</p>
-                            <p className="text-xs opacity-60">Hora: {currentShift.openedAt?.toDate().toLocaleTimeString()}</p>
+                            <p className="text-xs opacity-60">Hora: {formatShiftDate(currentShift.openedAt)}</p>
                         </div>
                         <div className="text-4xl">🔓</div>
                     </div>
@@ -144,7 +152,13 @@ export const ShiftsScreen: React.FC = () => {
             <div className="card bg-base-100 shadow-md border border-base-200 flex items-center justify-center">
                 <div className="card-body items-center w-full">
                     <p className="text-center opacity-70 mb-6">Al finalizar el día, realiza el conteo de efectivo y cierra la caja.</p>
-                    <button onClick={handlePreClose} className="btn btn-outline btn-error btn-wide">Realizar Corte de Caja</button>
+                    <button 
+                        onClick={handlePreClose} 
+                        className="btn btn-outline btn-error btn-wide"
+                        disabled={currentUser?.id !== currentShift.userId && currentUser?.role !== 'ADMIN'}
+                    >
+                        Realizar Corte de Caja
+                    </button>
                 </div>
             </div>
         </div>

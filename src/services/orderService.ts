@@ -1,7 +1,15 @@
+// src/services/orderService.ts
 import { db, collection, serverTimestamp, runTransaction, doc, writeBatch } from '../firebase';
 import { printService } from './printService';
 import type { TicketItem } from '../types/menu';
 import type { Order, PaymentDetails, OrderMode, KitchenStatus } from '../types/order';
+import type { DocumentReference } from 'firebase/firestore'; // Importamos el tipo estricto
+
+// Interfaz interna para asegurar que no usamos 'any'
+interface StockUpdate {
+    ref: DocumentReference;
+    newStock: number;
+}
 
 export const orderService = {
   async createOrder(
@@ -15,48 +23,73 @@ export const orderService = {
 
     const initialStatus = payment ? 'paid' : 'pending';
     const initialKitchenStatus: KitchenStatus = 'queued';
+
     try {
       let finalOrderNumber = 0;
 
       await runTransaction(db, async (transaction) => {
-        // A. Lectura de Contador
+        // --- 1. LECTURAS (Todo lo que se lee debe ser antes de escribir) ---
+        
+        // A. Referencias
         const counterRef = doc(db, "counters", "orders");
-        const counterSnap = await transaction.get(counterRef);
-
-        // B. Lectura de Stocks (Para validar inventario)
+        
+        // B. Preparar lecturas de stock
         const modifiersToDeduct = new Map<string, number>();
-        const modRefsToRead = new Set<string>();
+        const modIdsToRead = new Set<string>();
 
         items.forEach(item => {
             if (item.details?.selectedModifiers) {
                 item.details.selectedModifiers.forEach(mod => {
                     const currentQty = modifiersToDeduct.get(mod.id) || 0;
                     modifiersToDeduct.set(mod.id, currentQty + 1);
-                    modRefsToRead.add(mod.id);
+                    modIdsToRead.add(mod.id);
                 });
             }
         });
 
-        const updates: any[] = [];
-        for (const modId of Array.from(modRefsToRead)) {
-            const modRef = doc(db, "modifiers", modId);
-            const snap = await transaction.get(modRef);
+        const uniqueModIds = Array.from(modIdsToRead);
+        const modRefs = uniqueModIds.map(id => doc(db, "modifiers", id));
+
+        // C. EJECUCIÓN DE LECTURAS EN PARALELO (Optimización clave)
+        // Leemos el contador y todos los modificadores al mismo tiempo
+        const [counterSnap, ...modSnaps] = await Promise.all([
+            transaction.get(counterRef),
+            ...modRefs.map(ref => transaction.get(ref))
+        ]);
+
+        // --- 2. LÓGICA DE NEGOCIO ---
+
+        // D. Calcular Stock y Validar
+        const updates: StockUpdate[] = [];
+        
+        modSnaps.forEach((snap, index) => {
             if (snap.exists()) {
                 const data = snap.data();
                 if (data.trackStock) {
-                    const qty = modifiersToDeduct.get(modId) || 0;
-                    const newStock = (data.currentStock || 0) - qty;
-                    updates.push({ ref: modRef, newStock });
+                    const modId = uniqueModIds[index];
+                    const qtyToDeduct = modifiersToDeduct.get(modId) || 0;
+                    const currentStock = data.currentStock || 0;
+                    const newStock = currentStock - qtyToDeduct;
+
+                    // HARDENING: Evitar stock negativo
+                    if (newStock < 0) {
+                        throw new Error(`Stock insuficiente: ${data.name} (Quedan: ${currentStock})`);
+                    }
+
+                    updates.push({ ref: snap.ref, newStock });
                 }
             }
-        }
+        });
 
-        // C. Calcular Folio
+        // E. Calcular Folio
         let currentCount = 100;
-        if (counterSnap.exists()) currentCount = counterSnap.data().count || 100;
+        if (counterSnap.exists()) {
+            const data = counterSnap.data();
+            currentCount = data.count || 100;
+        }
         finalOrderNumber = currentCount + 1;
 
-        // D. Preparar Datos
+        // F. Preparar Objeto
         const firebaseOrderData: Order = {
           items,
           total,
@@ -70,8 +103,9 @@ export const orderService = {
           ...(payment && { payment }) 
         };
 
-        // E. Escrituras
+        // --- 3. ESCRITURAS ---
         const newOrderRef = doc(collection(db, "orders")); 
+        
         transaction.set(newOrderRef, firebaseOrderData);
         transaction.set(counterRef, { count: finalOrderNumber }, { merge: true });
         
@@ -80,7 +114,7 @@ export const orderService = {
         });
       });
 
-      // F. Impresión
+      // --- 4. EFECTOS SECUNDARIOS (Fuera de transacción) ---
       printService.printReceipt({
           items,
           total,
@@ -97,13 +131,11 @@ export const orderService = {
       return finalOrderNumber;
 
     } catch (error) {
-      console.error("Error al crear orden:", error);
-      throw error; 
+      console.error("Error crítico al crear orden:", error);
+      throw error; // Re-lanzamos para que la UI muestre el error (ej: "Stock insuficiente")
     }
   },
 
-  // 2. NUEVA FUNCIÓN: Cobrar múltiples órdenes a la vez
-  // Esto soluciona que "Juan" tenga 3 tickets separados pero pague una sola vez.
   async payOrders(orders: Order[], payment: PaymentDetails) {
       const batch = writeBatch(db);
 
@@ -111,14 +143,11 @@ export const orderService = {
           if (!order.id) return;
           const ref = doc(db, "orders", order.id);
           batch.update(ref, {
-              status: 'paid', // Cerramos la cuenta
-              payment: payment // Registramos cómo se pagó
+              status: 'paid',
+              payment: payment
           });
       });
 
       await batch.commit();
-
-      // Imprimir un "Ticket de Pago Total" (Opcional, pero recomendado)
-      // Podrías sumar todo e imprimir un comprobante final aquí.
   }
 };

@@ -15,3 +15,4 @@ export interface Movement {
   shiftId?: string; // Opcional: Para ligarlo al turno actual
   registeredBy?: string; // Nuevo: Saber quién registró el gasto
 }
+

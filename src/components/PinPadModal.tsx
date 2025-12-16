@@ -1,97 +1,136 @@
 // src/components/PinPadModal.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Modal from 'react-modal';
-import { db, collection, query, where, getDocs } from '../firebase';
-import type { UserRole } from '../store/useAuthStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { authService } from '../services/authService'; // <--- Importamos el servicio
+import { toast } from 'sonner';
 
-const customStyles = {
-  content: {
-    top: '50%', left: '50%', right: 'auto', bottom: 'auto', marginRight: '-50%',
-    transform: 'translate(-50%, -50%)', width: '90%', maxWidth: '350px',
-    padding: '20px', borderRadius: '1rem', border: 'none', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-  },
-  overlay: { backgroundColor: 'rgba(0, 0, 0, 0.8)', zIndex: 2000 }
-};
-
-Modal.setAppElement('#root');
-
-interface Props {
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess: (authorizerName: string) => void;
-  title?: string;
-  allowedRoles?: UserRole[];
+interface PinPadModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSuccess: (authorizerName: string) => void;
+    title?: string;
+    requireAdmin?: boolean; // <--- NUEVA PROPIEDAD
 }
 
-export const PinPadModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, title = "Autorización Requerida", allowedRoles = ['ADMIN', 'GERENTE'] }) => {
-  const [pin, setPin] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+export const PinPadModal: React.FC<PinPadModalProps> = ({ 
+    isOpen, 
+    onClose, 
+    onSuccess, 
+    title = "Ingrese PIN",
+    requireAdmin = false // Por defecto es falso, pero en ShiftScreen lo pondremos true
+}) => {
+    const [pin, setPin] = useState('');
+    const [verifying, setVerifying] = useState(false);
+    const { currentUser } = useAuthStore();
 
-  const handleNumber = (num: string) => {
-    if (pin.length < 4) {
-        setPin(prev => prev + num);
-        setError('');
-    }
-  };
-
-  const handleBackspace = () => setPin(prev => prev.slice(0, -1));
-
-  const handleVerify = async () => {
-    if (pin.length === 0) return;
-    setLoading(true);
-    try {
-        const q = query(collection(db, 'users'), where('pin', '==', pin));
-        const snap = await getDocs(q);
-
-        if (snap.empty) throw new Error('PIN incorrecto');
-
-        const userData = snap.docs[0].data();
-        if (!allowedRoles.includes(userData.role)) {
-            throw new Error('No tienes permisos para realizar esta acción');
+    useEffect(() => {
+        if (isOpen) {
+            setPin('');
+            setVerifying(false);
         }
+    }, [isOpen]);
 
-        // ¡Éxito!
-        onSuccess(userData.name);
-        setPin('');
-        onClose();
+    const handleNumberClick = (num: string) => {
+        if (pin.length < 4) setPin(prev => prev + num);
+    };
 
-    } catch (err: any) {
-        setError(err.message);
-        setPin('');
-    } finally {
-        setLoading(false);
-    }
-  };
+    const handleClear = () => setPin('');
+    const handleBackspace = () => setPin(prev => prev.slice(0, -1));
 
-  return (
-    <Modal isOpen={isOpen} onRequestClose={onClose} style={customStyles}>
-        <div className="text-center">
-            <h3 className="font-bold text-lg mb-1">{title}</h3>
-            <p className="text-xs opacity-60 mb-4">Ingresa PIN de Gerente/Admin</p>
+    const handleSubmit = async (e?: React.FormEvent) => {
+        e?.preventDefault();
+        
+        if (requireAdmin) {
+            // --- MODO: AUTORIZACIÓN DE ADMIN/GERENTE ---
+            // Buscamos en la BD de quién es este PIN
+            setVerifying(true);
+            try {
+                // Reutilizamos el login para buscar al usuario dueño del PIN
+                const adminUser = await authService.loginWithPin(pin);
+                
+                // Verificamos si tiene permisos
+                if (adminUser.role === 'ADMIN' || adminUser.role === 'GERENTE') {
+                    toast.success(`Autorizado por: ${adminUser.name}`);
+                    onSuccess(adminUser.name);
+                    onClose();
+                } else {
+                    toast.error("⛔ Este usuario no tiene permisos de Administrador");
+                    setPin('');
+                }
+            } catch (error) {
+                toast.error("PIN Incorrecto o no encontrado");
+                setPin('');
+            } finally {
+                setVerifying(false);
+            }
+
+        } else {
+            // --- MODO: AUTO-VERIFICACIÓN (Lo que tenías antes) ---
+            // Solo verifica que sea EL MISMO usuario conectado
+            if (!currentUser) return;
+            const userPin = currentUser.pin || '0000';
+
+            if (pin === userPin) {
+                onSuccess(currentUser.name);
+                onClose();
+            } else {
+                toast.error("PIN Incorrecto");
+                setPin('');
+            }
+        }
+    };
+
+    return (
+        <Modal
+            isOpen={isOpen}
+            onRequestClose={onClose}
+            className="bg-base-100 p-6 rounded-box shadow-2xl max-w-sm mx-auto mt-20 border border-base-200 outline-none"
+            overlayClassName="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-start pt-20"
+        >
+            <h2 className="text-2xl font-bold text-center mb-2">{title}</h2>
+            {requireAdmin && (
+                <p className="text-xs text-center text-error mb-4 uppercase tracking-widest font-bold">
+                    Requiere Administrador
+                </p>
+            )}
             
-            {/* Puntos del PIN */}
-            <div className="flex justify-center gap-3 mb-6">
-                {[0, 1, 2, 3].map(i => (
-                    <div key={i} className={`w-3 h-3 rounded-full transition-colors ${i < pin.length ? 'bg-primary' : 'bg-base-300'}`} />
-                ))}
-            </div>
+            <form onSubmit={handleSubmit}>
+                <input 
+                    type="password" 
+                    value={pin} 
+                    readOnly 
+                    className="input input-bordered w-full text-center text-3xl tracking-[1em] font-mono mb-6"
+                    placeholder="••••"
+                />
 
-            {error && <div className="text-error text-xs font-bold mb-3 animate-pulse">{error}</div>}
+                <div className="grid grid-cols-3 gap-3 mb-6">
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+                        <button 
+                            key={num} 
+                            type="button"
+                            onClick={() => handleNumberClick(num.toString())}
+                            className="btn btn-lg btn-outline font-mono text-2xl"
+                        >
+                            {num}
+                        </button>
+                    ))}
+                    <button type="button" onClick={handleClear} className="btn btn-lg btn-error text-white">C</button>
+                    <button type="button" onClick={() => handleNumberClick('0')} className="btn btn-lg btn-outline font-mono text-2xl">0</button>
+                    <button type="button" onClick={handleBackspace} className="btn btn-lg btn-warning text-white">⌫</button>
+                </div>
 
-            <div className="grid grid-cols-3 gap-2 mb-4">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
-                    <button key={num} onClick={() => handleNumber(num.toString())} className="btn btn-outline btn-md text-xl font-mono">{num}</button>
-                ))}
-                <button onClick={onClose} className="btn btn-ghost text-xs">Cancelar</button>
-                <button onClick={() => handleNumber('0')} className="btn btn-outline btn-md text-xl font-mono">0</button>
-                <button onClick={handleBackspace} className="btn btn-ghost text-xl text-warning">⌫</button>
-            </div>
-
-            <button onClick={handleVerify} disabled={loading || pin.length < 4} className="btn btn-primary btn-block">
-                {loading ? <span className="loading loading-spinner"></span> : 'Autorizar'}
-            </button>
-        </div>
-    </Modal>
-  );
+                <div className="flex gap-2">
+                    <button type="button" onClick={onClose} className="btn flex-1">Cancelar</button>
+                    <button 
+                        type="submit" 
+                        className="btn btn-primary flex-1" 
+                        disabled={pin.length < 4 || verifying}
+                    >
+                        {verifying ? <span className="loading loading-spinner"></span> : 'Confirmar'}
+                    </button>
+                </div>
+            </form>
+        </Modal>
+    );
 };

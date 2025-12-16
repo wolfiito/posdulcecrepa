@@ -1,3 +1,4 @@
+// src/components/OrdersScreen.tsx
 import React, { useEffect, useState } from 'react';
 import { db, collection, query, where, orderBy, onSnapshot } from '../firebase';
 import { orderService } from '../services/orderService';
@@ -5,12 +6,15 @@ import { PaymentModal } from './PaymentModal';
 import { toast } from 'sonner';
 import type { Order } from '../types/order';
 
-// Estructura para agrupar
+// 1. IMPORTAMOS LOS STORES DE SEGURIDAD
+import { useShiftStore } from '../store/useShiftStore';
+import { useUIStore } from '../store/useUIStore';
+
 interface GroupedOrder {
-    customerName: string;
-    mode: string;
-    orders: Order[];
-    totalDebt: number;
+  customerName: string;
+  mode: string;
+  orders: Order[];
+  totalDebt: number;
 }
 
 export const OrdersScreen: React.FC = () => {
@@ -22,13 +26,16 @@ export const OrdersScreen: React.FC = () => {
   const [selectedGroup, setSelectedGroup] = useState<GroupedOrder | null>(null);
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
 
+  // 2. CONECTAMOS CON LA SEGURIDAD DE CAJA
+  const { currentShift } = useShiftStore();
+  const { openShiftModal } = useUIStore();
+
   useEffect(() => {
-    // ESTA ES LA CLAVE: Buscamos TODO lo que sea diferente a 'paid'
-    // Así no importa si KDS dice 'delivered', aquí sigue apareciendo.
+    // Buscamos todo lo que NO esté pagado
     const q = query(
       collection(db, "orders"),
       where("status", "!=", "paid"), 
-      orderBy("status", "asc"), // Requerido por Firestore cuando usas !=
+      orderBy("status", "asc"), 
       orderBy("createdAt", "desc")
     );
 
@@ -49,7 +56,6 @@ export const OrdersScreen: React.FC = () => {
       const groups: Record<string, GroupedOrder> = {};
 
       activeOrders.forEach(order => {
-          // Clave única: Nombre + Modo (ej. "Juan - Para Llevar" o "Mesa 1 - Mesa 1")
           const key = `${order.customerName || 'Anónimo'}-${order.mode}`;
           
           if (!groups[key]) {
@@ -68,6 +74,14 @@ export const OrdersScreen: React.FC = () => {
   }, [activeOrders]);
 
   const handlePayGroup = (group: GroupedOrder) => {
+      // 3. BLOQUEO DE SEGURIDAD (CRÍTICO)
+      // Si no hay turno abierto, prohibimos cobrar y mandamos a abrir caja
+      if (!currentShift) {
+          toast.error("⛔ CAJA CERRADA: Debes abrir turno para cobrar.");
+          openShiftModal(); // Abre el modal de ShiftsScreen automáticamente
+          return;
+      }
+
       setSelectedGroup(group);
       setIsPayModalOpen(true);
   };
@@ -103,7 +117,7 @@ export const OrdersScreen: React.FC = () => {
               {groupedOrders.map((group) => (
                   <div key={`${group.customerName}-${group.mode}`} className="card bg-base-100 shadow-lg border border-base-200 hover:border-primary transition-colors">
                       <div className="card-body p-5">
-                          {/* Encabezado de la Tarjeta */}
+                          {/* Encabezado */}
                           <div className="flex justify-between items-start mb-2">
                               <div>
                                   <h3 className="card-title text-lg">{group.customerName}</h3>
@@ -117,7 +131,7 @@ export const OrdersScreen: React.FC = () => {
                               </div>
                           </div>
 
-                          {/* Lista de Tickets dentro del grupo */}
+                          {/* Lista Detalle */}
                           <div className="divider my-1 text-[10px] uppercase tracking-widest opacity-50">Detalle</div>
                           <ul className="space-y-1 mb-4 max-h-32 overflow-y-auto pr-1">
                               {group.orders.map(ord => (
@@ -128,7 +142,7 @@ export const OrdersScreen: React.FC = () => {
                               ))}
                           </ul>
 
-                          {/* Botón de Cobro */}
+                          {/* Botón de Cobro Protegido */}
                           <button 
                               onClick={() => handlePayGroup(group)}
                               className="btn btn-primary btn-block shadow-md text-white"
@@ -141,7 +155,7 @@ export const OrdersScreen: React.FC = () => {
           </div>
       )}
 
-      {/* Modal de Pago Reutilizado */}
+      {/* Modal de Pago */}
       <PaymentModal 
           isOpen={isPayModalOpen} 
           onClose={() => setIsPayModalOpen(false)} 

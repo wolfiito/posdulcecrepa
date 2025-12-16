@@ -1,12 +1,13 @@
+// src/services/shiftService.ts
 import { db, collection, addDoc, updateDoc, getDocs, query, where, orderBy, limit, serverTimestamp, doc, Timestamp } from '../firebase';
 import { reportService } from './reportService';
 
-// Interfaz corregida: Sin 'any'
 export interface Shift {
   id: string;
+  userId: string;
   isOpen: boolean;
   openedBy: string;
-  openedAt: Timestamp | Date; // <--- Tipado correcto
+  openedAt: Timestamp | Date; // Puede ser cualquiera de los dos
   initialFund: number;
   closedAt?: Timestamp | Date;
   finalCount?: number; 
@@ -17,23 +18,37 @@ export interface Shift {
 }
 
 export const shiftService = {
-  async getCurrentShift(): Promise<Shift | null> {
-    const q = query(collection(db, 'shifts'), where('isOpen', '==', true), orderBy('openedAt', 'desc'), limit(1));
+  async getCurrentShift(userId: string): Promise<Shift | null> {
+    if (!userId) return null;
+
+    const q = query(
+        collection(db, 'shifts'), 
+        where('userId', '==', userId), 
+        where('isOpen', '==', true), 
+        orderBy('openedAt', 'desc'), 
+        limit(1)
+    );
+    
     const snapshot = await getDocs(q);
     
     if (snapshot.empty) return null;
     
-    // Forzamos el tipado seguro al devolver
-    return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Shift;
+    // Convertimos los datos crudos a nuestra interfaz Shift
+    const data = snapshot.docs[0].data();
+    return { 
+        id: snapshot.docs[0].id, 
+        ...data 
+    } as Shift;
   },
 
-  async openShift(initialFund: number, user: string): Promise<string> {
-    const current = await this.getCurrentShift();
-    if (current) throw new Error("Ya hay un turno abierto.");
+  async openShift(initialFund: number, userId: string, userName: string): Promise<string> {
+    const current = await this.getCurrentShift(userId);
+    if (current) throw new Error("Ya tienes un turno abierto.");
     
     const docRef = await addDoc(collection(db, 'shifts'), {
+      userId, 
       isOpen: true,
-      openedBy: user,
+      openedBy: userName,
       openedAt: serverTimestamp(),
       initialFund: initialFund
     });
@@ -41,13 +56,21 @@ export const shiftService = {
   },
 
   async getShiftMetrics(shift: Shift) {
-    // Manejo robusto de fechas: Si es Timestamp de Firebase lo convertimos, si es Date lo usamos
-    const startDate = shift.openedAt instanceof Timestamp ? shift.openedAt.toDate() : (shift.openedAt as Date);
+    // CORRECCIÓN 2: Validación de tipos segura para TypeScript
+    // Verificamos si tiene el método toDate (es un Timestamp) o si ya es una fecha
+    let startDate: Date;
+
+    if (shift.openedAt instanceof Timestamp) {
+        startDate = shift.openedAt.toDate();
+    } else {
+        // Si no es Timestamp, asumimos que es Date (o forzamos la conversión)
+        startDate = new Date(shift.openedAt as any); 
+    }
+
     const endDate = new Date(); 
 
     const report = await reportService.getReportByDateRange(startDate, endDate); 
     
-    // Calculamos efectivo esperado: Caja Inicial + Ventas Efectivo - Gastos
     const expectedCash = shift.initialFund + report.cashTotal - report.totalExpenses;
     
     return {
