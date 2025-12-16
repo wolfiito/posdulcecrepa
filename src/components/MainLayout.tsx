@@ -1,8 +1,8 @@
-// src/components/MainLayout.tsx
 import React, { useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { useUIStore } from '../store/useUIStore';
+import { useShiftStore } from '../store/useShiftStore'; // <--- 1. IMPORTAR STORE DE CAJA
 import { 
   IconMenu, IconPOS, IconBox, IconWallet, IconChart, 
   IconUsers, IconSun, IconMoon, IconLogout, IconBack 
@@ -11,6 +11,7 @@ import {
 export const MainLayout: React.FC = () => {
   const { currentUser, logout } = useAuthStore();
   const { theme, toggleTheme, view, setView } = useUIStore();
+  const { startListeningToShift, stopListeningToShift } = useShiftStore(); // <--- 2. OBTENER FUNCIONES
   const location = useLocation();
 
   // Cerrar el drawer al cambiar de ruta en móvil
@@ -21,6 +22,17 @@ export const MainLayout: React.FC = () => {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+
+  // --- 3. EL CEREBRO GLOBAL (ESTO ES LO QUE FALTABA) ---
+  // Esto mantiene la caja vigilada en TODAS las pantallas
+  useEffect(() => {
+    if (currentUser) {
+        console.log("📡 Iniciando escucha de caja global...");
+        startListeningToShift();
+    }
+    return () => stopListeningToShift();
+  }, [currentUser, startListeningToShift, stopListeningToShift]);
+  // -----------------------------------------------------
   
   // Verificar si estamos en la ruta raíz (POS)
   const isPos = location.pathname === '/';
@@ -37,7 +49,6 @@ export const MainLayout: React.FC = () => {
         {/* Navbar */}
         <div className="navbar bg-base-100/90 backdrop-blur-md sticky top-0 z-40 shadow-sm px-2 border-b border-base-200 h-16">
           <div className="navbar-start flex gap-1 items-center w-auto">
-              {/* Lógica del botón de atrás específica del POS */}
               {isPos && view === 'ticket' ? (
                   <button onClick={() => setView('menu')} className="btn btn-ghost btn-circle m-1 text-primary">
                       <IconBack />
@@ -51,13 +62,9 @@ export const MainLayout: React.FC = () => {
                   DulceCrepa
               </span>
           </div>
-
-          {/* El contenido extra del navbar (como selectores de mesa) se inyectará desde las páginas usando Portals o Context, 
-              pero por ahora lo dejamos simple. El POS manejará sus propios controles. */}
         </div>
 
         <main className="p-4 max-w-5xl mx-auto w-full animate-fade-in flex-1">
-            {/* AQUÍ SE RENDERIZAN LAS PÁGINAS (POS, Orders, Shifts, etc.) */}
             <Outlet />
         </main>
       </div>
@@ -133,7 +140,6 @@ export const MainLayout: React.FC = () => {
 
           <div className="mt-auto"></div>
           
-          {/* Botón de Tema */}
           <li>
             <button onClick={toggleTheme} className="flex justify-between bg-base-200">
               <span className="text-xs font-bold">Modo Oscuro</span>

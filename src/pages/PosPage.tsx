@@ -47,16 +47,7 @@ export const PosPage: React.FC = () => {
   // 3. Datos necesarios para los modales
   const { modifiers, rules } = useMenuStore();
   const { getTotal } = useTicketStore();
-  const { startListeningToShift, stopListeningToShift } = useShiftStore();
-  const { currentUser } = useAuthStore();
 
-  useEffect(() => {
-    if (currentUser) {
-        startListeningToShift();
-    }
-    // Limpiar al salir
-    return () => stopListeningToShift();
-  }, [currentUser, startListeningToShift, stopListeningToShift]);
   
   return (
     <>

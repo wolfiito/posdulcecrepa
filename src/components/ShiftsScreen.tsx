@@ -1,24 +1,25 @@
 // src/components/ShiftsScreen.tsx
-import React, { useState } from 'react'; // Ya no necesitamos useEffect aquí
+import React, { useState } from 'react'; 
 import { useShiftStore } from '../store/useShiftStore';
 import { useAuthStore } from '../store/useAuthStore';
-import { shiftService } from '../services/shiftService';
+import { shiftService, type ShiftMetrics } from '../services/shiftService'; // Importamos el tipo nuevo
 import { PinPadModal } from './PinPadModal';
+import { ZReportTemplate } from './ZReportTemplate'; // <--- IMPORTAMOS EL TICKET
 import { Timestamp } from '../firebase';
+import { toast } from 'sonner';
 
 export const ShiftsScreen: React.FC = () => {
-  // 1. QUITAMOS 'checkCurrentShift' DEL DESTRUCTURING
-  // El store ya se actualiza solo gracias al listener en PosPage
   const { currentShift, isLoading, openShift, closeShift } = useShiftStore();
   const { currentUser } = useAuthStore();
 
   const [initialAmount, setInitialAmount] = useState('');
   const [finalCount, setFinalCount] = useState('');
-  const [closingSummary, setClosingSummary] = useState<{salesCash: number, expenses: number, expectedCash: number} | null>(null);
+  // Ahora usamos el tipo ShiftMetrics que trae todo (ventas, gastos, etc.)
+  const [closingSummary, setClosingSummary] = useState<ShiftMetrics | null>(null);
   const [showAuth, setShowAuth] = useState(false);
-
-  // 2. ELIMINAMOS EL USEEFFECT QUE LLAMABA A checkCurrentShift()
-  // useEffect(() => { checkCurrentShift(); }, []); <--- BORRAR ESTA LÍNEA
+  
+  // Estado para controlar cuándo imprimir el reporte Z
+  const [printZReport, setPrintZReport] = useState(false);
 
   const handleOpenClick = () => {
     if (!initialAmount) return;
@@ -31,16 +32,33 @@ export const ShiftsScreen: React.FC = () => {
 
   const handlePreClose = async () => {
     if (!currentShift) return;
-    const metrics = await shiftService.getShiftMetrics(currentShift);
-    setClosingSummary(metrics);
+    try {
+        const metrics = await shiftService.getShiftMetrics(currentShift);
+        setClosingSummary(metrics);
+        setPrintZReport(false); // Reseteamos impresión
+    } catch (e) {
+        toast.error("Error calculando el corte");
+    }
   };
 
   const handleConfirmClose = async () => {
-    if (!finalCount) return;
-    await closeShift(parseFloat(finalCount));
-    setClosingSummary(null);
-    setFinalCount('');
-    setInitialAmount('');
+    if (!finalCount || !closingSummary) return;
+    
+    // 1. Activamos la impresión del ticket Z
+    setPrintZReport(true);
+
+    // 2. Esperamos un micro-segundo para que React renderice el ticket y luego imprimimos
+    setTimeout(async () => {
+        window.print(); // <--- ABRE EL DIÁLOGO DE IMPRESIÓN
+        
+        // 3. Después de imprimir (o cancelar), cerramos en BD
+        await closeShift(parseFloat(finalCount));
+        setClosingSummary(null);
+        setFinalCount('');
+        setInitialAmount('');
+        setPrintZReport(false);
+        toast.success("Turno cerrado y Corte Z generado");
+    }, 500);
   };
 
   const formatShiftDate = (dateOrTimestamp: any) => {
@@ -83,35 +101,55 @@ export const ShiftsScreen: React.FC = () => {
             title="Autorizar Apertura"
             requireAdmin={true}
         />
-      
       </div>
     );
   }
 
-  // --- VISTA 2: CAJA ABIERTA (Resumen de Cierre) ---
+  // --- VISTA 2: CAJA ABIERTA (Resumen de Cierre y Corte Z) ---
   if (closingSummary) {
       const counted = parseFloat(finalCount) || 0;
       const difference = counted - closingSummary.expectedCash;
       return (
         <div className="max-w-lg mx-auto mt-10 animate-fade-in">
+            {/* AQUÍ INYECTAMOS EL TICKET PARA IMPRESIÓN (Invisible en pantalla, visible al imprimir) */}
+            {printZReport && (
+                <ZReportTemplate 
+                    shift={currentShift} 
+                    metrics={closingSummary} 
+                    finalCount={counted} 
+                />
+            )}
+
             <div className="card bg-base-100 shadow-xl border border-base-200">
                 <div className="card-body">
                     <h2 className="card-title text-error justify-center mb-6">🛑 Cerrar Turno</h2>
+                    
+                    {/* Resumen Visual en Pantalla */}
                     <div className="grid grid-cols-2 gap-4 text-sm mb-4 bg-base-200 p-4 rounded-box">
                         <div className="opacity-70">Fondo Inicial:</div>
                         <div className="text-right font-mono font-bold">${currentShift.initialFund.toFixed(2)}</div>
+                        
                         <div className="opacity-70 text-success">(+) Ventas Efectivo:</div>
-                        <div className="text-right font-mono font-bold text-success">${closingSummary.salesCash.toFixed(2)}</div>
+                        <div className="text-right font-mono font-bold text-success">${closingSummary.cashTotal.toFixed(2)}</div>
+                        
+                        <div className="opacity-70 text-blue-500">(+) Tarjeta/Transf:</div>
+                        <div className="text-right font-mono font-bold text-blue-500">
+                            ${(closingSummary.cardTotal + closingSummary.transferTotal).toFixed(2)}
+                        </div>
+
                         <div className="opacity-70 text-error">(-) Gastos Efectivo:</div>
-                        <div className="text-right font-mono font-bold text-error">-${closingSummary.expenses.toFixed(2)}</div>
+                        <div className="text-right font-mono font-bold text-error">-${closingSummary.totalExpenses.toFixed(2)}</div>
+                        
                         <div className="col-span-2 divider my-1"></div>
-                        <div className="font-black">DEBERÍA HABER:</div>
+                        <div className="font-black">DEBERÍA HABER (Efectivo):</div>
                         <div className="text-right font-black text-lg">${closingSummary.expectedCash.toFixed(2)}</div>
                     </div>
+
                     <div className="form-control w-full mb-6">
-                        <label className="label"><span className="label-text font-bold text-lg">¿Cuánto dinero contaste?</span></label>
+                        <label className="label"><span className="label-text font-bold text-lg">¿Cuánto efectivo contaste?</span></label>
                         <input type="number" className="input input-bordered input-lg text-center font-mono text-2xl bg-base-100 border-primary" placeholder="$0.00" value={finalCount} onChange={e => setFinalCount(e.target.value)} autoFocus />
                     </div>
+
                     {finalCount && (
                         <div className={`alert ${difference >= 0 ? 'alert-success' : 'alert-error'} mb-6`}>
                             <div className="flex-1">
@@ -120,8 +158,11 @@ export const ShiftsScreen: React.FC = () => {
                             </div>
                         </div>
                     )}
+
                     <div className="card-actions flex-col gap-3">
-                        <button onClick={handleConfirmClose} className="btn btn-error btn-block btn-lg text-white">CONFIRMAR CIERRE</button>
+                        <button onClick={handleConfirmClose} className="btn btn-error btn-block btn-lg text-white">
+                            CONFIRMAR Y CORTAR 🖨️
+                        </button>
                         <button onClick={() => setClosingSummary(null)} className="btn btn-ghost btn-block">Cancelar</button>
                     </div>
                 </div>
@@ -130,7 +171,7 @@ export const ShiftsScreen: React.FC = () => {
       );
   }
 
-  // --- VISTA 3: CAJA ABIERTA (Info General) ---
+  // --- VISTA 3: CAJA ABIERTA (Dashboard) ---
   return (
     <div className="max-w-4xl mx-auto mt-6 animate-fade-in">
         <div className="grid md:grid-cols-2 gap-6">
