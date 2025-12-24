@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useTicketStore } from '../store/useTicketStore';
 import { useAuthStore } from '../store/useAuthStore';
-import { useShiftStore } from '../store/useShiftStore'; // <--- Importante
+import { useShiftStore } from '../store/useShiftStore';
 import { useUIStore } from '../store/useUIStore';
 import { useMenuStore } from '../store/useMenuStore';
 import { orderService } from '../services/orderService';
@@ -14,7 +14,7 @@ export const usePosLogic = () => {
   // 1. Hooks de Estado Global
   const { startListening } = useMenuStore();
   const { currentUser } = useAuthStore();
-  const { currentShift } = useShiftStore(); // <--- Estado de la caja del usuario actual
+  const { currentShift } = useShiftStore(); 
   
   const { 
     addItem, 
@@ -70,19 +70,12 @@ export const usePosLogic = () => {
       const isMesero = currentUser?.role === 'MESERO';
       const isTakeOut = orderMode === 'Para Llevar';
       
-      // --- DEBUG TEMPORAL (Míralo en la consola F12) ---
-      console.log("INTENTO DE COBRO:");
-      console.log("- Modo:", orderMode);
-      console.log("- Es Mesero:", isMesero);
-      console.log("- Caja Abierta (Shift):", currentShift);
-      // --------------------------------------------------
-      
       // B. VALIDACIÓN DE CAJA (CRÍTICO)
       // Si es venta directa (Para Llevar) y NO es mesero (es Cajero/Admin)
       if (isTakeOut && !isMesero) {
           if (!currentShift) {
               toast.error("⛔ CAJA CERRADA: Debes abrir turno para cobrar.");
-              openShiftModal(); // Abre la pantalla de turnos automáticamente
+              openShiftModal(); 
               return;
           }
       }
@@ -111,8 +104,12 @@ export const usePosLogic = () => {
 
       const cashierName = currentUser?.name || 'Cajero';
       const total = getTotal();
-      const currentMode = orderMode; // Copia local para restaurar estado
+      const currentMode = orderMode;
       
+      // --- LÓGICA DE IMPRESIÓN ---
+      // Si es MESERO, NO imprime (false). Si es otro rol, SÍ imprime (true).
+      const shouldPrint = currentUser?.role !== 'MESERO';
+
       try {
           setIsPaymentModalOpen(false); 
           
@@ -121,7 +118,8 @@ export const usePosLogic = () => {
               total, 
               currentMode, 
               cashierName,
-              customerName, 
+              customerName,
+              shouldPrint, // <--- AQUI PASAMOS LA DECISIÓN DE IMPRIMIR
               paymentDetails
           );
           
@@ -134,7 +132,13 @@ export const usePosLogic = () => {
           }
           
           setView('menu');
-          toast.success(`¡Orden enviada correctamente!`);
+
+          // Mensaje personalizado según lo que pasó
+          if (shouldPrint) {
+              toast.success(`¡Orden cobrada e impresa! 🖨️`);
+          } else {
+              toast.success(`¡Orden enviada a cocina! 👨‍🍳`);
+          }
 
       } catch (error) {
           console.error(error);

@@ -18,6 +18,7 @@ export const orderService = {
     mode: OrderMode, 
     cashierName: string, 
     customerName: string,
+    shouldPrint: boolean,
     payment?: PaymentDetails 
   ): Promise<number> {
 
@@ -115,20 +116,22 @@ export const orderService = {
       });
 
       // --- 4. EFECTOS SECUNDARIOS (Fuera de transacción) ---
-      printService.printReceipt({
-          items,
-          total,
-          mode,
-          status: initialStatus,
-          kitchenStatus: initialKitchenStatus,
-          orderNumber: finalOrderNumber,
-          customerName,
-          createdAt: new Date(),
-          payment,
-          cashier: cashierName
-      });
+      if (shouldPrint) {
+        printService.printReceipt({
+                items,
+                total,
+                mode,
+                status: initialStatus,
+                kitchenStatus: initialKitchenStatus,
+                orderNumber: finalOrderNumber,
+                customerName,
+                createdAt: new Date(),
+                payment,
+                cashier: cashierName
+        });
+    }
 
-      return finalOrderNumber;
+    return finalOrderNumber;
 
     } catch (error) {
       console.error("Error crítico al crear orden:", error);
