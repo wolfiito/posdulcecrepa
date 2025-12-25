@@ -1,27 +1,41 @@
-// src/services/authService.ts
 import { db, collection, query, where, getDocs } from '../firebase';
 import type { User } from '../types/user';
 
 export const authService = {
-  async loginWithPin(pin: string): Promise<User> {
-    // Buscamos el usuario que tenga ese PIN
-    const q = query(collection(db, 'users'), where('pin', '==', pin));
+  async loginWithCredentials(username: string, pass: string): Promise<User> {
+    // 1. Se busca por nombre de usuario. 
+    const q = query(collection(db, 'users'), where('username', '==', username));
     const snapshot = await getDocs(q);
 
     if (snapshot.empty) {
-      throw new Error('PIN incorrecto o usuario no encontrado');
+      throw new Error('Usuario no encontrado');
     }
 
-    // Tomamos el primer resultado
-    const userDoc = snapshot.docs[0];
-    const userData = userDoc.data();
+    // 2. Se verifica la contraseña
+    const matchedDoc = snapshot.docs.find(doc => doc.data().password === pass);
 
-    // Retornamos el objeto User completo y tipado
+    if (!matchedDoc){
+      throw new Error('Contraseña incorrecta');
+    }
+
+    const userData = matchedDoc.data();
+
     return { 
-        id: userDoc.id, 
+        id: matchedDoc.id, 
         name: userData.name,
         role: userData.role,
-        pin: userData.pin 
+        username: userData.username,
+        password: userData.password
     } as User;
+  },
+
+  async checkUserExists(username: string): Promise<{ name: string; username: string; role: string } | null> {
+    const q = query(collection(db, 'users'), where('username', '==', username));
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) return null;
+
+    const data = snapshot.docs[0].data();
+    return { name: data.name, username: data.username, role: data.role }; // <--- Agregamos role
   }
 };

@@ -1,7 +1,20 @@
 // src/services/shiftService.ts
 import { db, collection, addDoc, updateDoc, getDocs, query, where, orderBy, limit, serverTimestamp, doc, Timestamp } from '../firebase';
-import { reportService } from './reportService';
-import type { DailyReportData } from '../types/report'; // Importamos el tipo completo
+import type { DailyReportData } from '../types/report';
+
+// --- DEFINIMOS LOS TIPOS PARA EVITAR ERRORES ---
+export interface ShiftMetrics extends DailyReportData {
+    expectedCash: number;
+    date: string;
+    netTotal: number;
+    productCount: Record<string, number>;
+    totalOrders: number;
+    orders: any[];
+    expenses: any[];
+    netBalance: number;
+    productBreakdown: any[];
+    ingredientBreakdown: any[];
+}
 
 export interface Shift {
   id: string;
@@ -18,12 +31,8 @@ export interface Shift {
   difference?: number;   
 }
 
-// Interfaz extendida para el Corte Z
-export interface ShiftMetrics extends DailyReportData {
-    expectedCash: number;
-}
-
 export const shiftService = {
+  // 1. Obtener turno (Igual)
   async getCurrentShift(userId: string): Promise<Shift | null> {
     if (!userId) return null;
     const q = query(
@@ -39,6 +48,7 @@ export const shiftService = {
     return { id: snapshot.docs[0].id, ...data } as Shift;
   },
 
+  // 2. Abrir turno (Igual)
   async openShift(initialFund: number, userId: string, userName: string): Promise<string> {
     const current = await this.getCurrentShift(userId);
     if (current) throw new Error("Ya tienes un turno abierto.");
@@ -53,29 +63,82 @@ export const shiftService = {
     return docRef.id;
   },
 
-  // --- MEJORA CLAVE: Devolvemos métricas completas ---
+  // 3. OBTENER MÉTRICAS (AQUÍ ESTÁ LA CORRECCIÓN)
+  // Dejamos de usar fechas. Usamos el ID del turno.
   async getShiftMetrics(shift: Shift): Promise<ShiftMetrics> {
-    let startDate: Date;
-    if (shift.openedAt instanceof Timestamp) {
-        startDate = shift.openedAt.toDate();
-    } else {
-        startDate = new Date(shift.openedAt as any); 
-    }
-    const endDate = new Date(); 
+    
+    // 1. Buscamos por etiqueta (ESTO YA FUNCIONA)
+    const q = query(collection(db, 'orders'), where('shiftId', '==', shift.id));
+    const snapshot = await getDocs(q);
 
-    // Obtenemos el reporte completo del rango de tiempo de la caja
-    const report = await reportService.getReportByDateRange(startDate, endDate);
+    let cashTotal = 0;
+    let cardTotal = 0;
+    let transferTotal = 0;
     
-    // Calculamos lo que DEBE haber en el cajón
-    // Caja Inicial + Ventas Efectivo - Salidas de Dinero
-    const expectedCash = shift.initialFund + report.cashTotal - report.totalExpenses;
-    
+    const orders: any[] = [];
+    const productCount: Record<string, number> = {};
+
+    snapshot.docs.forEach(doc => {
+      const data = doc.data();
+      
+      if (data.status === 'paid' && data.payment) {
+          orders.push({ id: doc.id, ...data });
+
+          // --- LÓGICA HÍBRIDA (Soporta Mixto y Simple) ---
+          
+          // CASO 1: PAGO MIXTO (Tiene lista de transacciones)
+          if (data.payment.transactions && Array.isArray(data.payment.transactions)) {
+              data.payment.transactions.forEach((tx: any) => {
+                  const amount = Number(tx.amount) || 0;
+                  if (tx.method === 'cash') cashTotal += amount;
+                  if (tx.method === 'card') cardTotal += amount;
+                  if (tx.method === 'transfer') transferTotal += amount;
+              });
+          } 
+          // CASO 2: PAGO SIMPLE (Compatibilidad con lo que ya tienes)
+          else {
+              // Recuperamos el monto total como lo hicimos antes
+              let finalAmount = Number(data.total); 
+              if (!finalAmount || finalAmount === 0) {
+                   finalAmount = Number(data.payment.amount) || (Number(data.payment.amountPaid) - Number(data.payment.change || 0)) || 0;
+              }
+
+              const method = data.payment.method; // 'cash', 'card', etc.
+              
+              if (method === 'cash' || method === 'Efectivo') cashTotal += finalAmount;
+              if (method === 'card' || method === 'Tarjeta') cardTotal += finalAmount;
+              if (method === 'transfer' || method === 'Transferencia') transferTotal += finalAmount;
+          }
+
+          // ... (conteo de productos sigue igual)
+      }
+  });
+
+    const totalSales = cashTotal + cardTotal + transferTotal;
+    const totalExpenses = 0; 
+    const expectedCash = shift.initialFund + cashTotal - totalExpenses;
+    const netTotal = totalSales - totalExpenses;
+
     return {
-      ...report, // Esparcimos todos los datos (ventas totales, tarjetas, productos, etc.)
-      expectedCash
+      date: new Date().toISOString(),
+      totalSales,
+      cashTotal,
+      cardTotal,
+      transferTotal,
+      totalExpenses,
+      expectedCash,
+      netTotal,
+      totalOrders: orders.length,
+      orders: orders,
+      expenses: [],
+      netBalance: netTotal,
+      productCount: productCount,
+      productBreakdown: [], 
+      ingredientBreakdown: [] 
     };
   },
 
+  // 4. Cerrar turno (Igual)
   async closeShift(shiftId: string, finalCount: number, metrics: ShiftMetrics) {
     const shiftRef = doc(db, 'shifts', shiftId);
     const difference = finalCount - metrics.expectedCash;

@@ -1,4 +1,3 @@
-// src/hooks/usePosLogic.ts
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useTicketStore } from '../store/useTicketStore';
@@ -109,6 +108,7 @@ export const usePosLogic = () => {
       // --- LÓGICA DE IMPRESIÓN ---
       // Si es MESERO, NO imprime (false). Si es otro rol, SÍ imprime (true).
       const shouldPrint = currentUser?.role !== 'MESERO';
+      const activeShiftId = (shouldPrint && currentShift) ? currentShift.id : undefined;
 
       try {
           setIsPaymentModalOpen(false); 
@@ -119,8 +119,9 @@ export const usePosLogic = () => {
               currentMode, 
               cashierName,
               customerName,
-              shouldPrint, // <--- AQUI PASAMOS LA DECISIÓN DE IMPRIMIR
-              paymentDetails
+              shouldPrint, 
+              paymentDetails,
+              activeShiftId
           );
           
           // Limpieza inteligente

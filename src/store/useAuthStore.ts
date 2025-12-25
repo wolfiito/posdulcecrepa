@@ -5,16 +5,14 @@ import type { User } from '../types/user';
 import { authService } from '../services/authService';
 
 interface AuthState {
-  // Estado
+
   currentUser: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
 
-  // Acciones
-  loginWithPin: (pin: string) => Promise<void>;
+  loginWithCredentials: (username: string, pass: string) => Promise<void>;
   logout: () => void;
-  // Mantenemos esta por si necesitas setear usuario manualmente en pruebas
   setUser: (user: User) => void; 
 }
 
@@ -26,22 +24,15 @@ export const useAuthStore = create<AuthState>()(
       isLoading: false,
       error: null,
 
-      // Acción que conecta la pantalla de Login con Firebase
-      loginWithPin: async (pin: string) => {
+      // Se conecta el Login con Firebase
+      loginWithCredentials: async (username: string, pass: string) => {
         set({ isLoading: true, error: null });
         try {
-            const user = await authService.loginWithPin(pin);
-            console.log("✅ Usuario logueado:", user);
-            
-            set({ 
-              currentUser: user, 
-              isAuthenticated: true, 
-              isLoading: false 
-            });
+          const user = await authService.loginWithCredentials(username, pass);                      
+          set({ currentUser: user, isAuthenticated: true, isLoading: false });
         } catch (err: any) {
-            console.error("❌ Error Login:", err);
             set({ 
-              error: err.message || 'PIN incorrecto', 
+              error: err.message || 'Credenciales incorrectas', 
               isLoading: false 
             });
         }

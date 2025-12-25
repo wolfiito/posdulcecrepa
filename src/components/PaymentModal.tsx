@@ -1,171 +1,242 @@
 // src/components/PaymentModal.tsx
 import React, { useState, useEffect } from 'react';
-import Modal from 'react-modal';
-import type { PaymentMethod, PaymentDetails } from '../services/orderService';
+import type { PaymentMethod, PaymentDetails, PaymentTransaction } from '../types/order';
+import { toast } from 'sonner';
 
-// Estilos para el modal (puedes ajustarlos o moverlos a CSS)
-const customStyles = {
-  content: {
-    top: '50%',
-    left: '50%',
-    right: 'auto',
-    bottom: 'auto',
-    marginRight: '-50%',
-    transform: 'translate(-50%, -50%)',
-    width: '90%',
-    maxWidth: '400px',
-    padding: '0',
-    border: 'none',
-    borderRadius: '1rem',
-    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-    overflow: 'hidden' // Para que el header no se salga
-  },
-  overlay: {
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    zIndex: 1000
-  }
-};
-
-Modal.setAppElement('#root');
-
-interface Props {
+interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   total: number;
-  onConfirm: (paymentDetails: PaymentDetails) => void;
+  onConfirm: (details: PaymentDetails) => void;
 }
 
-export const PaymentModal: React.FC<Props> = ({ isOpen, onClose, total, onConfirm }) => {
-  const [method, setMethod] = useState<PaymentMethod>('cash');
-  const [amountReceived, setAmountReceived] = useState<string>('');
-  const [cardFeePercent] = useState(0.035); // 3.5% ejemplo (Clip, MercadoPago, etc)
+export const PaymentModal: React.FC<PaymentModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  total, 
+  onConfirm 
+}) => {
+  // Estado del modo de pago
+  const [isMixedMode, setIsMixedMode] = useState(false);
 
-  // Resetear al abrir
+  // Estados para montos
+  const [amountReceived, setAmountReceived] = useState<string>(''); // Para pago simple efectivo
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('cash');
+  
+  // Estados para pago mixto
+  const [cashAmount, setCashAmount] = useState<string>('');
+  const [cardAmount, setCardAmount] = useState<string>('');
+  const [transferAmount, setTransferAmount] = useState<string>('');
+
   useEffect(() => {
     if (isOpen) {
-      setMethod('cash');
+      // Reset al abrir
       setAmountReceived('');
+      setCashAmount('');
+      setCardAmount('');
+      setTransferAmount('');
+      setIsMixedMode(false);
+      setSelectedMethod('cash');
     }
-  }, [isOpen]);
+  }, [isOpen, total]);
 
   // Cálculos
-  const numericReceived = parseFloat(amountReceived) || 0;
-  const cardFee = method === 'card' ? total * cardFeePercent : 0;
-  const totalWithFee = total + cardFee;
-  const change = method === 'cash' ? numericReceived - total : 0;
+  const numTotal = Number(total);
   
-  const isValid = () => {
-    if (method === 'cash') return numericReceived >= total;
-    return true; // Tarjeta y transferencia se asume que pasan exacto
-  };
+  // Cálculos MIXTOS
+  const valCash = parseFloat(cashAmount) || 0;
+  const valCard = parseFloat(cardAmount) || 0;
+  const valTransfer = parseFloat(transferAmount) || 0;
+  const totalCovered = valCash + valCard + valTransfer;
+  const remaining = Math.max(0, numTotal - totalCovered);
+  const mixedChange = Math.max(0, totalCovered - numTotal);
+
+  // Cálculos SIMPLES
+  const numReceived = parseFloat(amountReceived) || 0;
+  const simpleChange = selectedMethod === 'cash' ? Math.max(0, numReceived - numTotal) : 0;
 
   const handleConfirm = () => {
-    if (!isValid()) return;
+    // 1. Lógica para PAGO MIXTO
+    if (isMixedMode) {
+      if (remaining > 0.5) { // Margen de 50 centavos por redondeo
+        toast.error(`Faltan $${remaining.toFixed(2)} por cubrir`);
+        return;
+      }
 
-    onConfirm({
-      method,
-      amountPaid: method === 'cash' ? numericReceived : totalWithFee,
-      change: method === 'cash' ? change : 0,
-      cardFee: method === 'card' ? cardFee : 0
-    });
+      const transactions: PaymentTransaction[] = [];
+      if (valCash > 0) transactions.push({ method: 'cash', amount: valCash });
+      if (valCard > 0) transactions.push({ method: 'card', amount: valCard });
+      if (valTransfer > 0) transactions.push({ method: 'transfer', amount: valTransfer });
+
+      const details: PaymentDetails = {
+        method: 'mixed',
+        totalPaid: totalCovered, // Lo que sumaron todos los métodos
+        amountPaid: numTotal,    // Lo que costaba la orden
+        change: mixedChange,
+        transactions: transactions // <--- AQUÍ VA LA MAGIA
+      };
+      
+      onConfirm(details);
+    } 
+    
+    // 2. Lógica para PAGO SIMPLE (Legacy)
+    else {
+      if (selectedMethod === 'cash' && numReceived < numTotal) {
+        toast.error("El monto recibido es menor al total");
+        return;
+      }
+
+      const finalPaid = selectedMethod === 'cash' ? numReceived : numTotal;
+
+      const details: PaymentDetails = {
+        method: selectedMethod,
+        totalPaid: finalPaid,
+        amountPaid: numTotal,
+        change: simpleChange,
+        // No enviamos transactions en pago simple para mantenerlo ligero
+      };
+
+      onConfirm(details);
+    }
   };
 
+  if (!isOpen) return null;
+
   return (
-    <Modal
-      isOpen={isOpen}
-      onRequestClose={onClose}
-      style={customStyles}
-      contentLabel="Cobrar Orden"
-    >
-      {/* Header */}
-      <div className="bg-primary p-4 text-primary-content text-center">
-        <h2 className="text-2xl font-black m-0">Cobrar Orden</h2>
-        <p className="text-sm opacity-90 m-0 mt-1">Selecciona método de pago</p>
-      </div>
+    <div className="modal modal-open">
+      <div className="modal-box max-w-md">
+        <h3 className="font-bold text-2xl mb-4 text-center">
+            Total a Pagar: <span className="text-primary">${numTotal.toFixed(2)}</span>
+        </h3>
 
-      <div className="p-6 bg-base-100">
-        
-        {/* Total Display */}
-        <div className="text-center mb-6">
-          <span className="text-sm text-base-content/60 uppercase font-bold">Total a Pagar</span>
-          <div className="text-4xl font-black text-primary">
-            ${totalWithFee.toFixed(2)}
-          </div>
-          {method === 'card' && (
-            <span className="text-xs text-warning font-bold">
-              (+${cardFee.toFixed(2)} Comisión)
-            </span>
-          )}
+        {/* --- TABS PARA CAMBIAR MODO --- */}
+        <div className="tabs tabs-boxed mb-4">
+            <a 
+                className={`tab flex-1 ${!isMixedMode ? 'tab-active' : ''}`} 
+                onClick={() => setIsMixedMode(false)}
+            >
+                Pago Simple
+            </a>
+            <a 
+                className={`tab flex-1 ${isMixedMode ? 'tab-active' : ''}`} 
+                onClick={() => setIsMixedMode(true)}
+            >
+                Pago Dividido 🍰
+            </a>
         </div>
 
-        {/* Tabs de Método */}
-        <div className="tabs tabs-boxed mb-4 bg-base-200 p-1">
-          <a 
-            className={`tab tab-lg flex-1 ${method === 'cash' ? 'tab-active bg-white shadow-sm font-bold' : ''}`}
-            onClick={() => setMethod('cash')}
-          >
-            💵 Efec.
-          </a>
-          <a 
-            className={`tab tab-lg flex-1 ${method === 'card' ? 'tab-active bg-white shadow-sm font-bold' : ''}`}
-            onClick={() => setMethod('card')}
-          >
-            💳 Tarj.
-          </a>
-          <a 
-            className={`tab tab-lg flex-1 ${method === 'transfer' ? 'tab-active bg-white shadow-sm font-bold' : ''}`}
-            onClick={() => setMethod('transfer')}
-          >
-            🏦 Transf.
-          </a>
-        </div>
+        {/* === MODO PAGO SIMPLE === */}
+        {!isMixedMode && (
+            <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-2">
+                    <button 
+                        className={`btn ${selectedMethod === 'cash' ? 'btn-secondary' : 'btn-outline'}`}
+                        onClick={() => setSelectedMethod('cash')}
+                    >
+                        💵 Efectivo
+                    </button>
+                    <button 
+                        className={`btn ${selectedMethod === 'card' ? 'btn-secondary' : 'btn-outline'}`}
+                        onClick={() => setSelectedMethod('card')}
+                    >
+                        💳 Tarjeta
+                    </button>
+                    <button 
+                        className={`btn ${selectedMethod === 'transfer' ? 'btn-secondary' : 'btn-outline'}`}
+                        onClick={() => setSelectedMethod('transfer')}
+                    >
+                        🏦 Transf.
+                    </button>
+                </div>
 
-        {/* Contenido Dinámico */}
-        {method === 'cash' && (
-          <div className="form-control w-full mb-4">
-            <label className="label">
-              <span className="label-text font-bold">Efectivo Recibido</span>
-            </label>
-            <input 
-              type="number" 
-              placeholder="0.00" 
-              className="input input-bordered input-lg w-full text-center font-mono text-xl" 
-              value={amountReceived}
-              onChange={(e) => setAmountReceived(e.target.value)}
-              autoFocus
-            />
-            <div className={`alert mt-3 ${change >= 0 ? 'alert-success' : 'alert-error'} py-2`}>
-               <span className="font-bold w-full text-center block">
-                 Cambio: ${change >= 0 ? change.toFixed(2) : 'FALTA DINERO'}
-               </span>
+                {selectedMethod === 'cash' && (
+                    <div className="form-control">
+                        <label className="label"><span className="label-text">¿Con cuánto paga?</span></label>
+                        <input 
+                            type="number" 
+                            className="input input-bordered input-lg text-center text-xl" 
+                            placeholder="$0.00"
+                            autoFocus
+                            value={amountReceived}
+                            onChange={(e) => setAmountReceived(e.target.value)}
+                        />
+                        {numReceived > numTotal && (
+                            <div className="alert alert-success mt-2 py-2">
+                                Cambio: <span className="font-bold text-xl">${simpleChange.toFixed(2)}</span>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
-          </div>
         )}
 
-        {method === 'card' && (
-          <div className="alert alert-warning mb-4 text-sm">
-             <span>⚠️ Se aplicará el 3.5% de comisión al cliente. Cobrar en terminal: <b>${totalWithFee.toFixed(2)}</b></span>
-          </div>
-        )}
-        
-        {method === 'transfer' && (
-          <div className="alert alert-info mb-4 text-sm">
-             <span>📲 Confirma que recibiste la transferencia por <b>${total.toFixed(2)}</b> antes de finalizar.</span>
-          </div>
+        {/* === MODO PAGO MIXTO === */}
+        {isMixedMode && (
+            <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                    <span className="w-24 font-bold">💵 Efectivo:</span>
+                    <input 
+                        type="number" 
+                        className="input input-bordered flex-1" 
+                        placeholder="$0.00"
+                        value={cashAmount}
+                        onChange={(e) => setCashAmount(e.target.value)}
+                    />
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="w-24 font-bold">💳 Tarjeta:</span>
+                    <input 
+                        type="number" 
+                        className="input input-bordered flex-1" 
+                        placeholder="$0.00"
+                        value={cardAmount}
+                        onChange={(e) => setCardAmount(e.target.value)}
+                    />
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="w-24 font-bold">🏦 Transf.:</span>
+                    <input 
+                        type="number" 
+                        className="input input-bordered flex-1" 
+                        placeholder="$0.00"
+                        value={transferAmount}
+                        onChange={(e) => setTransferAmount(e.target.value)}
+                    />
+                </div>
+
+                <div className="divider my-1"></div>
+                
+                <div className="flex justify-between text-sm">
+                    <span>Cubierto:</span>
+                    <span className="font-bold">${totalCovered.toFixed(2)}</span>
+                </div>
+                
+                {remaining > 0 ? (
+                    <div className="flex justify-between text-error font-bold text-lg">
+                        <span>Falta:</span>
+                        <span>${remaining.toFixed(2)}</span>
+                    </div>
+                ) : (
+                    <div className="flex justify-between text-success font-bold text-lg">
+                        <span>Cambio:</span>
+                        <span>${mixedChange.toFixed(2)}</span>
+                    </div>
+                )}
+            </div>
         )}
 
-        {/* Botones */}
-        <div className="flex gap-3 mt-6">
-          <button onClick={onClose} className="btn btn-ghost flex-1">Cancelar</button>
-          <button 
-            onClick={handleConfirm} 
-            disabled={!isValid()} 
-            className="btn btn-primary flex-1 font-bold text-lg shadow-lg"
-          >
-            Cobrar e Imprimir
-          </button>
+        {/* --- BOTONES ACCIÓN --- */}
+        <div className="modal-action">
+            <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+            <button 
+                className="btn btn-primary px-8"
+                onClick={handleConfirm}
+                disabled={isMixedMode && remaining > 0.5} // Bloquear si falta dinero (margen de error pequeño)
+            >
+                COBRAR 💰
+            </button>
         </div>
       </div>
-    </Modal>
+    </div>
   );
 };

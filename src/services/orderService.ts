@@ -4,6 +4,7 @@ import { printService } from './printService';
 import type { TicketItem } from '../types/menu';
 import type { Order, PaymentDetails, OrderMode, KitchenStatus } from '../types/order';
 import type { DocumentReference } from 'firebase/firestore'; // Importamos el tipo estricto
+import { shiftService } from './shiftService';
 
 // Interfaz interna para asegurar que no usamos 'any'
 interface StockUpdate {
@@ -19,7 +20,8 @@ export const orderService = {
     cashierName: string, 
     customerName: string,
     shouldPrint: boolean,
-    payment?: PaymentDetails 
+    payment?: PaymentDetails,
+    shiftId?: string
   ): Promise<number> {
 
     const initialStatus = payment ? 'paid' : 'pending';
@@ -101,7 +103,8 @@ export const orderService = {
           customerName,
           createdAt: serverTimestamp(),
           cashier: cashierName,
-          ...(payment && { payment }) 
+          ...(payment && { payment }),
+          ...(shiftId && { shiftId })
         };
 
         // --- 3. ESCRITURAS ---
@@ -139,18 +142,23 @@ export const orderService = {
     }
   },
 
-  async payOrders(orders: Order[], payment: PaymentDetails) {
+  async payOrders(orderIds: string[], payment: PaymentDetails, shiftId?: string) {
       const batch = writeBatch(db);
 
-      orders.forEach(order => {
-          if (!order.id) return;
-          const ref = doc(db, "orders", order.id);
-          batch.update(ref, {
-              status: 'paid',
-              payment: payment
-          });
-      });
+      orderIds.forEach(id => {
+        const ref = doc(db, "orders", id);
+          
+        const updateData: any = {
+            status: 'paid',
+            payment: payment,
+            paidAt: serverTimestamp(), // Guardamos cuándo se pagó realmente
+        };
+        if (shiftId) {
+            updateData.shiftId = shiftId; 
+        }
 
+        batch.update(ref, updateData);
+      });
       await batch.commit();
   }
 };

@@ -1,8 +1,8 @@
 // src/services/reportService.ts
 import { db, collection, query, where, orderBy, getDocs } from '../firebase';
 import type { Modifier } from '../types/menu';
-import type { Order } from '../types/order'; // <--- Import correcto
-import type { DailyReportData, Expense, ProductSummary } from '../types/report'; // <--- Tipos centralizados
+import type { Order } from '../types/order'; 
+import type { DailyReportData, Expense, ProductSummary } from '../types/report';
 
 export const reportService = {
   // --- FUNCIÓN NÚCLEO: Genera reporte entre dos momentos EXACTOS ---
@@ -41,21 +41,43 @@ export const reportService = {
       const ingredientMap = new Map<string, number>();
 
       snapOrders.forEach((doc) => {
-        // Forzamos el tipo Order seguro
         const data = { id: doc.id, ...doc.data() } as Order;
         
         if (data.status === 'paid') {
             orders.push(data);
+            
+            // Sumamos al total general
             totalSales += data.total;
 
-            const method = data.payment?.method;
-            if (method === 'cash') cashTotal += data.total; 
-            else if (method === 'card') cardTotal += data.total;
-            else if (method === 'transfer') transferTotal += data.total;
+            // --- CORRECCIÓN AQUÍ: LÓGICA DE PAGO MIXTO ---
+            const payment = data.payment;
 
-            // Desglose de Productos e Ingredientes
+            // CASO 1: Es un pago dividido (Mixto)
+            if (payment?.transactions && Array.isArray(payment.transactions)) {
+                payment.transactions.forEach((tx: any) => {
+                    const amount = Number(tx.amount) || 0;
+                    if (tx.method === 'cash') cashTotal += amount;
+                    if (tx.method === 'card') cardTotal += amount;
+                    if (tx.method === 'transfer') transferTotal += amount;
+                });
+            } 
+            // CASO 2: Es un pago simple (Legacy / Normal)
+            else if (payment) {
+                // Usamos el total de la orden para evitar errores de campos faltantes
+                let finalAmount = Number(data.total);
+                
+                // Backup por si acaso
+                if (!finalAmount || finalAmount === 0) {
+                     finalAmount = Number(payment.amountPaid) || 0;
+                }
+
+                if (payment.method === 'cash') cashTotal += finalAmount;
+                else if (payment.method === 'card') cardTotal += finalAmount;
+                else if (payment.method === 'transfer') transferTotal += finalAmount;
+            }
+
+            // Desglose de Productos e Ingredientes (Esto sigue igual)
             data.items.forEach((item) => {
-                // Productos
                 const variantSuffix = item.details?.variantName ? ` (${item.details.variantName})` : '';
                 const fullName = item.baseName + variantSuffix;
                 
@@ -67,7 +89,6 @@ export const reportService = {
                     productMap.set(fullName, { name: fullName, quantity: 1, total: item.finalPrice });
                 }
 
-                // Insumos (Modifiers)
                 if (item.details?.selectedModifiers) {
                     item.details.selectedModifiers.forEach(mod => {
                         const currentCount = ingredientMap.get(mod.name) || 0;
@@ -89,7 +110,7 @@ export const reportService = {
             description: d.description,
             amount: d.amount,
             category: d.category || 'General',
-            createdAt: d.createdAt // Puede ser Timestamp
+            createdAt: d.createdAt 
           });
           totalExpenses += d.amount;
       });
@@ -104,7 +125,6 @@ export const reportService = {
         netBalance: totalSales - totalExpenses,
         orders,
         expenses,
-        // Ordenamos: Los más vendidos arriba
         productBreakdown: Array.from(productMap.values()).sort((a, b) => b.quantity - a.quantity),
         ingredientBreakdown: Array.from(ingredientMap.entries())
             .map(([name, quantity]) => ({ name, quantity }))

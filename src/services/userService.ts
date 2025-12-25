@@ -1,36 +1,32 @@
 // src/services/userService.ts
-import { db, collection, getDocs, addDoc, deleteDoc, doc, query, orderBy, where } from '../firebase';
-// Importamos desde la nueva ubicación centralizada
+import { db, collection, getDocs, addDoc, deleteDoc, doc, query, where } from '../firebase';
 import type { User, UserRole } from '../types/user';
 
 export const userService = {
-  // 1. Obtener todos los empleados
   async getUsers(): Promise<User[]> {
-    try {
-      const q = query(collection(db, 'users'), orderBy('name'));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as User));
-    } catch (error) {
-      console.error("Error al obtener usuarios:", error);
-      return [];
-    }
+    const snapshot = await getDocs(collection(db, 'users'));
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
   },
 
-  // 2. Crear nuevo empleado
-  async createUser(name: string, pin: string, role: UserRole) {
-    // Validar que el PIN no exista ya
-    const q = query(collection(db, 'users'), where('pin', '==', pin));
-    const snap = await getDocs(q);
-    
-    if (!snap.empty) {
-      throw new Error("Este PIN ya está en uso por otro empleado.");
+  async createUser(name: string, username: string, pass: string, role: UserRole) {
+    // 1. VALIDACIÓN ANTI-DUPLICADOS
+    const q = query(collection(db, 'users'), where('username', '==', username));
+    const querySnapshot = await getDocs(q);
+
+    if (!querySnapshot.empty) {
+        throw new Error(`El usuario "${username}" ya está registrado.`);
     }
 
-    await addDoc(collection(db, 'users'), { name, pin, role });
+    // 2. Si no existe, procedemos a crear
+    await addDoc(collection(db, 'users'), {
+      name,
+      username,
+      password: pass,
+      role
+    });
   },
 
-  // 3. Eliminar empleado
-  async deleteUser(id: string) {
-    await deleteDoc(doc(db, 'users', id));
+  async deleteUser(userId: string) {
+    await deleteDoc(doc(db, 'users', userId));
   }
 };

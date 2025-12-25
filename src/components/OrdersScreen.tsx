@@ -87,17 +87,37 @@ export const OrdersScreen: React.FC = () => {
   };
 
   const confirmPayment = async (paymentDetails: any) => {
-      if (!selectedGroup) return;
+    if (!selectedGroup) return;
 
-      try {
-          setIsPayModalOpen(false);
-          await orderService.payOrders(selectedGroup.orders, paymentDetails);
-          toast.success(`¡Cuenta de ${selectedGroup.customerName} pagada!`);
-          setSelectedGroup(null);
-      } catch (error) {
-          toast.error("Error al procesar el pago");
-      }
-  };
+    try {
+        setIsPayModalOpen(false);
+
+        // 1. OBTENER IDS: El servicio espera strings, no objetos completos
+        // Usamos 'as string' para asegurar que TypeScript sepa que son textos
+        const orderIds = selectedGroup.orders.map(o => o.id as string);
+
+        // 2. OBTENER EL TURNO: Verificamos si la caja está abierta
+        // Si currentShift es null (caja cerrada), enviará undefined
+        const activeShiftId = currentShift?.isOpen ? currentShift.id : undefined;
+
+        // 3. DEBUG (Opcional): Para que veas en consola si lo detecta
+        console.log("Cobrando ordenes:", orderIds); 
+        console.log("Asignando a Turno ID:", activeShiftId);
+
+        // 4. LLAMADA CORREGIDA: Enviamos (IDs, Pago, ID_CAJA)
+        await orderService.payOrders(
+            orderIds, 
+            paymentDetails, 
+            activeShiftId // <--- ¡ESTA ES LA CLAVE QUE FALTABA!
+        );
+
+        toast.success(`¡Cuenta de ${selectedGroup.customerName} pagada!`);
+        setSelectedGroup(null);
+    } catch (error) {
+        console.error("Error al cobrar:", error);
+        toast.error("Error al procesar el pago");
+    }
+};
 
   return (
     <div className="animate-fade-in max-w-5xl mx-auto pb-20 p-4">
