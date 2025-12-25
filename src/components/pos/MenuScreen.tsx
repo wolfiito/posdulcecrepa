@@ -1,3 +1,4 @@
+// src/components/pos/MenuScreen.tsx
 import React, { useMemo } from 'react';
 import { toast } from 'sonner';
 import { useMenuStore } from '../../store/useMenuStore';
@@ -44,7 +45,7 @@ export const MenuScreen: React.FC = () => {
                 openVariantModal(menuItem);
             } else {
                 addItem({
-                    id: crypto.randomUUID(), // ¡Mejoramos esto de una vez!
+                    id: crypto.randomUUID(),
                     baseName: menuItem.name,
                     finalPrice: menuItem.price || 0,
                     finalCost: menuItem.cost || 0,
@@ -61,7 +62,8 @@ export const MenuScreen: React.FC = () => {
             <div className="flex items-center mb-4 px-1">
                 {!isRoot && (
                     <button 
-                        onClick={() => navigateToGroup(groups.find(g => g.id === currentGroup.parent) || null)} 
+                        // --- CORRECCIÓN AQUÍ: Volver directo a INICIO (null) ---
+                        onClick={() => navigateToGroup(null)} 
                         className="btn btn-circle btn-ghost btn-sm mr-2"
                     >
                         <IconBack />
@@ -72,6 +74,7 @@ export const MenuScreen: React.FC = () => {
                 </h2>
             </div>
             
+            {/* GRID: Mantenemos tu configuración, pero usamos productCard para el tamaño interno */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {groupsToShow.map(group => (
                     <ProductCard key={group.id} item={group} onClick={() => handleProductClick(group)} isLarge={isRoot} />
