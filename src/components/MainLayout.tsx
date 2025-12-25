@@ -50,7 +50,7 @@ export const MainLayout: React.FC = () => {
             {/* 1. BARRA DE ESTADO (Notch/Hora) 
                 Esta barra solo existe para pintar el fondo detrás de la hora
                 y empujar el navbar hacia abajo. */}
-            <div className="w-full bg-base-100 safe-pt"></div>
+            <div className="w-full bg-base-100" style={{ height: 'max(env(safe-area-inset-top), 20px)' }}></div>
 
             {/* 2. NAVBAR REAL 
                 Quitamos transparencias (/90) para evitar el "rosa fuerte" raro.
