@@ -1,8 +1,9 @@
+// src/components/MainLayout.tsx
 import React, { useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { useUIStore } from '../store/useUIStore';
-import { useShiftStore } from '../store/useShiftStore'; // <--- 1. IMPORTAR STORE DE CAJA
+import { useShiftStore } from '../store/useShiftStore'; 
 import { 
   IconMenu, IconPOS, IconBox, IconWallet, IconChart, 
   IconUsers, IconSun, IconMoon, IconLogout, IconBack 
@@ -11,10 +12,9 @@ import {
 export const MainLayout: React.FC = () => {
   const { currentUser, logout } = useAuthStore();
   const { theme, toggleTheme, view, setView } = useUIStore();
-  const { startListeningToShift, stopListeningToShift } = useShiftStore(); // <--- 2. OBTENER FUNCIONES
+  const { startListeningToShift, stopListeningToShift } = useShiftStore(); 
   const location = useLocation();
 
-  // Cerrar el drawer al cambiar de ruta en móvil
   useEffect(() => {
     document.getElementById('main-drawer')?.click();
   }, [location.pathname]);
@@ -23,8 +23,6 @@ export const MainLayout: React.FC = () => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // --- 3. EL CEREBRO GLOBAL (ESTO ES LO QUE FALTABA) ---
-  // Esto mantiene la caja vigilada en TODAS las pantallas
   useEffect(() => {
     if (currentUser) {
         console.log("📡 Iniciando escucha de caja global...");
@@ -32,49 +30,62 @@ export const MainLayout: React.FC = () => {
     }
     return () => stopListeningToShift();
   }, [currentUser, startListeningToShift, stopListeningToShift]);
-  // -----------------------------------------------------
   
-  // Verificar si estamos en la ruta raíz (POS)
   const isPos = location.pathname === '/';
-
-  // Helper para clases de enlace activo
   const getLinkClass = (path: string) => 
     location.pathname === path ? 'active font-bold' : '';
 
   return (
-    <div className="drawer">
+    // 1. ESTRUCTURA FIJA (h-dvh) + CAJÓN
+    <div className="drawer h-dvh w-screen overflow-hidden">
       <input id="main-drawer" type="checkbox" className="drawer-toggle" />
       
-      <div className="drawer-content flex flex-col min-h-screen bg-base-200 transition-colors duration-300 pb-[140px]">
-        {/* Navbar */}
-        <div className="navbar bg-base-100/90 backdrop-blur-md sticky top-0 z-40 shadow-sm px-2 border-b border-base-200 h-16">
-          <div className="navbar-start flex gap-1 items-center w-auto">
-              {isPos && view === 'ticket' ? (
-                  <button onClick={() => setView('menu')} className="btn btn-ghost btn-circle m-1 text-primary">
-                      <IconBack />
-                  </button>
-              ) : (
-                  <label htmlFor="main-drawer" className="btn btn-ghost btn-circle m-1 drawer-button">
-                      <IconMenu />
-                  </label>
-              )}
-              <span className="text-lg font-black tracking-tight text-base-content ml-2 hidden sm:inline">
-                  DulceCrepa
-              </span>
+      {/* 2. CONTENIDO PRINCIPAL (Columna Flex) */}
+      <div className="drawer-content flex flex-col bg-base-200 h-full overflow-hidden">
+        
+        {/* NAVBAR NATIVO:
+           - pt-[env(safe-area-inset-top)] -> Empuja el contenido bajo el notch
+           - h-auto -> Permite que crezca según el notch
+           - min-h-[theme-size] -> Mantiene tamaño mínimo táctil
+        */}
+        <div className="navbar bg-base-100/90 backdrop-blur-md z-40 shadow-sm border-b border-base-200 flex-none w-full safe-pt">
+          <div className="flex gap-1 items-center w-full px-2 h-16">
+              <div className="navbar-start flex gap-1 items-center w-auto">
+                {isPos && view === 'ticket' ? (
+                    <button onClick={() => setView('menu')} className="btn btn-ghost btn-circle text-primary">
+                        <IconBack />
+                    </button>
+                ) : (
+                    <label htmlFor="main-drawer" className="btn btn-ghost btn-circle drawer-button">
+                        <IconMenu />
+                    </label>
+                )}
+                <span className="text-lg font-black tracking-tight text-base-content ml-2 hidden sm:inline">
+                    DulceCrepa
+                </span>
+              </div>
           </div>
         </div>
 
-        <main className="p-4 max-w-5xl mx-auto w-full animate-fade-in flex-1">
+        {/* ÁREA DE SCROLL (MAIN):
+            - flex-1 -> Ocupa todo el espacio restante
+            - overflow-y-auto -> Solo esto hace scroll
+            - safe-pb -> Deja espacio abajo para la barra de inicio del iPhone
+        */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 w-full max-w-5xl mx-auto animate-fade-in safe-pb scroll-smooth">
             <Outlet />
+            {/* Espacio extra al final para que nada quede tapado */}
+            <div className="h-20"></div>
         </main>
       </div>
 
-      {/* SIDEBAR */}
+      {/* SIDEBAR (Drawer) */}
       <div className="drawer-side z-50">
         <label htmlFor="main-drawer" aria-label="close sidebar" className="drawer-overlay"></label>
-        <ul className="menu p-4 w-80 min-h-full bg-base-100 text-base-content gap-2">
+        {/* safe-pt y safe-pb aquí también para que el menú respete bordes */}
+        <ul className="menu p-4 w-80 min-h-full bg-base-100 text-base-content gap-2 safe-pt safe-pb">
           
-          <li className="mb-4 border-b border-base-200 pb-4">
+          <li className="mb-4 border-b border-base-200 pb-4 mt-8 sm:mt-0">
              <div className="flex flex-col gap-1 items-start pointer-events-none">
                 <span className="font-black text-2xl text-primary">Dulce Crepa</span>
                 <span className="text-xs font-bold">{currentUser?.name || 'Usuario'}</span>

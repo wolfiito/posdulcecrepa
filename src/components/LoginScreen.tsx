@@ -94,8 +94,7 @@ export const LoginScreen: React.FC = () => {
 
   return (
     // 2. CORRECCIÓN DE ALTURA: Usamos min-h-dvh para evitar recortes en Safari Mobile
-    <div className="min-h-dvh w-full bg-base-200 flex flex-col items-center justify-center p-4 animate-fade-in select-none overflow-hidden touch-none">
-      
+    <div className="min-h-dvh w-full bg-base-200 flex flex-col items-center justify-center p-4 animate-fade-in select-none overflow-hidden touch-none safe-pt safe-pb">  
       <style>{`
         @keyframes shake {
           0%, 100% { transform: translateX(0); }

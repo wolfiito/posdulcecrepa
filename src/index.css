@@ -167,3 +167,27 @@ input, textarea {
   .print-right { text-align: right; }
   .print-line { border-bottom: 1px dashed black; margin: 5px 0; }
 }
+/* 1. Relleno para que el contenido no quede bajo el Notch (Arriba) */
+.safe-pt {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* 2. Relleno para que el contenido no quede bajo la Línea (Abajo) */
+.safe-pb {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 3. Margen (alternativa si no quieres padding) */
+.safe-mt {
+  margin-top: env(safe-area-inset-top);
+}
+.safe-mb {
+  margin-bottom: env(safe-area-inset-bottom);
+}
+
+/* 4. Altura total real considerando áreas seguras */
+.h-safe-screen {
+  min-height: 100dvh; /* Altura dinámica */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
