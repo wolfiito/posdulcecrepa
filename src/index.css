@@ -1,12 +1,70 @@
+/* src/index.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* DEFINICIÓN MANUAL DE TEMAS (DaisyUI v5 compatible)
-  Sobrescribimos las variables CSS directamente para asegurar
-  que los colores sean exactos.
-*/
+/* ----------------------------------------------------
+   1. ESTILOS DE APP NATIVA (Bloqueo de gestos web)
+---------------------------------------------------- */
+html {
+  /* Evita el rebote elástico al scrollear al tope */
+  overscroll-behavior-y: none;
+  /* Altura dinámica exacta (ignora barras de navegador) */
+  height: 100dvh; 
+  /* Evita zoom accidental en iOS */
+  -webkit-text-size-adjust: 100%;
+}
 
+body {
+  /* Fondo base y altura completa */
+  @apply bg-base-200 text-base-content antialiased;
+  height: 100%;
+  width: 100%;
+  overflow: hidden; /* Controlamos el scroll por componente */
+
+  /* BLOQUEO DE SELECCIÓN (Sensación de App) */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+
+  /* Elimina el cuadro azul al tocar botones en Android/iOS */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Permitir seleccionar texto SOLO donde es necesario (inputs) */
+input, textarea {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+#root {
+  /* Ocupa toda la pantalla disponible */
+  @apply h-full w-screen flex flex-col;
+}
+
+/* ----------------------------------------------------
+   2. CLASES UTILITARIAS PERSONALIZADAS
+---------------------------------------------------- */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Animación táctil para botones (Feedback físico) */
+.btn:active {
+  transform: scale(0.95);
+  transition: transform 0.1s;
+}
+
+/* ----------------------------------------------------
+   3. DEFINICIÓN DE TEMAS (DaisyUI v5)
+---------------------------------------------------- */
 @layer base {
   /* Tema Claro: dulce-light */
   :root[data-theme="dulce-light"] {
@@ -73,54 +131,31 @@
   }
 }
 
-/* Estilos Globales */
-body {
-  @apply bg-base-200 text-base-content antialiased overflow-y-auto;
-  overscroll-behavior: none; 
-}
-
-#root {
-  /* CORRECCIÓN: Altura mínima, no fija, para que crezca con el contenido */
-  @apply min-h-[100dvh] w-screen flex flex-col;
-}
-
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.hide-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-/* src/index.css (Al final) */
-
+/* ----------------------------------------------------
+   4. CONFIGURACIÓN DE IMPRESIÓN (TICKET)
+---------------------------------------------------- */
 @media print {
-  /* 1. ¡Desaparecer la App por completo! */
-  /* Como el ticket ahora está fuera del #root (por el Portal), 
-     podemos ocultar el #root sin miedo. */
   #root {
     display: none !important;
   }
 
-  /* 2. Configurar el área del ticket */
   #receipt-print-area {
     display: block !important;
     position: absolute;
     left: 0;
     top: 0;
-    width: 100%; /* Ocupa todo el ancho del "papel" definido abajo */
+    width: 100%;
     background-color: white;
     color: black;
     padding: 0;
     margin: 0;
   }
 
-  /* 3. Definir el tamaño del papel para el navegador */
   @page {
-    size: 58mm auto; /* Ancho 58mm, Alto automático (rollo infinito) */
-    margin: 0mm;     /* Cero márgenes para aprovechar el papel */
+    size: 58mm auto; 
+    margin: 0mm;     
   }
 
-  /* Estilos de texto para la térmica */
   .print-text {
     font-family: 'Courier New', Courier, monospace; 
     font-size: 12px;
