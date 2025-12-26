@@ -1,235 +1,276 @@
 // src/components/UsersScreen.tsx
 import React, { useEffect, useState } from 'react';
-import { userService } from '../services/userService';
-import type { User, UserRole } from '../types/user';
+import Modal from 'react-modal';
 import { toast } from 'sonner';
 
-export const UsersScreen: React.FC = () => {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+// Servicios y Componentes
+import { userService } from '../services/userService';
+import { useAuthStore } from '../store/useAuthStore';
+import { PinPadModal } from './PinPadModal'; // Tu modal de seguridad
 
-  // Formulario
-  const [name, setName] = useState('');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('CAJERO');
+// Tipos
+import type { User, UserRole } from '../types/user';
 
-  // Estado del Modal Numpad
-  const [numpadConfig, setNumpadConfig] = useState<{
-    isOpen: boolean;
-    targetField: 'username' | 'password' | null;
-    title: string;
-  }>({ isOpen: false, targetField: null, title: '' });
+Modal.setAppElement('#root');
 
-  const loadUsers = () => {
-    setLoading(true);
-    userService.getUsers()
-      .then(setUsers)
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => { loadUsers(); }, []);
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || username.length !== 6 || password.length !== 6) {
-        return toast.warning("Usuario y Contraseña deben tener 6 dígitos exactos");
-    }
-
-    setIsSubmitting(true);
-    toast.promise(userService.createUser(name, username, password, role), {
-      loading: 'Creando usuario...',
-        success: () => {
-            setName(''); setUsername(''); setPassword(''); setRole('CAJERO');
-            loadUsers();
-            setIsSubmitting(false);
-            return <b>Usuario creado correctamente</b>;
-        },
-        error: (err) => {
-            setIsSubmitting(false);
-            return <b>Error: {err.message}</b>;
-        }
-    });
-  };
-
-  const handleDelete = async (id: string, userName: string) => {
-      if(!confirm(`¿Eliminar a ${userName}?`)) return;
-      await userService.deleteUser(id);
-      toast.success("Usuario eliminado");
-      loadUsers();
-  };
-
-  // Funciones del Numpad
-  const openNumpad = (field: 'username' | 'password', title: string) => {
-      setNumpadConfig({ isOpen: true, targetField: field, title });
-  };
-
-  const handleNumpadInput = (value: string) => {
-      if (value.length !== 6) {
-          toast.error("Deben ser exactamente 6 dígitos");
-          return;
-      }
-      if (numpadConfig.targetField === 'username') setUsername(value);
-      if (numpadConfig.targetField === 'password') setPassword(value);
-      setNumpadConfig({ ...numpadConfig, isOpen: false });
-  };
-
-  return (
-    <div className="p-4 animate-fade-in max-w-5xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-primary">Gestión de Usuarios</h1>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* FORMULARIO */}
-        <div className="card bg-base-100 shadow-xl h-fit">
-          <div className="card-body">
-            <h2 className="card-title text-lg mb-4">Nuevo Usuario</h2>
-            <form onSubmit={handleCreate} className="space-y-3">
-              
-              <div>
-                <label className="label py-1"><span className="label-text">Nombre Completo</span></label>
-                <input 
-                  type="text" 
-                  value={name} 
-                  onChange={e => setName(e.target.value)}
-                  placeholder="Ej. Alejandro Flores" 
-                  className="input input-bordered w-full" 
-                />
-              </div>
-
-              {/* INPUT USUARIO CON NUMPAD */}
-              <div onClick={() => openNumpad('username', 'Ingresa ID (6 Dígitos)')}>
-                <label className="label py-1"><span className="label-text">Usuario (ID)</span></label>
-                <div className="input input-bordered w-full font-mono flex items-center cursor-pointer hover:bg-base-200">
-                    {username ? username : <span className="opacity-40">_ _ _ _ _ _</span>}
-                </div>
-              </div>
-
-              {/* INPUT PASSWORD CON NUMPAD */}
-              <div onClick={() => openNumpad('password', 'Asignar Contraseña (6 Dígitos)')}>
-                <label className="label py-1"><span className="label-text">Contraseña</span></label>
-                <div className="input input-bordered w-full font-mono flex items-center cursor-pointer hover:bg-base-200">
-                    {password ? '••••••' : <span className="opacity-40">_ _ _ _ _ _</span>}
-                </div>
-              </div>
-
-              <div>
-                <label className="label py-1"><span className="label-text">Rol</span></label>
-                <select 
-                  value={role} 
-                  onChange={e => setRole(e.target.value as UserRole)}
-                  className="select select-bordered w-full"
-                >
-                  <option value="CAJERO">Cajero</option>
-                  <option value="MESERO">Mesero</option>
-                  <option value="GERENTE">Gerente</option>
-                  <option value="ADMIN">Admin</option>
-                </select>
-              </div>
-
-              <button type="submit" disabled={isSubmitting} className="btn btn-primary w-full mt-4">
-                {isSubmitting ? "Guardando..." : "Crear Usuario"}
-              </button>
-            </form>
-          </div>
-        </div>
-
-        {/* LISTA */}
-        <div className="lg:col-span-2">
-          <div className="bg-base-100 rounded-box shadow-xl overflow-hidden">
-            {loading ? (
-                <div className="p-10 text-center text-base-content/40">Cargando usuarios...</div>
-            ) : users.length === 0 ? (
-                <div className="p-10 text-center text-base-content/40">No hay usuarios registrados</div>
-            ) : (
-              <table className="table table-zebra w-full">
-                <thead className="bg-base-200">
-                  <tr>
-                    <th>Nombre</th>
-                    <th>ID</th>
-                    <th>Rol</th>
-                    <th className="w-10"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map(user => (
-                    <tr key={user.id}>
-                      <td className="font-bold">{user.name}</td>
-                      <td className="font-mono">{user.username}</td>
-                      <td>
-                        <span className={`badge badge-sm ${user.role === 'ADMIN' ? 'badge-primary' : 'badge-ghost'}`}>
-                          {user.role}
-                        </span>
-                      </td>
-                      <td>
-                        <button onClick={() => handleDelete(user.id, user.name)} className="btn btn-ghost btn-xs text-error">✕</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* --- MODAL DE TECLADO 6 DÍGITOS --- */}
-      {numpadConfig.isOpen && (
-          <NumpadModal 
-            title={numpadConfig.title}
-            onClose={() => setNumpadConfig({ ...numpadConfig, isOpen: false })}
-            onConfirm={handleNumpadInput}
-          />
-      )}
-    </div>
-  );
+// Configuración de Estilos por Rol
+const ROLE_STYLES: Record<UserRole, { label: string, color: string, icon: string }> = {
+    ADMIN: { label: 'Administrador', color: 'bg-purple-100 text-purple-700 border-purple-200', icon: '🛡️' },
+    GERENTE: { label: 'Gerente', color: 'bg-pink-100 text-pink-700 border-pink-200', icon: '👔' },
+    CAJERO: { label: 'Cajero', color: 'bg-blue-100 text-blue-700 border-blue-200', icon: '📠' },
+    MESERO: { label: 'Mesero', color: 'bg-orange-100 text-orange-700 border-orange-200', icon: '🍽️' },
 };
 
-// COMPONENTE INTERNO DEL MODAL (LIMITE DE 6)
-const NumpadModal = ({ title, onClose, onConfirm }: { title: string, onClose: () => void, onConfirm: (val: string) => void }) => {
-    const [val, setVal] = useState('');
+export const UsersScreen: React.FC = () => {
+    const [users, setUsers] = useState<User[]>([]);
+    const [loading, setLoading] = useState(true);
     
-    // Función para manejar el límite en el modal
-    const addNum = (n: string) => {
-        if (val.length < 6) setVal(prev => prev + n);
+    // Estados de Modales
+    const [isFormOpen, setIsFormOpen] = useState(false);
+    const [isPinOpen, setIsPinOpen] = useState(false);
+    
+    const [editingUser, setEditingUser] = useState<User | null>(null);
+    const [userToDelete, setUserToDelete] = useState<string | null>(null);
+
+    // Cargar datos
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            const data = await userService.getUsers();
+            setUsers(data);
+        } catch (error) {
+            toast.error("Error al cargar usuarios");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { loadData(); }, []);
+
+    // --- ELIMINAR (Con PIN de Seguridad) ---
+    const requestDelete = (id: string) => {
+        setUserToDelete(id);
+        setIsPinOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!userToDelete) return;
+        try {
+            await userService.deleteUser(userToDelete);
+            toast.success("Usuario eliminado");
+            loadData();
+        } catch (error) {
+            toast.error("Error al eliminar");
+        } finally {
+            setUserToDelete(null);
+        }
+    };
+
+    // --- ABRIR FORMULARIO ---
+    const handleEdit = (user: User) => {
+        setEditingUser(user);
+        setIsFormOpen(true);
+    };
+
+    const handleNew = () => {
+        setEditingUser(null);
+        setIsFormOpen(true);
     };
 
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center animate-fade-in">
-            <div className="bg-base-100 p-6 rounded-2xl shadow-2xl w-full max-w-sm">
-                <h3 className="text-xl font-bold text-center mb-4">{title}</h3>
-                
-                {/* VISUALIZADOR 6 ESPACIOS */}
-                <div className="bg-base-200 p-4 rounded-xl mb-4 flex items-center justify-center space-x-2 h-20">
-                    {Array.from({ length: 6 }).map((_, i) => (
-                        <div key={i} className={`
-                            w-8 h-12 flex items-center justify-center rounded-md text-2xl font-mono font-bold
-                            ${i < val.length ? 'bg-white text-primary shadow-sm' : 'bg-base-300 text-transparent'}
-                        `}>
-                            {i < val.length ? val[i] : '_'}
-                        </div>
-                    ))}
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                    {[1,2,3,4,5,6,7,8,9].map(n => (
-                        <button key={n} onClick={() => addNum(n.toString())} className="btn btn-lg btn-outline font-mono text-2xl h-16">{n}</button>
-                    ))}
-                    <button onClick={() => setVal('')} className="btn btn-lg btn-ghost text-error">C</button>
-                    <button onClick={() => addNum('0')} className="btn btn-lg btn-outline font-mono text-2xl">0</button>
-                    <button 
-                        onClick={() => onConfirm(val)} 
-                        disabled={val.length !== 6} // Deshabilitar si no son 6
-                        className="btn btn-lg btn-primary text-xl"
-                    >
-                        OK
-                    </button>
-                </div>
-                <button onClick={onClose} className="btn btn-ghost btn-block mt-4">Cancelar</button>
+        <div className="animate-fade-in max-w-6xl mx-auto pb-24 px-4">
+            
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-8 mt-4">
+                <h2 className="text-3xl font-black text-base-content flex items-center gap-2">
+                    👥 Equipo
+                    <span className="badge badge-neutral badge-lg text-white font-bold">{users.length}</span>
+                </h2>
             </div>
+
+            {loading ? (
+                <div className="flex justify-center py-20"><span className="loading loading-spinner loading-lg text-primary"></span></div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {users.map((user) => {
+                        // Estilos dinámicos
+                        const style = ROLE_STYLES[user.role] || ROLE_STYLES['MESERO'];
+                        const initials = user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+
+                        return (
+                            <div key={user.id} className="card bg-base-100 shadow-sm border border-base-200 hover:shadow-md transition-all group">
+                                <div className="card-body p-5 flex-row items-center gap-4">
+                                    
+                                    {/* Avatar de Iniciales */}
+                                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black shrink-0 ${style.color.split(' ')[0]} ${style.color.split(' ')[1]}`}>
+                                        {initials}
+                                    </div>
+
+                                    {/* Info */}
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-bold text-lg truncate">{user.name}</h3>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className={`badge badge-sm font-bold border ${style.color} bg-opacity-20`}>
+                                                {style.icon} {style.label}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs opacity-50 font-mono bg-base-200 inline-block px-1 rounded">ID: {user.username}</p>
+                                    </div>
+
+                                    {/* Menú de 3 puntos */}
+                                    <div className="dropdown dropdown-end">
+                                        <div tabIndex={0} role="button" className="btn btn-circle btn-ghost btn-sm bg-base-200/50">
+                                            ⋮
+                                        </div>
+                                        <ul tabIndex={0} className="dropdown-content z-[1] menu p-2 shadow-xl bg-base-100 rounded-box w-40 border border-base-200">
+                                            <li><button onClick={() => handleEdit(user)}>✏️ Editar</button></li>
+                                            <li><button onClick={() => requestDelete(user.id)} className="text-error">🗑️ Eliminar</button></li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                {/* Barra de color inferior */}
+                                <div className={`h-1 w-full ${style.color.split(' ')[0]}`}></div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* BOTÓN FLOTANTE (FAB) */}
+            <button 
+                onClick={handleNew}
+                className="fixed bottom-6 right-6 btn btn-circle btn-primary btn-lg shadow-xl border-none z-40 w-16 h-16 text-3xl text-white animate-pop-in hover:scale-105 active:scale-95 transition-transform"
+            >
+                +
+            </button>
+
+            {/* MODAL CREAR/EDITAR */}
+            <UserFormModal 
+                isOpen={isFormOpen} 
+                onClose={() => setIsFormOpen(false)} 
+                userToEdit={editingUser} 
+                onSuccess={loadData}
+            />
+
+            {/* MODAL PIN (Para eliminar) */}
+            <PinPadModal 
+                isOpen={isPinOpen} 
+                onClose={() => setIsPinOpen(false)} 
+                onSuccess={() => confirmDelete()}
+                title="Autorizar Baja"
+                requireAdmin={true}
+            />
         </div>
+    );
+};
+
+// --- SUB-COMPONENTE: FORMULARIO ---
+interface FormProps { isOpen: boolean; onClose: () => void; userToEdit: User | null; onSuccess: () => void; }
+
+const UserFormModal: React.FC<FormProps> = ({ isOpen, onClose, userToEdit, onSuccess }) => {
+    const [name, setName] = useState('');
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [role, setRole] = useState<UserRole>('CAJERO');
+    const [submitting, setSubmitting] = useState(false);
+
+    // Cargar datos al abrir
+    useEffect(() => {
+        if (isOpen) {
+            if (userToEdit) {
+                setName(userToEdit.name);
+                setUsername(userToEdit.username);
+                setPassword(userToEdit.password);
+                setRole(userToEdit.role);
+            } else {
+                setName('');
+                setUsername('');
+                setPassword('');
+                setRole('CAJERO');
+            }
+        }
+    }, [isOpen, userToEdit]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSubmitting(true);
+        try {
+            if (userToEdit) {
+                // Editar
+                await userService.updateUser(userToEdit.id, { name, username, password, role });
+                toast.success("Usuario actualizado");
+            } else {
+                // Crear (Tu servicio valida duplicados aquí)
+                await userService.createUser({ name, username, password, role } as any);
+                toast.success("Usuario creado exitosamente");
+            }
+            onSuccess();
+            onClose();
+        } catch (error: any) {
+            // Mostramos el error de duplicado si ocurre
+            toast.error(error.message || "Error al guardar");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <Modal
+            isOpen={isOpen}
+            onRequestClose={onClose}
+            className="w-full max-w-md bg-base-100 p-0 rounded-3xl shadow-2xl overflow-hidden outline-none m-4"
+            overlayClassName="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center"
+        >
+            <div className="p-6">
+                <h3 className="text-xl font-black mb-6 flex items-center gap-2">
+                    {userToEdit ? '✏️ Editar Usuario' : '👤 Nuevo Usuario'}
+                </h3>
+                
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="form-control">
+                        <label className="label py-1 font-bold text-xs opacity-50 uppercase">Nombre Completo</label>
+                        <input type="text" className="input input-bordered w-full font-bold" value={name} onChange={e => setName(e.target.value)} required placeholder="Ej. Juan Pérez" />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="form-control">
+                            <label className="label py-1 font-bold text-xs opacity-50 uppercase">ID Usuario</label>
+                            <input type="text" className="input input-bordered w-full font-mono" value={username} onChange={e => setUsername(e.target.value)} required placeholder="user1" />
+                        </div>
+                        <div className="form-control">
+                            <label className="label py-1 font-bold text-xs opacity-50 uppercase">Contraseña</label>
+                            <input type="text" className="input input-bordered w-full font-mono" value={password} onChange={e => setPassword(e.target.value)} required placeholder="****" />
+                        </div>
+                    </div>
+
+                    <div className="form-control">
+                        <label className="label py-1 font-bold text-xs opacity-50 uppercase">Rol</label>
+                        <div className="grid grid-cols-2 gap-2">
+                            {(Object.entries(ROLE_STYLES) as [UserRole, any][]).map(([key, style]) => (
+                                <button
+                                    key={key}
+                                    type="button"
+                                    onClick={() => setRole(key)}
+                                    className={`
+                                        btn btn-sm h-auto py-2 justify-start
+                                        ${role === key ? 'btn-neutral text-white' : 'btn-ghost bg-base-200'}
+                                    `}
+                                >
+                                    <span className="text-lg mr-1">{style.icon}</span>
+                                    {style.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="pt-4 flex gap-3">
+                        <button type="button" onClick={onClose} className="btn btn-ghost flex-1 rounded-xl">Cancelar</button>
+                        <button type="submit" disabled={submitting} className="btn btn-primary flex-1 rounded-xl shadow-lg">
+                            {submitting ? <span className="loading loading-spinner"></span> : 'Guardar'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </Modal>
     );
 };
