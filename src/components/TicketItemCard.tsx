@@ -1,3 +1,5 @@
+// src/components/TicketItemCard.tsx
+import React from 'react';
 import { motion, useAnimation, type PanInfo } from 'framer-motion';
 import type { TicketItem } from '../types/menu';
 
@@ -15,11 +17,10 @@ const IconTrash = () => (
 
 export const TicketItemCard: React.FC<Props> = ({ item, onRemove }) => {
   const controls = useAnimation();
-  const dragThreshold = -80; // Distancia para activar borrado
+  const dragThreshold = -80; 
 
-  const onDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+  const onDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     if (info.offset.x < dragThreshold) {
-      // Animar salida
       controls.start({
         x: "-100%", 
         opacity: 0,
@@ -28,62 +29,63 @@ export const TicketItemCard: React.FC<Props> = ({ item, onRemove }) => {
         transition: { duration: 0.3 } 
       }).then(() => onRemove(item.id));
     } else {
-      // Regresar a posición original
       controls.start({ x: 0, transition: { type: "spring", stiffness: 400, damping: 35 } });
     }
   };
 
   return (
     <li className="relative w-full mb-3 select-none group">
-      {/* Fondo Rojo (Acción Eliminar) */}
-      <div className="absolute inset-y-0 right-0 w-full bg-error/90 text-error-content rounded-box flex items-center justify-end pr-6 z-0">
+      {/* FONDO DE ACCIÓN (ROJO) */}
+      <div className="absolute inset-y-0 right-0 w-full bg-error/10 text-error rounded-2xl flex items-center justify-end pr-6 z-0">
         <span className="flex items-center gap-2 font-bold text-sm">
             Eliminar <IconTrash />
         </span>
       </div>
       
-      {/* Contenido Frontal (Card) */}
+      {/* TARJETA DESLIZABLE */}
       <motion.div
-        // CORRECCIÓN: rounded-box para coincidir con el tema
-        className="relative bg-base-100 p-4 rounded-box shadow-sm border border-base-200 z-10 active:cursor-grabbing cursor-grab active:shadow-md active:border-primary/30 transition-colors"
+        className="relative bg-base-100 p-3 rounded-2xl shadow-sm z-10 active:cursor-grabbing cursor-grab border border-transparent hover:border-base-200 transition-colors"
         drag="x"
         dragConstraints={{ right: 0, left: 0 }}
         onDragEnd={onDragEnd}
         animate={controls}
-        // Elasticidad: poca a la derecha, normal a la izquierda
         dragElastic={{ left: 0.2, right: 0.02 }} 
         whileTap={{ scale: 0.98 }}
-        style={{ touchAction: "none" }} // Importante para móviles
+        style={{ touchAction: "none" }}
       >
-        <div className="flex justify-between items-start mb-1 gap-4">
-          <div className="font-bold text-base-content text-sm leading-tight">
-            {item.baseName} 
-            {item.details?.variantName && (
-                <span className="text-primary font-normal ml-1 text-xs opacity-90">
-                    ({item.details.variantName})
-                </span>
-            )}
-          </div>
-          <span className="font-black text-base text-success shrink-0">
-            ${item.finalPrice.toFixed(2)}
-          </span>
-        </div>
-        
-        {/* Lista de Modificadores */}
-        {item.details && item.details.selectedModifiers.length > 0 && (
-          <ul className="text-xs text-base-content/60 space-y-1 mt-2 border-l-2 border-base-200 pl-2">
-            {item.details.selectedModifiers.map((mod, idx) => (
-                <li key={`${mod.id}-${idx}`} className="flex justify-between">
-                    <span>• {mod.name}</span>
-                    {mod.price > 0 && <span>+${mod.price.toFixed(2)}</span>}
-                </li>
-            ))}
-          </ul>
-        )}
-        
-        {/* Indicador visual de "deslizar" - Solo visible si no se está arrastrando (opcional, aquí lo dejo sutil) */}
-        <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-5 pointer-events-none">
-            <svg width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M15 19l-7-7 7-7" /></svg>
+        <div className="flex justify-between items-start gap-3">
+            {/* Cantidad (Por ahora 1x, preparado para futuro) */}
+            <div className="flex items-center justify-center bg-base-200 w-8 h-8 rounded-lg text-xs font-bold shrink-0 text-base-content/70">
+                1x
+            </div>
+
+            {/* Detalles */}
+            <div className="flex-1 min-w-0 pt-0.5">
+                <div className="font-bold text-base-content text-sm leading-tight truncate">
+                    {item.baseName}
+                </div>
+                {item.details?.variantName && (
+                    <div className="text-primary text-xs font-medium">
+                        {item.details.variantName}
+                    </div>
+                )}
+                
+                {/* Modificadores (Lista limpia) */}
+                {item.details && item.details.selectedModifiers.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1">
+                    {item.details.selectedModifiers.map((mod, idx) => (
+                        <span key={`${mod.id}-${idx}`} className="badge badge-xs badge-ghost text-[10px] h-auto py-0.5 px-1.5 border-base-200 text-base-content/60">
+                            {mod.name}
+                        </span>
+                    ))}
+                </div>
+                )}
+            </div>
+
+            {/* Precio */}
+            <div className="font-black text-base text-base-content shrink-0">
+                ${item.finalPrice.toFixed(2)}
+            </div>
         </div>
       </motion.div>
     </li>

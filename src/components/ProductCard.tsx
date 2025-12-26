@@ -1,4 +1,4 @@
-// src/components/ProductCard.tsx
+import React from 'react'
 import type { MenuItem, MenuGroup } from '../types/menu';
 import { getIconForItem } from './ProductIcons';
 
@@ -15,17 +15,14 @@ interface ProductCardProps {
 export const ProductCard: React.FC<ProductCardProps> = ({ item, onClick, isLarge = false }) => {
     const isGrp = isGroup(item);
 
-    // --- LÓGICA DE TAMAÑOS (3 CAPAS) ---
+    //Si es producto y tiene precio, lo mostramos.
+    const price = !isGrp && 'price' in item ? item.price : null;
+
+
     const getIconSize = () => {
-        // CAPA 1: Menú Principal (Gigante)
-        if (isLarge) return 'w-28 h-28 md:w-36 md:h-36';
-        
-        // CAPA 2: Sub-Categorías (Muy Grande)
-        if (isGrp) return 'w-24 h-24 md:w-28 md:h-28';
-        
-        // CAPA 3: Productos Finales (Grande)
-        // Antes era w-24, vamos a probar w-28 también si quieres que se vean casi igual
-        return 'w-24 h-24 md:w-28 md:h-28';
+        if (isLarge) return 'w-24 h-24';
+        if (isGrp) return 'w-20 h-20';
+        return 'w-20 h-20';
     };
 
     const handleClick = () => {
@@ -37,39 +34,60 @@ export const ProductCard: React.FC<ProductCardProps> = ({ item, onClick, isLarge
         <div 
             onClick={handleClick}
             className={`
-                card h-full bg-base-100 aspect-square relative
-                rounded-2xl
-                border border-base-200 shadow-sm
+                relative group
+                card h-full aspect-square
+                shadow-sm hover:shadow-md
                 cursor-pointer transition-all duration-200
-                hover:shadow-md hover:scale-[1.02]
-                active:scale-95
-                ${isGrp ? 'border-l-[6px] border-l-primary' : ''}
-                flex flex-col justify-center items-center overflow-hidden
-            `}
+                active:scale-95 border border-transparent
+                overflow-hidden select-none
+            
+            /* ESTILOS CONDICIONALES */
+                ${isGrp 
+                    ? 'bg-primary/5 border-primary/10 hover:border-primary/30' 
+                    : 'bg-base-100 border-base-200 hover:border-primary'       
+                }
+            `}  
         >
-            <div className="card-body p-1 w-full h-full flex flex-col items-center justify-center">
+            <div className="card-body p-2 w-full h-full flex flex-col items-center justify-center relative">
                 
-                {/* --- AQUÍ ESTÁ EL TRUCO --- 
-                    Agregamos [&>svg]:w-full [&>svg]:h-full
-                    Esto obliga a cualquier SVG hijo a ocupar todo el espacio disponible.
-                */}
+                {/* 1. INDICADOR DE TIPO (Icono esquina) */}
+                {isGrp && (
+                    <div className="absolute top-2 right-2 opacity-20 text-primary">
+                        {/* Icono de carpeta sutil */}
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                        </svg>
+                    </div>
+                )}
+
+                {/* 2. ICONO PRINCIPAL */}
                 <div className={`
                     ${getIconSize()} 
-                    flex items-center justify-center drop-shadow-sm transition-all duration-300
-                    mt-2
-                    [&>svg]:w-full [&>svg]:h-full [&>img]:w-full [&>img]:h-full object-contain
+                    flex items-center justify-center 
+                    transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3
+                    [&>svg]:w-full [&>svg]:h-full [&>img]:w-full [&>img]:h-full object-contain filter drop-shadow-sm
+                    mb-1
                 `}>
                     {getIconForItem(item)}
                 </div>
                 
-                <div className="w-full flex flex-col items-center justify-start flex-1 mt-1">
+                {/* 3. NOMBRE */}
+                <div className="w-full flex flex-col items-center justify-start z-10">
                     <h3 className={`
-                        font-bold leading-tight text-base-content text-center w-full px-1 
-                        ${isLarge ? 'text-xl' : isGrp ? 'text-lg' : 'text-base'}
+                        font-bold leading-tight text-center w-full line-clamp-2
+                        ${isGrp ? 'text-primary' : 'text-base-content'}
+                        ${isLarge ? 'text-lg' : 'text-sm'}
                     `}>
                         {item.name.split('(')[0].trim()}
                     </h3>
                 </div>
+
+                {/* 4. PRECIO FLOTANTE (Solo Productos) */}
+                {price !== null && (
+                    <div className="mt-1 badge badge-sm font-bold bg-base-200 border-base-300 text-base-content/80">
+                        ${price}
+                    </div>
+                )}
             </div>
         </div>
     );

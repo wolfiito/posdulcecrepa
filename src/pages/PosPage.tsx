@@ -1,13 +1,14 @@
-import React, { useEffect } from 'react'
+// src/pages/PosPage.tsx
+import React from 'react'
 import Modal from 'react-modal';
 
 // Hooks y Stores
 import { usePosLogic } from '../hooks/usePosLogic';
 import { useUIStore } from '../store/useUIStore';
 import { useMenuStore } from '../store/useMenuStore';
-import { useTicketStore } from '../store/useTicketStore'; // Necesario para el total del modal
-import { useShiftStore } from '../store/useShiftStore';
-import { useAuthStore } from '../store/useAuthStore';
+import { useTicketStore } from '../store/useTicketStore'; 
+import { ShiftsScreen } from '../components/ShiftsScreen';
+
 // Componentes Refactorizados
 import { MenuScreen } from '../components/pos/MenuScreen';
 import { TicketScreen } from '../components/pos/TicketScreen';
@@ -18,10 +19,8 @@ import { ReceiptTemplate } from '../components/ReceiptTemplate';
 import { PaymentModal } from '../components/PaymentModal';
 import { CustomizeCrepeModal } from '../components/CustomizeCrepeModal';
 import { CustomizeVariantModal } from '../components/CustomizeVariantModal';
-import { ShiftsScreen } from '../components/ShiftsScreen';
 
 export const PosPage: React.FC = () => {
-  // 1. Conectamos con el cerebro (Lógica de Negocio)
   const { 
     orderMode, 
     customerName, 
@@ -34,7 +33,6 @@ export const PosPage: React.FC = () => {
     setIsPaymentModalOpen
   } = usePosLogic();
 
-  // 2. Conectamos con la UI Global (Modales y Navegación)
   const { 
     view, 
     activeModal, 
@@ -44,59 +42,78 @@ export const PosPage: React.FC = () => {
     orderToPrint 
   } = useUIStore();
 
-  // 3. Datos necesarios para los modales
   const { modifiers, rules } = useMenuStore();
   const { getTotal } = useTicketStore();
 
+  // --- CONFIGURACIÓN DE MODOS VISUALES ---
+  const modes = [
+      { id: 'Mesa 1', label: 'Mesa 1', icon: '🍽️' },
+      { id: 'Mesa 2', label: 'Mesa 2', icon: '🍽️' },
+      { id: 'Para Llevar', label: 'Llevar', icon: '🛍️' },
+  ] as const;
   
   return (
     <>
-      {/* --- SECCIÓN SUPERIOR: BARRA DE ESTADO Y MESA --- */}
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-2 gap-2 bg-base-100 p-2 rounded-box shadow-sm border border-base-200">
+      {/* --- 1. HEADER MODERNO --- */}
+      <div className="flex flex-col gap-3 mb-4 sticky top-0 z-20 bg-base-200/50 backdrop-blur-md py-2 -mx-4 px-4 border-b border-base-200">
          
-         {/* Selector de Modo (Mesa / Llevar) */}
-         <div className="join shadow-sm border border-base-300 bg-base-200 p-0.5 rounded-btn">
-            {(['Mesa 1', 'Mesa 2', 'Para Llevar'] as const).map((mode) => (
-                <button 
-                    key={mode} 
-                    onClick={() => handleModeChange(mode)} 
-                    className={`join-item btn btn-xs sm:btn-sm border-none transition-all ${orderMode === mode ? 'bg-white text-black shadow-sm font-extrabold' : 'btn-ghost font-medium text-base-content/60'}`}
-                >
-                    {mode === 'Para Llevar' ? 'Llevar 🛍️' : mode}
-                </button>
-            ))}
-        </div>
+         <div className="flex w-full items-center justify-between gap-2">
+             
+             {/* A. SEGMENTED CONTROL (Selector de Modo) */}
+             <div className="bg-base-300/50 p-1 rounded-2xl inline-flex relative">
+                {modes.map((mode) => {
+                    const isActive = orderMode === mode.id;
+                    return (
+                        <button 
+                            key={mode.id} 
+                            onClick={() => handleModeChange(mode.id)} 
+                            className={`
+                                relative px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200
+                                flex items-center gap-1
+                                ${isActive 
+                                    ? 'bg-base-100 text-base-content shadow-sm scale-100' 
+                                    : 'text-base-content/60 hover:bg-base-100/50'
+                                }
+                            `}
+                        >
+                            <span>{mode.icon}</span>
+                            <span className="hidden sm:inline">{mode.label}</span>
+                        </button>
+                    )
+                })}
+             </div>
 
-         {/* Input Inteligente de Nombre */}
-         <div className="flex-1 w-full sm:w-auto text-right">
-            {orderMode === 'Para Llevar' ? (
-                <input 
-                    id="customer-name-input"
-                    type="text" 
-                    placeholder="Nombre del Cliente..." 
-                    className="input input-sm input-bordered w-full sm:max-w-xs font-bold text-primary"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    autoComplete="off"
-                />
-            ) : (
-                <div className="badge badge-lg badge-ghost font-bold opacity-50">
-                    {orderMode} (Cuenta Abierta)
-                </div>
-            )}
+             {/* B. INPUT NOMBRE (Solo aparece en Llevar) */}
+             <div className="flex-1 flex justify-end">
+                {orderMode === 'Para Llevar' ? (
+                    <input 
+                        type="text" 
+                        placeholder="Nombre del cliente..." 
+                        className="input input-sm bg-base-100 border-transparent focus:border-primary focus:outline-none rounded-xl w-full max-w-[180px] shadow-sm text-center font-bold placeholder:font-normal placeholder:text-sm"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        autoComplete="off"
+                    />
+                ) : (
+                    <div className="badge badge-lg badge-primary badge-outline font-bold opacity-80">
+                        Cuenta Abierta
+                    </div>
+                )}
+             </div>
          </div>
       </div>
 
-      {/* --- CONTENIDO PRINCIPAL --- */}
-      {/* Ahora es limpio: o mostramos el menú, o mostramos el ticket */}
-      {view === 'menu' ? <MenuScreen /> : <TicketScreen />}
+      {/* --- 2. CONTENIDO PRINCIPAL --- */}
+      <div className="pb-24"> {/* Padding bottom extra para la barra fija */}
+        {view === 'menu' ? <MenuScreen /> : <TicketScreen />}
+      </div>
 
-      {/* --- BARRA INFERIOR --- */}
+      {/* --- 3. BARRA INFERIOR --- */}
       <BottomBar onAction={handleMainBtnClick} />
 
-      {/* --- GESTIÓN DE MODALES --- */}
+      {/* --- 4. MODALES --- */}
       
-      {/* 1. Modal de Crepa Personalizada */}
+      {/* Modal Crepa */}
       {activeModal === 'custom_crepe' && groupToCustomize && (
           <CustomizeCrepeModal 
             isOpen={true} 
@@ -108,7 +125,7 @@ export const PosPage: React.FC = () => {
           />
       )}
 
-      {/* 2. Modal de Variantes (Frappés, etc) */}
+      {/* Modal Variantes */}
       {activeModal === 'variant_select' && itemToSelectVariant && (
           <CustomizeVariantModal 
             isOpen={true} 
@@ -119,7 +136,7 @@ export const PosPage: React.FC = () => {
           />
       )}
       
-      {/* 3. Modal de Cobro */}
+      {/* Modal Cobro */}
       <PaymentModal 
         isOpen={isPaymentModalOpen} 
         onClose={() => setIsPaymentModalOpen(false)} 
@@ -127,10 +144,10 @@ export const PosPage: React.FC = () => {
         onConfirm={handleFinalizeOrder} 
       />
 
-      {/* 4. Template de Impresión (Invisible) */}
+      {/* Print Template */}
       <ReceiptTemplate order={orderToPrint} />
 
-      {/* 5. Modal de Control de Turnos/Caja */}
+      {/* Modal Turnos */}
       <Modal 
         isOpen={activeModal === 'shift_control'} 
         onRequestClose={closeModals}
