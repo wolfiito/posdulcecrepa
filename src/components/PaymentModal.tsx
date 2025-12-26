@@ -82,27 +82,31 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    // CAMBIO 1: items-end en móvil (Bottom Sheet) y items-center en desktop
-    // z-50 y backdrop para enfoque total
-    <div className="modal modal-open bg-base-300/90 backdrop-blur-sm z-50 p-0 sm:p-4 items-end sm:items-center">
+    // ESTRATEGIA:
+    // 1. 'fixed inset-0': Ocupa toda la pantalla visible (viewport)
+    // 2. 'z-50': Siempre encima
+    // 3. Flex container para centrar en Desktop y llenar en Móvil
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-base-100 sm:bg-black/60 sm:backdrop-blur-sm">
       
-      {/* CAMBIO 2: h-full en móvil para ocupar toda la pantalla, sm:h-auto para desktop */}
-      <div className="modal-box w-full h-[95dvh] sm:h-auto sm:max-w-md p-0 bg-base-100 shadow-2xl rounded-t-3xl sm:rounded-3xl flex flex-col overflow-hidden">
+      {/* CAJA PRINCIPAL:
+          - Móvil: w-full h-full (Full Screen absoluto)
+          - Desktop: max-w-md h-auto (Caja flotante redondeada)
+      */}
+      <div className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-md bg-base-100 sm:rounded-3xl sm:shadow-2xl flex flex-col overflow-hidden">
         
-        {/* --- SECCIÓN 1: HEADER (Fijo arriba) --- */}
-        <div className="flex-none bg-base-100 p-4 text-center border-b border-base-200 shadow-sm z-10">
+        {/* --- 1. HEADER (Fijo Arriba) --- */}
+        <div className="flex-none bg-base-100 p-4 text-center border-b border-base-200 z-20">
             <div className="text-xs font-bold text-base-content/50 uppercase tracking-wide mb-1">Total a Pagar</div>
             <div className="text-5xl font-black text-primary tracking-tight">
                 ${numTotal.toFixed(2)}
             </div>
         </div>
 
-        {/* --- SECCIÓN 2: BODY (Scrollable - Flex 1) --- 
-            Esto es lo que se encoge cuando sale el teclado */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-2">
+        {/* --- 2. BODY (Scrollable - Se encoge cuando sale el teclado) --- */}
+        <div className="flex-1 overflow-y-auto p-4 relative">
             
             {/* TABS */}
-            <div className="bg-base-200 p-1 rounded-2xl flex mb-6 relative shrink-0">
+            <div className="bg-base-200 p-1 rounded-2xl flex mb-6 shrink-0">
                 <button 
                     className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all duration-200 ${!isMixedMode ? 'bg-white shadow-sm text-base-content' : 'text-base-content/50 hover:bg-white/50'}`} 
                     onClick={() => setIsMixedMode(false)}
@@ -117,10 +121,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </button>
             </div>
 
-            {/* === MODO PAGO SIMPLE === */}
+            {/* === PAGO SIMPLE === */}
             {!isMixedMode && (
-                <div className="space-y-6 animate-fade-in">
-                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                <div className="space-y-6 animate-fade-in pb-4">
+                    <div className="grid grid-cols-3 gap-2">
                         {[
                             { id: 'cash', label: 'Efectivo', icon: '💵' },
                             { id: 'card', label: 'Tarjeta', icon: '💳' },
@@ -150,7 +154,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-base-content/40">$</span>
                                 <input 
                                     type="number" 
-                                    inputMode="decimal" 
+                                    inputMode="decimal" // Teclado numérico
                                     className="input input-lg input-bordered w-full pl-10 text-2xl font-bold bg-base-200 border-transparent focus:border-primary focus:bg-base-100 rounded-2xl" 
                                     placeholder="0.00"
                                     autoFocus
@@ -168,7 +172,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </div>
             )}
 
-            {/* === MODO PAGO MIXTO === */}
+            {/* === PAGO MIXTO === */}
             {isMixedMode && (
                 <div className="space-y-3 animate-fade-in pb-4">
                     {[
@@ -176,9 +180,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                         { label: 'Tarjeta', val: cardAmount, set: setCardAmount, icon: '💳' },
                         { label: 'Transf.', val: transferAmount, set: setTransferAmount, icon: '🏦' },
                     ].map((field) => (
-                        <div key={field.label} className="flex items-center gap-2 sm:gap-3">
-                            <div className="w-24 sm:w-28 flex items-center gap-2 font-bold text-base-content/70 shrink-0">
-                                <span>{field.icon}</span> <span className="text-sm sm:text-base">{field.label}</span>
+                        <div key={field.label} className="flex items-center gap-2">
+                            <div className="w-24 flex items-center gap-2 font-bold text-base-content/70 shrink-0">
+                                <span>{field.icon}</span> <span className="text-sm">{field.label}</span>
                             </div>
                             
                             <input 
@@ -191,9 +195,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                             />
                         </div>
                     ))}
-
-                    <div className="divider my-2"></div>
                     
+                    <div className="divider my-2"></div>
                     <div className="flex justify-between items-end">
                         <div className="text-sm font-bold text-base-content/60">Restante</div>
                         {remaining > 0 ? (
@@ -206,9 +209,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             )}
         </div>
 
-        {/* --- SECCIÓN 3: FOOTER (Fijo abajo) --- 
-            Siempre visible encima del teclado */}
-        <div className="flex-none p-4 bg-base-100 border-t border-base-200 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        {/* --- 3. FOOTER (Fijo Abajo) --- 
+            Al usar 'flex-none' y estar dentro del contenedor 'h-full', 
+            este bloque SIEMPRE estará visible pegado al teclado.
+        */}
+        <div className="flex-none p-4 bg-base-100 border-t border-base-200 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20">
             <div className="grid grid-cols-2 gap-3">
                 <button className="btn btn-lg btn-ghost rounded-2xl font-bold" onClick={onClose}>
                     Cancelar
