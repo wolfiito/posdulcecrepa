@@ -82,39 +82,32 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    // ESTRATEGIA:
-    // 1. 'fixed inset-0': Ocupa toda la pantalla visible (viewport)
-    // 2. 'z-50': Siempre encima
-    // 3. Flex container para centrar en Desktop y llenar en Móvil
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-base-100 sm:bg-black/60 sm:backdrop-blur-sm">
+    // CAMBIO CLAVE: h-[100dvh] fuerza al modal a respetar el tamaño REAL visible (sin teclado)
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-base-100 sm:bg-black/60 sm:backdrop-blur-sm h-[100dvh]">
       
-      {/* CAJA PRINCIPAL:
-          - Móvil: w-full h-full (Full Screen absoluto)
-          - Desktop: max-w-md h-auto (Caja flotante redondeada)
-      */}
       <div className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-md bg-base-100 sm:rounded-3xl sm:shadow-2xl flex flex-col overflow-hidden">
         
-        {/* --- 1. HEADER (Fijo Arriba) --- */}
-        <div className="flex-none bg-base-100 p-4 text-center border-b border-base-200 z-20">
-            <div className="text-xs font-bold text-base-content/50 uppercase tracking-wide mb-1">Total a Pagar</div>
-            <div className="text-5xl font-black text-primary tracking-tight">
+        {/* HEADER (Fijo Arriba) */}
+        <div className="flex-none bg-base-100 px-4 py-3 text-center border-b border-base-200 z-20 shadow-sm">
+            <div className="text-[10px] font-bold text-base-content/50 uppercase tracking-wide">Total a Pagar</div>
+            <div className="text-4xl font-black text-primary tracking-tight">
                 ${numTotal.toFixed(2)}
             </div>
         </div>
 
-        {/* --- 2. BODY (Scrollable - Se encoge cuando sale el teclado) --- */}
-        <div className="flex-1 overflow-y-auto p-4 relative">
+        {/* BODY (Flexible) */}
+        <div className="flex-1 overflow-y-auto px-4 py-2 relative">
             
-            {/* TABS */}
-            <div className="bg-base-200 p-1 rounded-2xl flex mb-6 shrink-0">
+            {/* TABS COMPACTOS */}
+            <div className="bg-base-200 p-1 rounded-xl flex mb-4 shrink-0">
                 <button 
-                    className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all duration-200 ${!isMixedMode ? 'bg-white shadow-sm text-base-content' : 'text-base-content/50 hover:bg-white/50'}`} 
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${!isMixedMode ? 'bg-white shadow-sm text-base-content' : 'text-base-content/50'}`} 
                     onClick={() => setIsMixedMode(false)}
                 >
                     Pago Simple
                 </button>
                 <button 
-                    className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all duration-200 ${isMixedMode ? 'bg-white shadow-sm text-base-content' : 'text-base-content/50 hover:bg-white/50'}`} 
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${isMixedMode ? 'bg-white shadow-sm text-base-content' : 'text-base-content/50'}`} 
                     onClick={() => setIsMixedMode(true)}
                 >
                     Dividido
@@ -123,7 +116,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
             {/* === PAGO SIMPLE === */}
             {!isMixedMode && (
-                <div className="space-y-6 animate-fade-in pb-4">
+                <div className="space-y-4 animate-fade-in pb-2">
                     <div className="grid grid-cols-3 gap-2">
                         {[
                             { id: 'cash', label: 'Efectivo', icon: '💵' },
@@ -134,28 +127,28 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                                 key={m.id}
                                 onClick={() => setSelectedMethod(m.id as PaymentMethod)}
                                 className={`
-                                    flex flex-col items-center justify-center gap-1 p-3 rounded-2xl border-2 transition-all
+                                    flex flex-col items-center justify-center gap-1 p-2 rounded-xl border-2 transition-all
                                     ${selectedMethod === m.id 
                                         ? 'border-primary bg-primary/5 text-primary shadow-sm' 
-                                        : 'border-transparent bg-base-200 text-base-content/70 hover:bg-base-300'
+                                        : 'border-transparent bg-base-200 text-base-content/70'
                                     }
                                 `}
                             >
-                                <span className="text-2xl">{m.icon}</span>
-                                <span className="text-xs font-bold">{m.label}</span>
+                                <span className="text-xl">{m.icon}</span>
+                                <span className="text-[10px] font-bold">{m.label}</span>
                             </button>
                         ))}
                     </div>
 
                     {selectedMethod === 'cash' && (
                         <div className="form-control">
-                            <label className="label pl-1 pt-0"><span className="label-text font-bold text-base-content/60">Recibido</span></label>
+                            <label className="label pl-1 pt-0 pb-1"><span className="label-text font-bold text-base-content/60 text-xs">Recibido</span></label>
                             <div className="relative">
                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-base-content/40">$</span>
                                 <input 
                                     type="number" 
-                                    inputMode="decimal" // Teclado numérico
-                                    className="input input-lg input-bordered w-full pl-10 text-2xl font-bold bg-base-200 border-transparent focus:border-primary focus:bg-base-100 rounded-2xl" 
+                                    inputMode="decimal"
+                                    className="input input-lg input-bordered w-full pl-10 text-2xl font-bold bg-base-200 border-transparent focus:border-primary focus:bg-base-100 rounded-2xl h-14" 
                                     placeholder="0.00"
                                     autoFocus
                                     value={amountReceived}
@@ -163,9 +156,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                                 />
                             </div>
                             
-                            <div className={`mt-3 p-3 rounded-2xl flex justify-between items-center transition-all ${numReceived >= numTotal ? 'bg-success/10 text-success' : 'bg-base-200/50 text-base-content/30'}`}>
-                                <span className="font-bold text-sm">Cambio</span>
-                                <span className="font-black text-2xl">${simpleChange.toFixed(2)}</span>
+                            <div className={`mt-2 p-2 px-3 rounded-xl flex justify-between items-center transition-all ${numReceived >= numTotal ? 'bg-success/10 text-success' : 'bg-base-200/50 text-base-content/30'}`}>
+                                <span className="font-bold text-xs">Cambio</span>
+                                <span className="font-black text-xl">${simpleChange.toFixed(2)}</span>
                             </div>
                         </div>
                     )}
@@ -174,52 +167,49 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
             {/* === PAGO MIXTO === */}
             {isMixedMode && (
-                <div className="space-y-3 animate-fade-in pb-4">
+                <div className="space-y-2 animate-fade-in pb-2">
                     {[
                         { label: 'Efectivo', val: cashAmount, set: setCashAmount, icon: '💵' },
                         { label: 'Tarjeta', val: cardAmount, set: setCardAmount, icon: '💳' },
                         { label: 'Transf.', val: transferAmount, set: setTransferAmount, icon: '🏦' },
                     ].map((field) => (
                         <div key={field.label} className="flex items-center gap-2">
-                            <div className="w-24 flex items-center gap-2 font-bold text-base-content/70 shrink-0">
-                                <span>{field.icon}</span> <span className="text-sm">{field.label}</span>
+                            <div className="w-20 flex items-center gap-1.5 font-bold text-base-content/70 shrink-0">
+                                <span>{field.icon}</span> <span className="text-xs">{field.label}</span>
                             </div>
                             
                             <input 
                                 type="number" 
                                 inputMode="decimal"
-                                className="input input-bordered flex-1 min-w-0 rounded-xl focus:border-primary bg-base-200 focus:bg-base-100 font-bold text-right" 
-                                placeholder="$0.00"
+                                className="input input-sm input-bordered flex-1 min-w-0 rounded-lg focus:border-primary bg-base-200 focus:bg-base-100 font-bold text-right h-10 text-lg" 
+                                placeholder="0.00"
                                 value={field.val}
                                 onChange={(e) => field.set(e.target.value)}
                             />
                         </div>
                     ))}
                     
-                    <div className="divider my-2"></div>
-                    <div className="flex justify-between items-end">
-                        <div className="text-sm font-bold text-base-content/60">Restante</div>
+                    <div className="divider my-1"></div>
+                    <div className="flex justify-between items-end px-1">
+                        <div className="text-xs font-bold text-base-content/60">Restante</div>
                         {remaining > 0 ? (
-                            <div className="text-xl font-black text-error">${remaining.toFixed(2)}</div>
+                            <div className="text-lg font-black text-error">${remaining.toFixed(2)}</div>
                         ) : (
-                            <div className="text-xl font-black text-success">¡Cubierto!</div>
+                            <div className="text-lg font-black text-success">¡Cubierto!</div>
                         )}
                     </div>
                 </div>
             )}
         </div>
 
-        {/* --- 3. FOOTER (Fijo Abajo) --- 
-            Al usar 'flex-none' y estar dentro del contenedor 'h-full', 
-            este bloque SIEMPRE estará visible pegado al teclado.
-        */}
-        <div className="flex-none p-4 bg-base-100 border-t border-base-200 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20">
+        {/* FOOTER (Fijo Abajo) */}
+        <div className="flex-none p-3 bg-base-100 border-t border-base-200 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-4px_10px_-1px_rgba(0,0,0,0.05)] z-30">
             <div className="grid grid-cols-2 gap-3">
-                <button className="btn btn-lg btn-ghost rounded-2xl font-bold" onClick={onClose}>
+                <button className="btn btn-lg btn-ghost rounded-2xl font-bold h-12 min-h-0 text-sm" onClick={onClose}>
                     Cancelar
                 </button>
                 <button 
-                    className="btn btn-lg btn-primary rounded-2xl shadow-lg border-none"
+                    className="btn btn-lg btn-primary rounded-2xl shadow-lg border-none h-12 min-h-0 text-base"
                     onClick={handleConfirm}
                     disabled={isMixedMode && remaining > 0.5}
                 >
