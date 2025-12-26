@@ -82,20 +82,27 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="modal modal-open bg-base-300/80 backdrop-blur-sm z-50 px-4">
-      <div className="modal-box w-full max-w-md p-0 overflow-hidden bg-base-100 shadow-2xl rounded-3xl">
+    // CAMBIO 1: items-end en móvil (Bottom Sheet) y items-center en desktop
+    // z-50 y backdrop para enfoque total
+    <div className="modal modal-open bg-base-300/90 backdrop-blur-sm z-50 p-0 sm:p-4 items-end sm:items-center">
+      
+      {/* CAMBIO 2: h-full en móvil para ocupar toda la pantalla, sm:h-auto para desktop */}
+      <div className="modal-box w-full h-[95dvh] sm:h-auto sm:max-w-md p-0 bg-base-100 shadow-2xl rounded-t-3xl sm:rounded-3xl flex flex-col overflow-hidden">
         
-        {/* HEADER */}
-        <div className="bg-base-100 p-6 text-center border-b border-base-200">
+        {/* --- SECCIÓN 1: HEADER (Fijo arriba) --- */}
+        <div className="flex-none bg-base-100 p-4 text-center border-b border-base-200 shadow-sm z-10">
             <div className="text-xs font-bold text-base-content/50 uppercase tracking-wide mb-1">Total a Pagar</div>
             <div className="text-5xl font-black text-primary tracking-tight">
                 ${numTotal.toFixed(2)}
             </div>
         </div>
 
-        <div className="p-4 sm:p-6 pt-4">
+        {/* --- SECCIÓN 2: BODY (Scrollable - Flex 1) --- 
+            Esto es lo que se encoge cuando sale el teclado */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-2">
+            
             {/* TABS */}
-            <div className="bg-base-200 p-1 rounded-2xl flex mb-6 relative">
+            <div className="bg-base-200 p-1 rounded-2xl flex mb-6 relative shrink-0">
                 <button 
                     className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all duration-200 ${!isMixedMode ? 'bg-white shadow-sm text-base-content' : 'text-base-content/50 hover:bg-white/50'}`} 
                     onClick={() => setIsMixedMode(false)}
@@ -106,11 +113,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all duration-200 ${isMixedMode ? 'bg-white shadow-sm text-base-content' : 'text-base-content/50 hover:bg-white/50'}`} 
                     onClick={() => setIsMixedMode(true)}
                 >
-                    Pago Dividido
+                    Dividido
                 </button>
             </div>
 
-            {/* === PAGO SIMPLE === */}
+            {/* === MODO PAGO SIMPLE === */}
             {!isMixedMode && (
                 <div className="space-y-6 animate-fade-in">
                     <div className="grid grid-cols-3 gap-2 sm:gap-3">
@@ -143,7 +150,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-base-content/40">$</span>
                                 <input 
                                     type="number" 
-                                    inputMode="decimal" // <--- EL TRUCO PARA TECLADO NUMÉRICO
+                                    inputMode="decimal" 
                                     className="input input-lg input-bordered w-full pl-10 text-2xl font-bold bg-base-200 border-transparent focus:border-primary focus:bg-base-100 rounded-2xl" 
                                     placeholder="0.00"
                                     autoFocus
@@ -161,9 +168,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </div>
             )}
 
-            {/* === PAGO MIXTO === */}
+            {/* === MODO PAGO MIXTO === */}
             {isMixedMode && (
-                <div className="space-y-3 animate-fade-in">
+                <div className="space-y-3 animate-fade-in pb-4">
                     {[
                         { label: 'Efectivo', val: cashAmount, set: setCashAmount, icon: '💵' },
                         { label: 'Tarjeta', val: cardAmount, set: setCardAmount, icon: '💳' },
@@ -176,7 +183,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                             
                             <input 
                                 type="number" 
-                                inputMode="decimal" // <--- EL TRUCO AQUÍ TAMBIÉN
+                                inputMode="decimal"
                                 className="input input-bordered flex-1 min-w-0 rounded-xl focus:border-primary bg-base-200 focus:bg-base-100 font-bold text-right" 
                                 placeholder="$0.00"
                                 value={field.val}
@@ -197,9 +204,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     </div>
                 </div>
             )}
+        </div>
 
-            {/* BOTONES */}
-            <div className="grid grid-cols-2 gap-3 mt-8">
+        {/* --- SECCIÓN 3: FOOTER (Fijo abajo) --- 
+            Siempre visible encima del teclado */}
+        <div className="flex-none p-4 bg-base-100 border-t border-base-200 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="grid grid-cols-2 gap-3">
                 <button className="btn btn-lg btn-ghost rounded-2xl font-bold" onClick={onClose}>
                     Cancelar
                 </button>
@@ -212,6 +222,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </button>
             </div>
         </div>
+
       </div>
     </div>
   );
