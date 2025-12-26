@@ -82,19 +82,19 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="modal modal-open bg-base-300/80 backdrop-blur-sm z-50">
-      <div className="modal-box max-w-md p-0 overflow-hidden bg-base-100 shadow-2xl rounded-3xl">
+    <div className="modal modal-open bg-base-300/80 backdrop-blur-sm z-50 px-4">
+      <div className="modal-box w-full max-w-md p-0 overflow-hidden bg-base-100 shadow-2xl rounded-3xl">
         
-        {/* HEADER: Total Gigante */}
+        {/* HEADER */}
         <div className="bg-base-100 p-6 text-center border-b border-base-200">
-            <div className="text-sm font-bold text-base-content/50 uppercase tracking-wide mb-1">Total a Pagar</div>
+            <div className="text-xs font-bold text-base-content/50 uppercase tracking-wide mb-1">Total a Pagar</div>
             <div className="text-5xl font-black text-primary tracking-tight">
                 ${numTotal.toFixed(2)}
             </div>
         </div>
 
-        <div className="p-6 pt-4">
-            {/* TABS (Segmented Control Estilo iOS) */}
+        <div className="p-4 sm:p-6 pt-4">
+            {/* TABS */}
             <div className="bg-base-200 p-1 rounded-2xl flex mb-6 relative">
                 <button 
                     className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all duration-200 ${!isMixedMode ? 'bg-white shadow-sm text-base-content' : 'text-base-content/50 hover:bg-white/50'}`} 
@@ -110,11 +110,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </button>
             </div>
 
-            {/* === MODO PAGO SIMPLE === */}
+            {/* === PAGO SIMPLE === */}
             {!isMixedMode && (
                 <div className="space-y-6 animate-fade-in">
-                    {/* Botones Grandes de Método */}
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
                         {[
                             { id: 'cash', label: 'Efectivo', icon: '💵' },
                             { id: 'card', label: 'Tarjeta', icon: '💳' },
@@ -137,7 +136,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                         ))}
                     </div>
 
-                    {/* Input Efectivo */}
                     {selectedMethod === 'cash' && (
                         <div className="form-control">
                             <label className="label pl-1 pt-0"><span className="label-text font-bold text-base-content/60">Recibido</span></label>
@@ -145,6 +143,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-base-content/40">$</span>
                                 <input 
                                     type="number" 
+                                    inputMode="decimal" // <--- EL TRUCO PARA TECLADO NUMÉRICO
                                     className="input input-lg input-bordered w-full pl-10 text-2xl font-bold bg-base-200 border-transparent focus:border-primary focus:bg-base-100 rounded-2xl" 
                                     placeholder="0.00"
                                     autoFocus
@@ -153,7 +152,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                                 />
                             </div>
                             
-                            {/* Cambio Dinámico */}
                             <div className={`mt-3 p-3 rounded-2xl flex justify-between items-center transition-all ${numReceived >= numTotal ? 'bg-success/10 text-success' : 'bg-base-200/50 text-base-content/30'}`}>
                                 <span className="font-bold text-sm">Cambio</span>
                                 <span className="font-black text-2xl">${simpleChange.toFixed(2)}</span>
@@ -163,7 +161,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </div>
             )}
 
-            {/* === MODO PAGO MIXTO === */}
+            {/* === PAGO MIXTO === */}
             {isMixedMode && (
                 <div className="space-y-3 animate-fade-in">
                     {[
@@ -171,13 +169,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                         { label: 'Tarjeta', val: cardAmount, set: setCardAmount, icon: '💳' },
                         { label: 'Transf.', val: transferAmount, set: setTransferAmount, icon: '🏦' },
                     ].map((field) => (
-                        <div key={field.label} className="flex items-center gap-3">
-                            <div className="w-28 flex items-center gap-2 font-bold text-base-content/70">
-                                <span>{field.icon}</span> {field.label}
+                        <div key={field.label} className="flex items-center gap-2 sm:gap-3">
+                            <div className="w-24 sm:w-28 flex items-center gap-2 font-bold text-base-content/70 shrink-0">
+                                <span>{field.icon}</span> <span className="text-sm sm:text-base">{field.label}</span>
                             </div>
+                            
                             <input 
                                 type="number" 
-                                className="input input-bordered flex-1 rounded-xl focus:border-primary bg-base-200 focus:bg-base-100 font-bold text-right" 
+                                inputMode="decimal" // <--- EL TRUCO AQUÍ TAMBIÉN
+                                className="input input-bordered flex-1 min-w-0 rounded-xl focus:border-primary bg-base-200 focus:bg-base-100 font-bold text-right" 
                                 placeholder="$0.00"
                                 value={field.val}
                                 onChange={(e) => field.set(e.target.value)}
@@ -198,7 +198,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </div>
             )}
 
-            {/* BOTONES ACCIÓN */}
+            {/* BOTONES */}
             <div className="grid grid-cols-2 gap-3 mt-8">
                 <button className="btn btn-lg btn-ghost rounded-2xl font-bold" onClick={onClose}>
                     Cancelar
