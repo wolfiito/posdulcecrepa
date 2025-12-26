@@ -1,20 +1,22 @@
 // src/components/OrdersScreen.tsx
 import React, { useEffect, useState } from 'react';
-import { db, collection, query, where, orderBy, onSnapshot } from '../firebase';
+import { db, collection, query, where, orderBy, onSnapshot, Timestamp } from '../firebase';
 import { orderService } from '../services/orderService';
 import { PaymentModal } from './PaymentModal';
 import { toast } from 'sonner';
 import type { Order } from '../types/order';
 
-// 1. IMPORTAMOS LOS STORES DE SEGURIDAD
+// Stores
 import { useShiftStore } from '../store/useShiftStore';
 import { useUIStore } from '../store/useUIStore';
 
 interface GroupedOrder {
+  id: string; // ID compuesto para la key
   customerName: string;
   mode: string;
   orders: Order[];
   totalDebt: number;
+  oldestOrderTime: any; // Para calcular "Hace X min"
 }
 
 export const OrdersScreen: React.FC = () => {
@@ -22,21 +24,21 @@ export const OrdersScreen: React.FC = () => {
   const [groupedOrders, setGroupedOrders] = useState<GroupedOrder[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Para el pago
+  // Pago
   const [selectedGroup, setSelectedGroup] = useState<GroupedOrder | null>(null);
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
 
-  // 2. CONECTAMOS CON LA SEGURIDAD DE CAJA
+  // Seguridad
   const { currentShift } = useShiftStore();
   const { openShiftModal } = useUIStore();
 
   useEffect(() => {
-    // Buscamos todo lo que NO esté pagado
+    // Escuchar órdenes pendientes
     const q = query(
       collection(db, "orders"),
       where("status", "!=", "paid"), 
       orderBy("status", "asc"), 
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "asc") // Las más viejas primero (FIFO)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -44,134 +46,196 @@ export const OrdersScreen: React.FC = () => {
       setActiveOrders(docs);
       setLoading(false);
     }, (error) => {
-      console.error("Error cargando órdenes activas:", error);
+      console.error(error);
       setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  // Agrupar órdenes por Cliente/Mesa
+  // Agrupar
   useEffect(() => {
       const groups: Record<string, GroupedOrder> = {};
 
       activeOrders.forEach(order => {
+          // Agrupamos por Cliente + Modo (Ej: "Mesa 1-Mesa")
           const key = `${order.customerName || 'Anónimo'}-${order.mode}`;
           
           if (!groups[key]) {
               groups[key] = {
+                  id: key,
                   customerName: order.customerName || 'Cliente Anónimo',
                   mode: order.mode,
                   orders: [],
-                  totalDebt: 0
+                  totalDebt: 0,
+                  oldestOrderTime: order.createdAt
               };
           }
           groups[key].orders.push(order);
           groups[key].totalDebt += order.total;
+          
+          // Mantener la fecha más antigua del grupo
+          if (order.createdAt < groups[key].oldestOrderTime) {
+              groups[key].oldestOrderTime = order.createdAt;
+          }
       });
 
       setGroupedOrders(Object.values(groups));
   }, [activeOrders]);
 
   const handlePayGroup = (group: GroupedOrder) => {
-      // 3. BLOQUEO DE SEGURIDAD (CRÍTICO)
-      // Si no hay turno abierto, prohibimos cobrar y mandamos a abrir caja
       if (!currentShift) {
-          toast.error("⛔ CAJA CERRADA: Debes abrir turno para cobrar.");
-          openShiftModal(); // Abre el modal de ShiftsScreen automáticamente
+          toast.error("⛔ CAJA CERRADA: Abre turno para cobrar.");
+          openShiftModal();
           return;
       }
-
       setSelectedGroup(group);
       setIsPayModalOpen(true);
   };
 
   const confirmPayment = async (paymentDetails: any) => {
     if (!selectedGroup) return;
-
     try {
         setIsPayModalOpen(false);
-
-        // 1. OBTENER IDS: El servicio espera strings, no objetos completos
-        // Usamos 'as string' para asegurar que TypeScript sepa que son textos
         const orderIds = selectedGroup.orders.map(o => o.id as string);
-
-        // 2. OBTENER EL TURNO: Verificamos si la caja está abierta
-        // Si currentShift es null (caja cerrada), enviará undefined
         const activeShiftId = currentShift?.isOpen ? currentShift.id : undefined;
 
-        // 3. DEBUG (Opcional): Para que veas en consola si lo detecta
-        console.log("Cobrando ordenes:", orderIds); 
-        console.log("Asignando a Turno ID:", activeShiftId);
+        await orderService.payOrders(orderIds, paymentDetails, activeShiftId);
 
-        // 4. LLAMADA CORREGIDA: Enviamos (IDs, Pago, ID_CAJA)
-        await orderService.payOrders(
-            orderIds, 
-            paymentDetails, 
-            activeShiftId // <--- ¡ESTA ES LA CLAVE QUE FALTABA!
-        );
-
-        toast.success(`¡Cuenta de ${selectedGroup.customerName} pagada!`);
+        toast.success(`Ticket de ${selectedGroup.customerName} cerrado`);
         setSelectedGroup(null);
     } catch (error) {
-        console.error("Error al cobrar:", error);
         toast.error("Error al procesar el pago");
     }
-};
+  };
+
+  // Helper para "Hace X min"
+  const getTimeAgo = (timestamp: any) => {
+      if (!timestamp) return 'Reciente';
+      const date = timestamp instanceof Timestamp ? timestamp.toDate() : new Date(timestamp);
+      const diffMs = new Date().getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      
+      if (diffMins < 1) return 'Ahora';
+      if (diffMins < 60) return `${diffMins} min`;
+      const diffHrs = Math.floor(diffMins / 60);
+      return `${diffHrs} h ${diffMins % 60} m`;
+  };
 
   return (
-    <div className="animate-fade-in max-w-5xl mx-auto pb-20 p-4">
-      <h2 className="text-2xl font-black mb-6 flex items-center gap-2">
-        🧾 Cuentas Abiertas
-      </h2>
+    <div className="animate-fade-in pb-24 px-4 max-w-7xl mx-auto">
+      
+      <div className="flex items-center gap-3 mb-8 mt-4">
+        <h2 className="text-3xl font-black text-base-content flex items-center gap-2">
+            🧾 Comandas Activas
+            <span className="badge badge-primary badge-lg text-white font-bold">{groupedOrders.length}</span>
+        </h2>
+      </div>
 
       {loading ? (
-          <div className="text-center py-10"><span className="loading loading-spinner"></span></div>
+          <div className="flex justify-center py-20"><span className="loading loading-spinner loading-lg text-primary"></span></div>
       ) : groupedOrders.length === 0 ? (
-          <div className="text-center py-10 opacity-50 bg-base-200 rounded-box">
-              <p className="font-bold">¡Todo cobrado!</p>
-              <p className="text-sm">No hay cuentas pendientes.</p>
+          <div className="flex flex-col items-center justify-center py-20 opacity-40">
+              <div className="text-6xl mb-4">🧹</div>
+              <h3 className="text-xl font-bold">Todo limpio</h3>
+              <p>No hay cuentas abiertas por cobrar.</p>
           </div>
       ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {groupedOrders.map((group) => (
-                  <div key={`${group.customerName}-${group.mode}`} className="card bg-base-100 shadow-lg border border-base-200 hover:border-primary transition-colors">
-                      <div className="card-body p-5">
-                          {/* Encabezado */}
-                          <div className="flex justify-between items-start mb-2">
-                              <div>
-                                  <h3 className="card-title text-lg">{group.customerName}</h3>
-                                  <div className="badge badge-ghost badge-sm">{group.mode}</div>
-                              </div>
-                              <div className="text-right">
-                                  <div className="text-2xl font-black text-error">
-                                      ${group.totalDebt.toFixed(2)}
-                                  </div>
-                                  <div className="text-xs opacity-60">{group.orders.length} ticket(s)</div>
-                              </div>
-                          </div>
+          // GRID DE TICKETS
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {groupedOrders.map((group) => {
+                  const timeAgo = getTimeAgo(group.oldestOrderTime);
+                  // Colores según modo
+                  const isTakeout = group.mode === 'Para Llevar';
+                  const accentColor = isTakeout ? 'border-orange-400' : 'border-blue-500';
+                  const badgeColor = isTakeout ? 'badge-warning' : 'badge-info';
 
-                          {/* Lista Detalle */}
-                          <div className="divider my-1 text-[10px] uppercase tracking-widest opacity-50">Detalle</div>
-                          <ul className="space-y-1 mb-4 max-h-32 overflow-y-auto pr-1">
-                              {group.orders.map(ord => (
-                                  <li key={ord.id} className="text-xs flex justify-between p-1 bg-base-200 rounded">
-                                      <span>#{ord.orderNumber} - {ord.items.length} prod.</span>
-                                      <span className="font-mono font-bold">${ord.total.toFixed(2)}</span>
-                                  </li>
-                              ))}
-                          </ul>
+                  // Juntamos todos los items de todas las ordenes del grupo para mostrarlos
+                  const allItems = group.orders.flatMap(o => o.items);
+                  const displayItems = allItems.slice(0, 4); // Solo mostramos 4
+                  const remaining = allItems.length - 4;
 
-                          {/* Botón de Cobro Protegido */}
-                          <button 
-                              onClick={() => handlePayGroup(group)}
-                              className="btn btn-primary btn-block shadow-md text-white"
-                          >
-                              Cobrar Todo
-                          </button>
-                      </div>
-                  </div>
-              ))}
+                  return (
+                    <div 
+                        key={group.id} 
+                        className={`
+                            relative bg-[#fffdf5] text-gray-800 shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1
+                            flex flex-col rounded-t-lg
+                            border-t-4 ${accentColor}
+                        `}
+                    >
+                        {/* Clavo virtual (decoración) */}
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-gray-300 border-2 border-white shadow-sm z-10"></div>
+
+                        {/* HEADER TICKET */}
+                        <div className="p-4 pb-2 border-b border-dashed border-gray-300">
+                            <div className="flex justify-between items-start mb-1">
+                                <h3 className="font-black text-lg leading-tight line-clamp-1">{group.customerName}</h3>
+                                <span className={`badge ${badgeColor} badge-sm font-bold text-white shadow-sm shrink-0`}>
+                                    {group.mode === 'Para Llevar' ? '🥡 Llevar' : '🍽️ Mesa'}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-1 text-xs font-medium text-gray-400">
+                                <span>🕒 Abierto hace: {timeAgo}</span>
+                            </div>
+                        </div>
+
+                        {/* CUERPO TICKET (Lista) */}
+                        <div className="p-4 flex-1 bg-[linear-gradient(transparent_95%,rgba(0,0,0,0.02)_100%)] bg-[length:100%_20px]">
+                            <ul className="space-y-1.5">
+                                {displayItems.map((item, idx) => (
+                                    <li key={`${item.id}-${idx}`} className="text-sm flex justify-between items-start leading-tight">
+                                        <span className="font-medium text-gray-700 w-full truncate">
+                                            <span className="font-bold text-gray-900 mr-1">1x</span> 
+                                            {item.baseName}
+                                            {item.type === 'CUSTOM' && ' (Armada)'}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                            
+                            {remaining > 0 && (
+                                <div className="mt-2 text-xs text-center font-bold text-gray-400 italic bg-gray-50 rounded py-1">
+                                    + {remaining} productos más...
+                                </div>
+                            )}
+                        </div>
+
+                        {/* FOOTER TICKET (Total + Cobrar) */}
+                        <div className="p-4 pt-2 bg-[#fffdf5] relative">
+                            {/* Efecto borde dentado abajo */}
+                            <div className="absolute -bottom-1 left-0 w-full h-2 bg-transparent"
+                                style={{
+                                    backgroundImage: 'radial-gradient(circle, transparent 50%, #fffdf5 50%)',
+                                    backgroundSize: '10px 10px',
+                                    backgroundPosition: '0 -5px'
+                                }}
+                            ></div>
+                            
+                            {/* Separador */}
+                            <div className="border-t-2 border-dashed border-gray-300 mb-3 mx-2"></div>
+
+                            <div className="flex justify-between items-end mb-3">
+                                <span className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1">Total</span>
+                                <span className="text-3xl font-mono font-black text-gray-900 tracking-tighter">
+                                    ${group.totalDebt.toFixed(2)}
+                                </span>
+                            </div>
+
+                            <button 
+                                onClick={() => handlePayGroup(group)}
+                                className={`
+                                    btn btn-block border-none text-white shadow-lg
+                                    ${isTakeout ? 'btn-warning' : 'btn-primary'}
+                                    hover:scale-[1.02] active:scale-95 transition-all
+                                `}
+                            >
+                                COBRAR
+                            </button>
+                        </div>
+                    </div>
+                  );
+              })}
           </div>
       )}
 
