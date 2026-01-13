@@ -11,7 +11,7 @@ import type { OrderMode, PaymentDetails } from '../types/order';
 import type { TicketItem } from '../types/menu';
 
 export const usePosLogic = () => {
-  // 1. Hooks de Estado Global
+  // 1. Hooks (Solo para renderizar la UI)
   const { startListening } = useMenuStore();
   const { currentUser } = useAuthStore();
   const { currentShift } = useShiftStore(); 
@@ -21,9 +21,7 @@ export const usePosLogic = () => {
     orderMode, 
     setOrderMode, 
     customerName, 
-    setCustomerName, 
-    items, 
-    getTotal, 
+    setCustomerName,  
     clearTicket 
   } = useTicketStore();
   
@@ -34,12 +32,10 @@ export const usePosLogic = () => {
     openShiftModal 
   } = useUIStore();
 
-  // 2. Estado Local
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isModeModalOpen, setIsModeModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // 3. Inicialización
   useEffect(() => {
     const unsubscribe = startListening();
     return () => unsubscribe();
@@ -52,65 +48,33 @@ export const usePosLogic = () => {
     navigateToGroup(null);
   }, [addItem, closeModals, setView, navigateToGroup]);
 
-  // 4. Botón Principal: Solo abre el modal
-  const handleMainBtnClick = useCallback(() => {
-      if (items.length === 0) {
-          toast.warning("Agrega productos primero");
-          return;
-      }
-      setIsModeModalOpen(true);
-  }, [items]);
-
-  // 5. NUEVA LÓGICA: Se ejecuta AL CONFIRMAR el modal
-  const handleModeConfirmed = useCallback((selectedMode: OrderMode, finalName: string) => {
-      // Guardamos en el store (para que la UI se actualice)
-      setOrderMode(selectedMode);
-      setCustomerName(finalName);
-      setIsModeModalOpen(false);
-
-      const isMesero = currentUser?.role === 'MESERO';
-      const isTakeOut = selectedMode === 'Para Llevar';
-
-      // Validación de Caja
-      if (isTakeOut && !isMesero) {
-          if (!currentShift) {
-              toast.error("⛔ CAJA CERRADA: Abre turno para cobrar.");
-              openShiftModal(); 
-              return;
-          }
-      }
-      
-      // Decisión de Ruta
-      if (isTakeOut && !isMesero) {
-          // Cajero cobrando -> Pagar (Esperamos un poco para que el estado se asiente)
-          setTimeout(() => setIsPaymentModalOpen(true), 100); 
-      } else {
-          // Mesero o Mesa -> Enviar a Cocina directo
-          // IMPORTANTE: Pasamos finalName aquí directamente para evitar el error de "Anónimo"
-          handleFinalizeOrder(undefined, selectedMode, finalName); 
-      }
-  }, [currentUser, currentShift, openShiftModal, setOrderMode, setCustomerName]);
-
-  // 6. Finalizar Orden (CORREGIDO PARA RECIBIR ARGUMENTOS)
-  const handleFinalizeOrder = async (
+  // --- FINALIZAR ORDEN (VERSIÓN BLINDADA) ---
+  const handleFinalizeOrder = useCallback(async (
       paymentDetails?: PaymentDetails, 
-      overrideMode?: OrderMode,    // <--- IMPORTANTE: Nuevo argumento
-      overrideName?: string        // <--- IMPORTANTE: Nuevo argumento
+      overrideMode?: OrderMode, 
+      overrideName?: string
   ) => {
       if (isProcessing) return;
+
+      // TRUCO PRO: Leemos directo del Store, ignorando closures de React
+      // Esto garantiza que SIEMPRE tenemos los items reales en este milisegundo.
+      const currentItems = useTicketStore.getState().items;
+
+      if (currentItems.length === 0) {
+          toast.error("Error: La orden está vacía (Intento de envío fallido)");
+          return;
+      }
+
       setIsProcessing(true);
 
+      // Usamos los overrides si existen, si no, leemos directo del store también para asegurar
+      const currentMode = overrideMode || useTicketStore.getState().orderMode;
+      const currentClientName = overrideName || useTicketStore.getState().customerName;
+      
       const cashierName = currentUser?.name || 'Cajero';
-      const total = getTotal();
+      // Recalculamos el total con los items frescos
+      const total = currentItems.reduce((sum, item) => sum + item.finalPrice, 0);
       
-      // USAMOS EL VALOR MANUAL SI EXISTE, SI NO, EL DEL STORE
-      // Esto arregla el bug: overrideName trae "Mesa 1" aunque el store siga vacío por milisegundos
-      const currentMode = overrideMode || orderMode;
-      const currentClientName = overrideName || customerName;
-      
-      // Debug rápido por si acaso (puedes borrarlo luego)
-      console.log("Creando orden para:", currentClientName);
-
       const shouldPrint = currentUser?.role !== 'MESERO';
       const activeShiftId = (shouldPrint && currentShift) ? currentShift.id : undefined;
 
@@ -118,11 +82,11 @@ export const usePosLogic = () => {
           setIsPaymentModalOpen(false); 
           
           await orderService.createOrder(
-              items, 
+              currentItems, // Enviamos los items frescos
               total, 
               currentMode, 
               cashierName,
-              currentClientName, // <--- Aquí pasamos el nombre correcto
+              currentClientName, 
               shouldPrint, 
               paymentDetails,
               activeShiftId
@@ -143,7 +107,38 @@ export const usePosLogic = () => {
       } finally {
           setIsProcessing(false);
       }
-  };
+  }, [isProcessing, currentUser, currentShift, clearTicket, setView]);
+
+  const handleModeConfirmed = useCallback((selectedMode: OrderMode, finalName: string) => {
+      setOrderMode(selectedMode);
+      setCustomerName(finalName);
+      setIsModeModalOpen(false);
+
+      const isMesero = currentUser?.role === 'MESERO';
+      const isTakeOut = selectedMode === 'Para Llevar';
+
+      if (isTakeOut && !isMesero) {
+          if (!currentShift) {
+              toast.error("⛔ CAJA CERRADA: Abre turno para cobrar.");
+              openShiftModal(); 
+              return;
+          }
+          // Cajero: Pagar
+          setTimeout(() => setIsPaymentModalOpen(true), 100); 
+      } else {
+          // Mesero: Cocina
+          handleFinalizeOrder(undefined, selectedMode, finalName); 
+      }
+  }, [currentUser, currentShift, openShiftModal, setOrderMode, setCustomerName, handleFinalizeOrder]);
+
+  const handleMainBtnClick = useCallback(() => {
+      // Verificamos items actuales para no abrir el modal si está vacío
+      if (useTicketStore.getState().items.length === 0) {
+          toast.warning("Agrega productos primero");
+          return;
+      }
+      setIsModeModalOpen(true);
+  }, []); // Sin dependencias, siempre lee fresco
 
   return {
     orderMode,
