@@ -19,18 +19,19 @@ import { ReceiptTemplate } from '../components/ReceiptTemplate';
 import { PaymentModal } from '../components/PaymentModal';
 import { CustomizeCrepeModal } from '../components/CustomizeCrepeModal';
 import { CustomizeVariantModal } from '../components/CustomizeVariantModal';
+import { OrderModeModal } from '../components/OrderModeModal'; // <--- IMPORTAR
 
 export const PosPage: React.FC = () => {
   const { 
-    orderMode, 
-    customerName, 
-    setCustomerName, 
-    handleModeChange, 
+    // Ya no necesitamos handleModeChange ni los setters directos aquí
     handleAddItem, 
     handleMainBtnClick, 
     handleFinalizeOrder,
+    handleModeConfirmed, // <--- NUEVO
     isPaymentModalOpen,
-    setIsPaymentModalOpen
+    setIsPaymentModalOpen,
+    isModeModalOpen,     // <--- NUEVO
+    setIsModeModalOpen   // <--- NUEVO
   } = usePosLogic();
 
   const { 
@@ -45,75 +46,32 @@ export const PosPage: React.FC = () => {
   const { modifiers, rules } = useMenuStore();
   const { getTotal } = useTicketStore();
 
-  // --- CONFIGURACIÓN DE MODOS VISUALES ---
-  const modes = [
-      { id: 'Mesa 1', label: 'Mesa 1', icon: '🍽️' },
-      { id: 'Mesa 2', label: 'Mesa 2', icon: '🍽️' },
-      { id: 'Para Llevar', label: 'Llevar', icon: '🛍️' },
-  ] as const;
-  
   return (
     <>
-      {/* --- 1. HEADER MODERNO --- */}
-      <div className="flex flex-col gap-3 mb-4 sticky top-0 z-20 bg-base-200/50 backdrop-blur-md py-2 -mx-4 px-4 border-b border-base-200">
-         
-         <div className="flex w-full items-center justify-between gap-2">
-             
-             {/* A. SEGMENTED CONTROL (Selector de Modo) */}
-             <div className="bg-base-300/50 p-1 rounded-2xl inline-flex relative">
-                {modes.map((mode) => {
-                    const isActive = orderMode === mode.id;
-                    return (
-                        <button 
-                            key={mode.id} 
-                            onClick={() => handleModeChange(mode.id)} 
-                            className={`
-                                relative px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200
-                                flex items-center gap-1
-                                ${isActive 
-                                    ? 'bg-base-100 text-base-content shadow-sm scale-100' 
-                                    : 'text-base-content/60 hover:bg-base-100/50'
-                                }
-                            `}
-                        >
-                            <span>{mode.icon}</span>
-                            <span className="hidden sm:inline">{mode.label}</span>
-                        </button>
-                    )
-                })}
-             </div>
+      {/* 1. HEADER LIMPIO: 
+          Hemos quitado los botones de Mesa/Llevar.
+          Ahora solo dejamos un padding para que no se pegue al techo.
+      */}
+      <div className="h-2"></div>
 
-             {/* B. INPUT NOMBRE (Solo aparece en Llevar) */}
-             <div className="flex-1 flex justify-end">
-                {orderMode === 'Para Llevar' ? (
-                    <input 
-                        type="text" 
-                        placeholder="Nombre del cliente..." 
-                        className="input input-sm bg-base-100 border-transparent focus:border-primary focus:outline-none rounded-xl w-full max-w-[180px] shadow-sm text-center font-bold placeholder:font-normal placeholder:text-sm"
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
-                        autoComplete="off"
-                    />
-                ) : (
-                    <div className="badge badge-lg badge-primary badge-outline font-bold opacity-80">
-                        Cuenta Abierta
-                    </div>
-                )}
-             </div>
-         </div>
-      </div>
-
-      {/* --- 2. CONTENIDO PRINCIPAL --- */}
-      <div className="pb-24"> {/* Padding bottom extra para la barra fija */}
+      {/* 2. CONTENIDO PRINCIPAL */}
+      <div className="pb-24"> 
         {view === 'menu' ? <MenuScreen /> : <TicketScreen />}
       </div>
 
-      {/* --- 3. BARRA INFERIOR --- */}
+      {/* 3. BARRA INFERIOR */}
       <BottomBar onAction={handleMainBtnClick} />
 
       {/* --- 4. MODALES --- */}
       
-      {/* Modal Crepa */}
+      {/* A. NUEVO MODAL DE MODO */}
+      <OrderModeModal 
+          isOpen={isModeModalOpen}
+          onClose={() => setIsModeModalOpen(false)}
+          onConfirm={handleModeConfirmed}
+      />
+
+      {/* B. Modal Crepa */}
       {activeModal === 'custom_crepe' && groupToCustomize && (
           <CustomizeCrepeModal 
             isOpen={true} 
@@ -125,7 +83,7 @@ export const PosPage: React.FC = () => {
           />
       )}
 
-      {/* Modal Variantes */}
+      {/* C. Modal Variantes */}
       {activeModal === 'variant_select' && itemToSelectVariant && (
           <CustomizeVariantModal 
             isOpen={true} 
@@ -136,12 +94,12 @@ export const PosPage: React.FC = () => {
           />
       )}
       
-      {/* Modal Cobro */}
+      {/* D. Modal Cobro */}
       <PaymentModal 
         isOpen={isPaymentModalOpen} 
         onClose={() => setIsPaymentModalOpen(false)} 
         total={getTotal()} 
-        onConfirm={handleFinalizeOrder} 
+        onConfirm={(details) => handleFinalizeOrder(details)} 
       />
 
       {/* Print Template */}

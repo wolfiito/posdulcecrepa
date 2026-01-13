@@ -110,12 +110,8 @@ export const buildReceiptJSON = (order: Order) => {
         // Mostrar Subtotal (que es el total de los productos)
         add({ type: 0, content: formatLine("Subtotal:", `$${order.total.toFixed(2)}`), bold: 0, align: 2, format: 0 });
         
-        // Calcular Comisión
-        const fee = order.payment.cardFee || (order.total * 0.035);
-        add({ type: 0, content: formatLine(`Comisión (${(CARD_FEE_PERCENT*100)}%):`, `$${fee.toFixed(2)}`), bold: 0, align: 2, format: 0 });
-        
         // Nuevo Gran Total
-        const grandTotal = order.total + fee;
+        const grandTotal = order.total;
         add({ type: 0, content: formatLine("TOTAL:", `$${grandTotal.toFixed(2)}`), bold: 1, align: 2, format: 1 });
         
         add({ type: 0, content: "[PAGO CON TARJETA]", bold: 1, align: 1, format: 0 });

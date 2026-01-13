@@ -9,6 +9,7 @@ import type { Order } from '../types/order';
 // Stores
 import { useShiftStore } from '../store/useShiftStore';
 import { useUIStore } from '../store/useUIStore';
+import { printService } from '../services/printService';
 
 interface GroupedOrder {
   id: string; // ID compuesto para la key
@@ -102,7 +103,24 @@ export const OrdersScreen: React.FC = () => {
 
         await orderService.payOrders(orderIds, paymentDetails, activeShiftId);
 
-        toast.success(`Ticket de ${selectedGroup.customerName} cerrado`);
+        const allItems = selectedGroup.orders.flatMap(o => o.items);
+        
+        const consolidatedOrder = {
+            items: allItems,
+            total: selectedGroup.totalDebt,
+            mode: selectedGroup.mode,
+            status: 'paid', // Ya está pagada
+            kitchenStatus: 'delivered',
+            orderNumber: selectedGroup.orders[0].orderNumber, // Usamos el folio de la primera orden como ref
+            customerName: selectedGroup.customerName,
+            createdAt: new Date(), // Fecha del pago
+            payment: paymentDetails,
+            cashier: "Cajero" // O podrías usar currentUser.name si lo traes del store
+        };
+        
+        printService.printReceipt(consolidatedOrder as any);
+
+        toast.success(`Cuenta de ${selectedGroup.customerName} cerrada e impresa`);
         setSelectedGroup(null);
     } catch (error) {
         toast.error("Error al procesar el pago");

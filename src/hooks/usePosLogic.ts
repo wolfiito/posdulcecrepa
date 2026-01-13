@@ -1,3 +1,4 @@
+// src/hooks/usePosLogic.ts
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useTicketStore } from '../store/useTicketStore';
@@ -35,6 +36,7 @@ export const usePosLogic = () => {
 
   // 2. Estado Local
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isModeModalOpen, setIsModeModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // 3. Inicialización
@@ -43,17 +45,6 @@ export const usePosLogic = () => {
     return () => unsubscribe();
   }, [startListening]);
 
-  // 4. Lógica de Negocio: Manejo de Modos (Mesas vs Llevar)
-  const handleModeChange = useCallback((mode: OrderMode) => {
-    setOrderMode(mode);
-    if (mode !== 'Para Llevar') {
-        setCustomerName(mode); // Auto-asignar nombre de mesa
-    } else {
-        setCustomerName(''); // Limpiar para cliente manual
-    }
-  }, [setOrderMode, setCustomerName]);
-
-  // 5. Lógica de Negocio: Agregar Items
   const handleAddItem = useCallback((item: TicketItem) => {
     addItem(item);
     closeModals();
@@ -61,52 +52,65 @@ export const usePosLogic = () => {
     navigateToGroup(null);
   }, [addItem, closeModals, setView, navigateToGroup]);
 
-  // 6. Lógica de Negocio: Validación y Preparación de Pago
+  // 4. Botón Principal: Solo abre el modal
   const handleMainBtnClick = useCallback(() => {
-      // A. ¿Hay items?
-      if (items.length === 0) return;
-      
+      if (items.length === 0) {
+          toast.warning("Agrega productos primero");
+          return;
+      }
+      setIsModeModalOpen(true);
+  }, [items]);
+
+  // 5. NUEVA LÓGICA: Se ejecuta AL CONFIRMAR el modal
+  const handleModeConfirmed = useCallback((selectedMode: OrderMode, finalName: string) => {
+      // Guardamos en el store (para que la UI se actualice)
+      setOrderMode(selectedMode);
+      setCustomerName(finalName);
+      setIsModeModalOpen(false);
+
       const isMesero = currentUser?.role === 'MESERO';
-      const isTakeOut = orderMode === 'Para Llevar';
-      
-      // B. VALIDACIÓN DE CAJA (CRÍTICO)
-      // Si es venta directa (Para Llevar) y NO es mesero (es Cajero/Admin)
+      const isTakeOut = selectedMode === 'Para Llevar';
+
+      // Validación de Caja
       if (isTakeOut && !isMesero) {
           if (!currentShift) {
-              toast.error("⛔ CAJA CERRADA: Debes abrir turno para cobrar.");
+              toast.error("⛔ CAJA CERRADA: Abre turno para cobrar.");
               openShiftModal(); 
               return;
           }
       }
       
-      // C. VALIDACIÓN DE NOMBRE
-      if (isTakeOut && !customerName.trim()) {
-          toast.warning("⚠️ Escribe el nombre del cliente para llevar");
-          document.getElementById('customer-name-input')?.focus();
-          return;
-      }
-      
-      // D. DECISIÓN DE RUTA
+      // Decisión de Ruta
       if (isTakeOut && !isMesero) {
-          // Cajero cobrando -> Pagar
-          setIsPaymentModalOpen(true); 
+          // Cajero cobrando -> Pagar (Esperamos un poco para que el estado se asiente)
+          setTimeout(() => setIsPaymentModalOpen(true), 100); 
       } else {
-          // Mesero o Mesa -> Enviar a Cocina (Sin cobrar aun)
-          handleFinalizeOrder(undefined); 
+          // Mesero o Mesa -> Enviar a Cocina directo
+          // IMPORTANTE: Pasamos finalName aquí directamente para evitar el error de "Anónimo"
+          handleFinalizeOrder(undefined, selectedMode, finalName); 
       }
-  }, [items, orderMode, customerName, currentUser, currentShift, openShiftModal]);
+  }, [currentUser, currentShift, openShiftModal, setOrderMode, setCustomerName]);
 
-  // 7. Lógica de Negocio: Finalizar Orden (Transacción)
-  const handleFinalizeOrder = async (paymentDetails?: PaymentDetails) => {
+  // 6. Finalizar Orden (CORREGIDO PARA RECIBIR ARGUMENTOS)
+  const handleFinalizeOrder = async (
+      paymentDetails?: PaymentDetails, 
+      overrideMode?: OrderMode,    // <--- IMPORTANTE: Nuevo argumento
+      overrideName?: string        // <--- IMPORTANTE: Nuevo argumento
+  ) => {
       if (isProcessing) return;
       setIsProcessing(true);
 
       const cashierName = currentUser?.name || 'Cajero';
       const total = getTotal();
-      const currentMode = orderMode;
       
-      // --- LÓGICA DE IMPRESIÓN ---
-      // Si es MESERO, NO imprime (false). Si es otro rol, SÍ imprime (true).
+      // USAMOS EL VALOR MANUAL SI EXISTE, SI NO, EL DEL STORE
+      // Esto arregla el bug: overrideName trae "Mesa 1" aunque el store siga vacío por milisegundos
+      const currentMode = overrideMode || orderMode;
+      const currentClientName = overrideName || customerName;
+      
+      // Debug rápido por si acaso (puedes borrarlo luego)
+      console.log("Creando orden para:", currentClientName);
+
       const shouldPrint = currentUser?.role !== 'MESERO';
       const activeShiftId = (shouldPrint && currentShift) ? currentShift.id : undefined;
 
@@ -118,27 +122,19 @@ export const usePosLogic = () => {
               total, 
               currentMode, 
               cashierName,
-              customerName,
+              currentClientName, // <--- Aquí pasamos el nombre correcto
               shouldPrint, 
               paymentDetails,
               activeShiftId
           );
           
-          // Limpieza inteligente
           clearTicket();
-          
-          if (currentMode !== 'Para Llevar') {
-              setCustomerName(currentMode);
-              setOrderMode(currentMode);
-          }
-          
           setView('menu');
 
-          // Mensaje personalizado según lo que pasó
           if (shouldPrint) {
               toast.success(`¡Orden cobrada e impresa! 🖨️`);
           } else {
-              toast.success(`¡Orden enviada a cocina! 👨‍🍳`);
+              toast.success(`¡Enviado a cocina: ${currentClientName}! 👨‍🍳`);
           }
 
       } catch (error) {
@@ -150,18 +146,18 @@ export const usePosLogic = () => {
   };
 
   return {
-    // Estado
     orderMode,
     customerName,
     isPaymentModalOpen,
+    isModeModalOpen,
     isProcessing,
     setIsPaymentModalOpen,
+    setIsModeModalOpen,
     setCustomerName,
     
-    // Métodos / Handlers
-    handleModeChange,
     handleAddItem,
     handleMainBtnClick,
+    handleModeConfirmed,
     handleFinalizeOrder
   };
 };
