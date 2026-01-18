@@ -1,5 +1,5 @@
 import { storage, ref, uploadString, getDownloadURL } from '../firebase';
-import { buildReceiptJSON } from '../utils/bluetoothPrintBuilder';
+import { buildReceiptJSON, buildReceiptString } from '../utils/bluetoothPrintBuilder';
 import type { Order } from '../types/order'; // <--- Importación corregida
 
 // --- TRUCO PARA PWA (Pantalla de Inicio) ---
@@ -18,9 +18,6 @@ export const printService = {
     const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
     const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream;
     const isAndroid = /android/i.test(userAgent);
-    
-    // Generamos el JSON del ticket
-    const jsonString = buildReceiptJSON(order);
 
     try {
       if (isIOS || isAndroid) {
@@ -28,17 +25,20 @@ export const printService = {
         
         if (isIOS) {
             // --- IPHONE (Thermer Directo) ---
+               // Generamos el JSON del ticket
+            const jsonString = buildReceiptJSON(order);
             const encodedData = encodeURIComponent(jsonString);
             const deepLink = `thermer://?data=${encodedData}`;
             openDeepLink(deepLink);
 
         } else {
             // --- ANDROID (RawBT / Bluetooth Print - Vía Firebase) ---
+            const ticketString = buildReceiptString(order);
             const fileName = `receipts/order_${order.orderNumber}_${Date.now()}.json`;
             const storageRef = ref(storage, fileName);
             
             // Subimos el ticket temporalmente
-            await uploadString(storageRef, jsonString, 'raw', { contentType: 'application/json' });
+            await uploadString(storageRef, ticketString, 'raw', { contentType: 'application/json' });
             const downloadUrl = await getDownloadURL(storageRef);
             
             // Esquema para abrir app externa
@@ -50,6 +50,7 @@ export const printService = {
 
       } else {
         // --- PC / DESKTOP ---
+        const jsonString = buildReceiptJSON(order);
         const encodedData = encodeURIComponent(jsonString);
         const deepLink = `thermer://?data=${encodedData}`;
         openDeepLink(deepLink);
