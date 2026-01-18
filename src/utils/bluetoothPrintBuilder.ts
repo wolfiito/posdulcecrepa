@@ -176,32 +176,33 @@ return JSON.stringify(data);
 export const buildReceiptString = (order: Order) => {
   let str = "";
   const { date, time } = getFormattedDate(order);
-  const cashierName = order.cashier || 'Cajero General'
+  
+  // Recuperamos el nombre del cajero
+  const cashierName = order.cashier || 'Cajero General';
 
   // Tags: <BAF> -> B:Bold(0/1), A:Align(0L,1C,2R), F:Font(0N,1DH,2DHW,3DW)
   
-  // Encabezado
+  // --- 1. ENCABEZADO ---
   str += "<112>DULCE CREPA\n"; // Negrita, Centro, Doble Alto+Ancho
   str += "<010>Sucursal: Centro\n";
   str += `<000>Fecha: ${date}\n`;
   str += `<000>Hora: ${time}\n`;
+  // 👇 CAMBIO AQUÍ: Nombre real del cajero
   str += `<000>Atendió: ${cashierName}\n`;
   str += "<110>--------------------------------\n";
 
-  // Productos
+  // --- 2. PRODUCTOS ---
   order.items.forEach(item => {
     const variant = item.details?.variantName ? `(${item.details.variantName})` : '';
     const nameFull = `${item.baseName} ${variant}`;
     const priceStr = `$${item.finalPrice.toFixed(2)}`;
     
-    // Usamos la función formatLine para alinear los precios a la derecha
     // <100> = Negrita, Izquierda, Normal
     str += `<100>${formatLine(nameFull, priceStr)}\n`;
 
     // Extras
     if (item.details?.selectedModifiers) {
         item.details.selectedModifiers.forEach(mod => {
-            // <100> = Negrita para el "+" y el nombre
             str += `<100>  + ${mod.name}\n`;
         });
     }
@@ -209,17 +210,68 @@ export const buildReceiptString = (order: Order) => {
 
   str += "<110>--------------------------------\n";
 
-  // Total (Alineado Derecha, Doble Alto)
-  // <121> = Negrita, Derecha, Doble Alto
-  str += `<121>Total: $${order.total.toFixed(2)}\n`;
+  // --- 3. TOTALES Y PAGOS (LÓGICA MEJORADA) ---
+
+  // A. PAGO CON TARJETA
+  if (order.payment?.method === 'card') {
+      str += `<020>${formatLine("Subtotal:", `$${order.total.toFixed(2)}`)}\n`;
+      str += `<121>Total: $${order.total.toFixed(2)}\n`;
+      str += "<110>[PAGO CON TARJETA]\n";
+
+  // B. PAGO EN EFECTIVO
+  } else if (order.payment?.method === 'cash') {
+      str += `<121>Total: $${order.total.toFixed(2)}\n`;
+      
+      const paid = order.payment.amountPaid || order.total;
+      const change = order.payment.change || 0;
+      
+      str += `<020>${formatLine("Su Pago:", `$${paid.toFixed(2)}`)}\n`;
+      str += `<120>${formatLine("Cambio:", `$${change.toFixed(2)}`)}\n`; // 120 = Negrita, Derecha
+      str += "<110>[PAGO EN EFECTIVO]\n";
+
+  // C. TRANSFERENCIA
+  } else if (order.payment?.method === 'transfer') {
+      str += `<121>Total: $${order.total.toFixed(2)}\n`;
+      str += "<110>[TRANSFERENCIA]\n";
+
+  // D. 👇 PAGO COMBINADO (MIXTO) 👇
+  } else if (order.payment?.method === 'mixed') {
+      str += `<121>Total: $${order.total.toFixed(2)}\n`;
+      str += "<010>--------------------------------\n";
+
+      if (order.payment.transactions && order.payment.transactions.length > 0) {
+          order.payment.transactions.forEach(tx => {
+              let methodLabel = "Otro";
+              if (tx.method === 'cash') methodLabel = "Efectivo";
+              if (tx.method === 'card') methodLabel = "Tarjeta";
+              if (tx.method === 'transfer') methodLabel = "Transf.";
+
+              // <000> Normal, Izquierda para el desglose
+              str += `<000>${formatLine(methodLabel, `$${tx.amount.toFixed(2)}`)}\n`;
+          });
+      }
+
+      // Si hubo cambio en la parte de efectivo
+      if (order.payment.change && order.payment.change > 0) {
+          str += `<120>${formatLine("Cambio:", `$${order.payment.change.toFixed(2)}`)}\n`;
+      }
+      
+      str += "\n";
+      str += "<110>[PAGO COMBINADO]\n";
+
+  // E. OTROS / PENDIENTE
+  } else {
+      str += `<121>Total: $${order.total.toFixed(2)}\n`;
+      const statusText = order.status === 'paid' ? 'PAGADO' : 'PENDIENTE DE PAGO';
+      str += `<110>${statusText}\n`;
+  }
 
   str += "<110>--------------------------------\n";
 
   // Pie
-  str += "<010>\n"; // Espacio
+  str += "<010>\n"; 
   str += "<010>¡Gracias por su compra!\n";
-  str += "\n\n"; // Corte de papel
-  str += "\n\n";
-  str += "\n\n";
+  str += "\n\n\n"; // Corte de papel
+  
   return str;
 };
