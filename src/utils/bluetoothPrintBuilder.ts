@@ -2,9 +2,9 @@
 import { Timestamp } from '../firebase';
 import type { Order } from '../types/order';
 
-// CONFIGURACIÓN DE ANCHO (58mm suele ser 32 caracteres con fuente normal)
+// CONFIGURACIÓN DE ANCHO (Estándar 58mm = 32 caracteres)
 const MAX_CHARS = 32;
-const CARD_FEE_PERCENT = 0.035;
+
 /**
  * Ayuda a crear una línea con texto a la izquierda y a la derecha
  * Ejemplo: "Crepa Dulce ........... $55.00"
@@ -14,21 +14,17 @@ const formatLine = (leftText: string, rightText: string): string => {
     if (spaceNeeded < 1) return `${leftText.substring(0, MAX_CHARS - rightText.length - 1)} ${rightText}`;
     const spaces = " ".repeat(spaceNeeded);
     return `${leftText}${spaces}${rightText}`;
-  };
+};
   
-  const getFormattedDate = (order: Order) => {
+const getFormattedDate = (order: Order) => {
     try {
         let d: Date;
-
         // VERIFICACIÓN SEGURA DE TIPOS
         if (order.createdAt instanceof Timestamp) {
-            // Si es Timestamp de Firebase, lo convertimos
             d = order.createdAt.toDate();
         } else if (order.createdAt instanceof Date) {
-            // Si ya es Date, lo usamos directo
             d = order.createdAt;
         } else {
-            // Si es FieldValue (aún no guardado) o null, usamos fecha actual
             d = new Date();
         }
 
@@ -42,15 +38,14 @@ const formatLine = (leftText: string, rightText: string): string => {
 };
 
 // ==========================================
-// 1. CONSTRUCTOR PARA IPHONE (JSON Thermer)
+// 1. CONSTRUCTOR JSON (Para bprint:// y Thermer)
 // ==========================================
 export const buildReceiptJSON = (order: Order) => {
     const data: Record<string, any> = {};
     let index = 0;
     
-    // --- CORRECCIÓN CRÍTICA AQUÍ ---
-    // Usamos padStart(3, '0') para que sea "001", "002", "010".
-    // Esto evita que la App ordene "10" antes que "2".
+    // Función auxiliar para agregar líneas al objeto JSON
+    // Usamos padStart para asegurar el orden (000, 001, 002...)
     const add = (item: any) => {
       const key = index.toString().padStart(3, '0'); 
       data[key] = item;
@@ -58,9 +53,12 @@ export const buildReceiptJSON = (order: Order) => {
     };
   
     const { date, time } = getFormattedDate(order);
-    const cashierName = order.cashier || 'Cajero General';
+    
+    // Recuperamos el nombre del cajero o ponemos un default
+    const cashierName = order.cashier || 'Cajero General'; 
+  
     // --- 1. ENCABEZADO ---
-    // Format 2 = Doble Ancho y Alto (Gigante)
+    // Format: 0=Normal, 1=Doble Alto, 2=Doble Alto+Ancho
     add({ type: 0, content: "DULCE CREPA", bold: 1, align: 1, format: 2 }); 
     add({ type: 0, content: "Sucursal: Centro", bold: 0, align: 0, format: 0 });
     add({ type: 0, content: `Fecha: ${date}`, bold: 0, align: 0, format: 0 });
@@ -68,6 +66,7 @@ export const buildReceiptJSON = (order: Order) => {
     add({ type: 0, content: `Atendió: ${cashierName}`, bold: 0, align: 0, format: 0 });
     add({ type: 0, content: "--------------------------------", bold: 1, align: 1, format: 0 });
     add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
+
     // --- 2. PRODUCTOS ---
     order.items.forEach(item => {
       const variant = item.details?.variantName ? `(${item.details.variantName})` : '';
@@ -82,13 +81,12 @@ export const buildReceiptJSON = (order: Order) => {
           align: 0, 
           format: 0 
       });  
-      // Extras (Con signo + en negrita)
+      
+      // Extras / Modificadores
       if (item.details?.selectedModifiers) {
-        
          item.details.selectedModifiers.forEach(mod => {
             const modName = ` + ${mod.name}`;
             const modPrice = mod.price > 0 ? `$${mod.price.toFixed(2)}` : '$0.00';
-             // Format 0 (Normal) para que se lea bien, Bold activado
              add({ 
                 type: 0, 
                 content: formatLine(modName, modPrice), 
@@ -97,181 +95,89 @@ export const buildReceiptJSON = (order: Order) => {
                 format: 0 }); 
          });
       }
+      // Espacio pequeño entre items
       add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
     });
     
     add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
     add({ type: 0, content: "--------------------------------", bold: 1, align: 1, format: 0 });
 
-  // --- 3. TOTALES Y PAGOS (LÓGICA MEJORADA) ---
+    // --- 3. TOTALES Y PAGOS (Lógica Completa) ---
   
-  // A. PAGO CON TARJETA
-  if (order.payment?.method === 'card') {
-    add({ type: 0, content: formatLine("Subtotal:", `$${order.total.toFixed(2)}`), bold: 0, align: 2, format: 0 });
-    add({ type: 0, content: formatLine("TOTAL:", `$${order.total.toFixed(2)}`), bold: 1, align: 2, format: 1 });
-    add({ type: 0, content: "[PAGO CON TARJETA]", bold: 1, align: 1, format: 0 });
+    // CASO A: PAGO CON TARJETA
+    if (order.payment?.method === 'card') {
+        add({ type: 0, content: formatLine("Subtotal:", `$${order.total.toFixed(2)}`), bold: 0, align: 2, format: 0 });
+        add({ type: 0, content: formatLine("TOTAL:", `$${order.total.toFixed(2)}`), bold: 1, align: 2, format: 1 });
+        add({ type: 0, content: "[PAGO CON TARJETA]", bold: 1, align: 1, format: 0 });
 
-  // B. PAGO EN EFECTIVO
-  } else if (order.payment?.method === 'cash') {
-    add({ type: 0, content: formatLine("TOTAL:", `$${order.total.toFixed(2)}`), bold: 1, align: 2, format: 1 });
-    const paid = order.payment.amountPaid || order.total;
-    const change = order.payment.change || 0;
-    add({ type: 0, content: formatLine("Su Pago:", `$${paid.toFixed(2)}`), bold: 0, align: 2, format: 0 });
-    add({ type: 0, content: formatLine("Cambio:", `$${change.toFixed(2)}`), bold: 1, align: 2, format: 0 });
-    add({ type: 0, content: "[PAGO EN EFECTIVO]", bold: 1, align: 1, format: 0 });
+    // CASO B: PAGO EN EFECTIVO
+    } else if (order.payment?.method === 'cash') {
+        add({ type: 0, content: formatLine("TOTAL:", `$${order.total.toFixed(2)}`), bold: 1, align: 2, format: 1 });
+        
+        const paid = order.payment.amountPaid || order.total;
+        const change = order.payment.change || 0;
 
-  // C. TRANSFERENCIA
-  } else if (order.payment?.method === 'transfer') {
-    add({ type: 0, content: formatLine("TOTAL:", `$${order.total.toFixed(2)}`), bold: 1, align: 2, format: 1 });
-    add({ type: 0, content: "[TRANSFERENCIA]", bold: 1, align: 1, format: 0 });
+        add({ type: 0, content: formatLine("Su Pago:", `$${paid.toFixed(2)}`), bold: 0, align: 2, format: 0 });
+        add({ type: 0, content: formatLine("Cambio:", `$${change.toFixed(2)}`), bold: 1, align: 2, format: 0 });
+        add({ type: 0, content: "[PAGO EN EFECTIVO]", bold: 1, align: 1, format: 0 });
 
-  // D. 👇 NUEVO: PAGO COMBINADO (MIXTO) 👇
-  } else if (order.payment?.method === 'mixed') {
-    add({ type: 0, content: formatLine("TOTAL:", `$${order.total.toFixed(2)}`), bold: 1, align: 2, format: 1 });
-    add({ type: 0, content: "--------------------------------", bold: 0, align: 1, format: 0 });
-    
-    // Recorremos las transacciones guardadas en order.payment.transactions
-    if (order.payment.transactions && order.payment.transactions.length > 0) {
-        order.payment.transactions.forEach(tx => {
-            // Traducimos el método a español para el ticket
-            let methodLabel = "Otro";
-            if (tx.method === 'cash') methodLabel = "Efectivo";
-            if (tx.method === 'card') methodLabel = "Tarjeta";
-            if (tx.method === 'transfer') methodLabel = "Transf.";
+    // CASO C: TRANSFERENCIA
+    } else if (order.payment?.method === 'transfer') {
+        add({ type: 0, content: formatLine("TOTAL:", `$${order.total.toFixed(2)}`), bold: 1, align: 2, format: 1 });
+        add({ type: 0, content: "[TRANSFERENCIA]", bold: 1, align: 1, format: 0 });
 
-            add({ 
-                type: 0, 
-                content: formatLine(methodLabel, `$${tx.amount.toFixed(2)}`), 
-                bold: 0, 
-                align: 0, 
-                format: 0 
+    // CASO D: PAGO COMBINADO (MIXTO)
+    } else if (order.payment?.method === 'mixed') {
+        add({ type: 0, content: formatLine("TOTAL:", `$${order.total.toFixed(2)}`), bold: 1, align: 2, format: 1 });
+        add({ type: 0, content: "--------------------------------", bold: 0, align: 1, format: 0 });
+        
+        // Desglose de transacciones
+        if (order.payment.transactions && order.payment.transactions.length > 0) {
+            order.payment.transactions.forEach(tx => {
+                let methodLabel = "Otro";
+                if (tx.method === 'cash') methodLabel = "Efectivo";
+                if (tx.method === 'card') methodLabel = "Tarjeta";
+                if (tx.method === 'transfer') methodLabel = "Transf.";
+
+                add({ 
+                    type: 0, 
+                    content: formatLine(methodLabel, `$${tx.amount.toFixed(2)}`), 
+                    bold: 0, 
+                    align: 0, 
+                    format: 0 
+                });
             });
-        });
-    }
-    
-    if (order.payment.change && order.payment.change > 0) {
-         add({ type: 0, content: formatLine("Cambio:", `$${order.payment.change.toFixed(2)}`), bold: 1, align: 2, format: 0 });
+        }
+        
+        // Cambio (si aplica en la parte de efectivo)
+        if (order.payment.change && order.payment.change > 0) {
+             add({ type: 0, content: formatLine("Cambio:", `$${order.payment.change.toFixed(2)}`), bold: 1, align: 2, format: 0 });
+        }
+
+        add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
+        add({ type: 0, content: "[PAGO COMBINADO]", bold: 1, align: 1, format: 0 });
+
+    // CASO E: DEFAULT (Pendiente o sin pago)
+    } else {
+        add({ type: 0, content: formatLine("TOTAL:", `$${order.total.toFixed(2)}`), bold: 1, align: 2, format: 1 });
+        const statusText = order.status === 'paid' ? 'PAGADO' : 'PENDIENTE DE PAGO';
+        add({ type: 0, content: statusText, bold: 1, align: 1, format: 0 });
     }
 
+    // Espacios finales para corte de papel
     add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
-    add({ type: 0, content: "[PAGO COMBINADO]", bold: 1, align: 1, format: 0 });
+    add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
+    add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
 
-  // E. OTROS (Pendiente)
-  } else {
-      add({ type: 0, content: formatLine("TOTAL:", `$${order.total.toFixed(2)}`), bold: 1, align: 2, format: 1 });
-      const statusText = order.status === 'paid' ? 'PAGADO' : 'PENDIENTE DE PAGO';
-      add({ type: 0, content: statusText, bold: 1, align: 1, format: 0 });
-}
-
-// Espacios finales para corte
-add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
-add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
-
-return JSON.stringify(data);
+    return JSON.stringify(data);
 };
 
 // ==========================================
-// 2. CONSTRUCTOR PARA ANDROID (String con Tags)
+// 2. CONSTRUCTOR STRING (Opcional / Fallback)
 // ==========================================
+// Mantenemos esta función por si decides usar navigator.share en el futuro
 export const buildReceiptString = (order: Order) => {
-  let str = "";
-  const { date, time } = getFormattedDate(order);
-  
-  // Recuperamos el nombre del cajero
-  const cashierName = order.cashier || 'Cajero General';
-
-  // Tags: <BAF> -> B:Bold(0/1), A:Align(0L,1C,2R), F:Font(0N,1DH,2DHW,3DW)
-  
-  // --- 1. ENCABEZADO ---
-  str += "<112>DULCE CREPA\n"; // Negrita, Centro, Doble Alto+Ancho
-  str += "<010>Sucursal: Centro\n";
-  str += `<000>Fecha: ${date}\n`;
-  str += `<000>Hora: ${time}\n`;
-  // 👇 CAMBIO AQUÍ: Nombre real del cajero
-  str += `<000>Atendió: ${cashierName}\n`;
-  str += "<110>--------------------------------\n";
-
-  // --- 2. PRODUCTOS ---
-  order.items.forEach(item => {
-    const variant = item.details?.variantName ? `(${item.details.variantName})` : '';
-    const nameFull = `${item.baseName} ${variant}`;
-    const priceStr = `$${item.finalPrice.toFixed(2)}`;
-    
-    // <100> = Negrita, Izquierda, Normal
-    str += `<100>${formatLine(nameFull, priceStr)}\n`;
-
-    // Extras
-    if (item.details?.selectedModifiers) {
-        item.details.selectedModifiers.forEach(mod => {
-            str += `<100>  + ${mod.name}\n`;
-        });
-    }
-  });
-
-  str += "<110>--------------------------------\n";
-
-  // --- 3. TOTALES Y PAGOS (LÓGICA MEJORADA) ---
-
-  // A. PAGO CON TARJETA
-  if (order.payment?.method === 'card') {
-      str += `<020>${formatLine("Subtotal:", `$${order.total.toFixed(2)}`)}\n`;
-      str += `<121>Total: $${order.total.toFixed(2)}\n`;
-      str += "<110>[PAGO CON TARJETA]\n";
-
-  // B. PAGO EN EFECTIVO
-  } else if (order.payment?.method === 'cash') {
-      str += `<121>Total: $${order.total.toFixed(2)}\n`;
-      
-      const paid = order.payment.amountPaid || order.total;
-      const change = order.payment.change || 0;
-      
-      str += `<020>${formatLine("Su Pago:", `$${paid.toFixed(2)}`)}\n`;
-      str += `<120>${formatLine("Cambio:", `$${change.toFixed(2)}`)}\n`; // 120 = Negrita, Derecha
-      str += "<110>[PAGO EN EFECTIVO]\n";
-
-  // C. TRANSFERENCIA
-  } else if (order.payment?.method === 'transfer') {
-      str += `<121>Total: $${order.total.toFixed(2)}\n`;
-      str += "<110>[TRANSFERENCIA]\n";
-
-  // D. 👇 PAGO COMBINADO (MIXTO) 👇
-  } else if (order.payment?.method === 'mixed') {
-      str += `<121>Total: $${order.total.toFixed(2)}\n`;
-      str += "<010>--------------------------------\n";
-
-      if (order.payment.transactions && order.payment.transactions.length > 0) {
-          order.payment.transactions.forEach(tx => {
-              let methodLabel = "Otro";
-              if (tx.method === 'cash') methodLabel = "Efectivo";
-              if (tx.method === 'card') methodLabel = "Tarjeta";
-              if (tx.method === 'transfer') methodLabel = "Transf.";
-
-              // <000> Normal, Izquierda para el desglose
-              str += `<000>${formatLine(methodLabel, `$${tx.amount.toFixed(2)}`)}\n`;
-          });
-      }
-
-      // Si hubo cambio en la parte de efectivo
-      if (order.payment.change && order.payment.change > 0) {
-          str += `<120>${formatLine("Cambio:", `$${order.payment.change.toFixed(2)}`)}\n`;
-      }
-      
-      str += "\n";
-      str += "<110>[PAGO COMBINADO]\n";
-
-  // E. OTROS / PENDIENTE
-  } else {
-      str += `<121>Total: $${order.total.toFixed(2)}\n`;
-      const statusText = order.status === 'paid' ? 'PAGADO' : 'PENDIENTE DE PAGO';
-      str += `<110>${statusText}\n`;
-  }
-
-  str += "<110>--------------------------------\n";
-
-  // Pie
-  str += "<010>\n"; 
-  str += "<010>¡Gracias por su compra!\n";
-  str += "\n\n\n"; // Corte de papel
-  
-  return str;
+  // Por ahora retornamos vacío ya que usarás bprint:// (JSON)
+  // Si necesitas la versión texto avísame y la agrego aquí también.
+  return ""; 
 };
