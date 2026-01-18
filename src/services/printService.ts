@@ -31,20 +31,30 @@ export const printService = {
             const deepLink = `thermer://?data=${encodedData}`;
             openDeepLink(deepLink);
 
-        } else {
-            // --- ANDROID (RawBT / Bluetooth Print - Vía Firebase) ---
-            const ticketString = buildReceiptString(order);
-            const fileName = `receipts/order_${order.orderNumber}_${Date.now()}.json`;
-            const storageRef = ref(storage, fileName);
-            
-            // Subimos el ticket temporalmente
-            await uploadString(storageRef, ticketString, 'raw', { contentType: 'application/json' });
-            const downloadUrl = await getDownloadURL(storageRef);
-            
-            // Esquema para abrir app externa
-            const deepLink = `my.bluetoothprint.scheme://${downloadUrl}`;
-            openDeepLink(deepLink);
-        }
+        }  
+      } else if (isAndroid) {
+           try {
+            const receiptText = buildReceiptString(order);
+    
+            // Verificamos si el navegador soporta compartir
+            if (navigator.share) {
+                await navigator.share({
+                    title: `Ticket #${order.orderNumber}`,
+                    text: receiptText, // Aquí va el string con etiquetas <BAF>
+                });
+                console.log("Menú de compartir abierto con éxito");
+            } else {
+                // Fallback por si el navegador es muy viejo (raro hoy en día)
+                alert("Tu navegador no soporta la impresión nativa directa. Intenta usar Chrome actualizado.");
+            }
+    
+          } catch (error) {
+            // El usuario canceló el menú de compartir o hubo error
+            if ((error as any).name !== 'AbortError') {
+                 console.error("Error al compartir:", error);
+                 alert("Error al intentar abrir el menú de impresión.");
+            }
+          }
         
         setTimeout(() => { window.focus(); }, 1000);
 
