@@ -43,16 +43,19 @@ export const reportService = {
       snapOrders.forEach((doc) => {
         const data = { id: doc.id, ...doc.data() } as Order;
         
+        // SIEMPRE agregamos la orden a la lista, sea pagada o cancelada
+        // Esto permite que aparezca en la pantalla de "Tickets" (quizás en rojo si es cancelada)
+        orders.push(data);
+
+        // SOLO sumamos dinero e inventario si la orden está PAGADA
         if (data.status === 'paid') {
-            orders.push(data);
             
             // Sumamos al total general
             totalSales += data.total;
 
-            // --- CORRECCIÓN AQUÍ: LÓGICA DE PAGO MIXTO ---
+            // --- LÓGICA DE PAGO MIXTO ---
             const payment = data.payment;
 
-            // CASO 1: Es un pago dividido (Mixto)
             if (payment?.transactions && Array.isArray(payment.transactions)) {
                 payment.transactions.forEach((tx: any) => {
                     const amount = Number(tx.amount) || 0;
@@ -61,12 +64,8 @@ export const reportService = {
                     if (tx.method === 'transfer') transferTotal += amount;
                 });
             } 
-            // CASO 2: Es un pago simple (Legacy / Normal)
             else if (payment) {
-                // Usamos el total de la orden para evitar errores de campos faltantes
                 let finalAmount = Number(data.total);
-                
-                // Backup por si acaso
                 if (!finalAmount || finalAmount === 0) {
                      finalAmount = Number(payment.amountPaid) || 0;
                 }
@@ -76,7 +75,7 @@ export const reportService = {
                 else if (payment.method === 'transfer') transferTotal += finalAmount;
             }
 
-            // Desglose de Productos e Ingredientes (Esto sigue igual)
+            // Desglose de Productos e Ingredientes (Solo de lo vendido real)
             data.items.forEach((item) => {
                 const variantSuffix = item.details?.variantName ? ` (${item.details.variantName})` : '';
                 const fullName = item.baseName + variantSuffix;
@@ -97,6 +96,7 @@ export const reportService = {
                 }
             });
         }
+        // Si está cancelada, simplemente la ignoramos para la suma (pero ya está en el array 'orders')
       });
 
       // Procesamiento de Gastos
@@ -117,13 +117,13 @@ export const reportService = {
 
       return {
         totalSales,
-        totalOrders: orders.length,
+        totalOrders: orders.filter(o => o.status === 'paid').length, // Solo contamos órdenes válidas para el KPI
         cashTotal,
         cardTotal,
         transferTotal,
         totalExpenses,
         netBalance: totalSales - totalExpenses,
-        orders,
+        orders, // Aquí van TODAS (incluyendo canceladas) para que la UI las muestre
         expenses,
         productBreakdown: Array.from(productMap.values()).sort((a, b) => b.quantity - a.quantity),
         ingredientBreakdown: Array.from(ingredientMap.entries())

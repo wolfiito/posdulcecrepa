@@ -1,10 +1,9 @@
 // src/services/orderService.ts
-import { db, collection, serverTimestamp, runTransaction, doc, writeBatch } from '../firebase';
+import { db, collection, serverTimestamp, runTransaction, doc, writeBatch, increment } from '../firebase';
 import { printService } from './printService';
 import type { TicketItem } from '../types/menu';
 import type { Order, PaymentDetails, OrderMode, KitchenStatus } from '../types/order';
 import type { DocumentReference } from 'firebase/firestore'; // Importamos el tipo estricto
-import { shiftService } from './shiftService';
 
 // Interfaz interna para asegurar que no usamos 'any'
 interface StockUpdate {
@@ -160,5 +159,42 @@ export const orderService = {
         batch.update(ref, updateData);
       });
       await batch.commit();
+  },
+  // --- NUEVA FUNCIÓN: CANCELAR Y DEVOLVER STOCK ---
+  
+  async cancelOrder(orderId: string, items: TicketItem[]) {
+    try {
+        const batch = writeBatch(db);
+        const orderRef = doc(db, "orders", orderId);
+
+        // 1. Marcar como cancelada
+        batch.update(orderRef, { 
+            status: 'cancelled',
+            cancelledAt: serverTimestamp() 
+        });
+
+        // 2. Restaurar Stock (Inventario Inverso)
+        items.forEach(item => {
+            if (item.details?.selectedModifiers) {
+                item.details.selectedModifiers.forEach(mod => {
+                    // Solo restauramos si tenemos el ID del modificador
+                    if (mod.id) {
+                        const modRef = doc(db, "modifiers", mod.id);
+                        // Incrementamos el stock atómicamente
+                        batch.update(modRef, {
+                            currentStock: increment(1)
+                        });
+                    }
+                });
+            }
+        });
+
+        await batch.commit();
+        return true;
+    } catch (error) {
+        console.error("Error al cancelar orden:", error);
+        throw error;
+    }
   }
 };
+

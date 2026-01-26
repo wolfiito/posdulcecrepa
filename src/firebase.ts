@@ -25,7 +25,8 @@ import {
   setDoc,
   onSnapshot,
   FieldValue,
-  writeBatch
+  writeBatch,
+  increment
       // Podrías sumar todo e imprimir un comprobante final aquí.
 } from "firebase/firestore";
 
@@ -73,7 +74,8 @@ export {
   setDoc,
   onSnapshot,
   FieldValue,
-  writeBatch
+  writeBatch,
+  increment
       // Podrías sumar todo e imprimir un comprobante final aquí.
 };
 
