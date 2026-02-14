@@ -1,4 +1,4 @@
-// src/types/menu.ts
+
 export interface FixedPriceItem {
     id: string; 
     name: string;
@@ -30,7 +30,7 @@ export interface FixedPriceItem {
     price: number;
     cost?: number;
     group: string; 
-    trackStock?: boolean;  // ¿Controlamos stock de esto?
+    trackStock?: boolean;
     currentStock?: number;
   }
   
@@ -64,7 +64,8 @@ export interface FixedPriceItem {
     finalPrice: number; 
     finalCost?: number;
     type: 'CUSTOM' | 'FIXED' | 'VARIANT'; 
-    
+    quantity?: number; 
+    productId?: string;
     details?: {
       itemId?: string; 
       baseRuleId?: string; 

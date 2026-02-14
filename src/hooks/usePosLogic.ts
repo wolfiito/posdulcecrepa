@@ -1,4 +1,3 @@
-// src/hooks/usePosLogic.ts
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useTicketStore } from '../store/useTicketStore';
@@ -11,18 +10,18 @@ import type { OrderMode, PaymentDetails } from '../types/order';
 import type { TicketItem } from '../types/menu';
 
 export const usePosLogic = () => {
-  // 1. Hooks (Solo para renderizar la UI)
   const { startListening } = useMenuStore();
-  const { currentUser } = useAuthStore();
+  const { currentUser, activeBranchId } = useAuthStore();
   const { currentShift } = useShiftStore(); 
   
   const { 
-    addItem, 
+    items,
+    clearTicket, 
     orderMode, 
-    setOrderMode, 
     customerName, 
+    setOrderMode, 
     setCustomerName,  
-    clearTicket 
+    addItem, 
   } = useTicketStore();
   
   const { 
@@ -32,9 +31,16 @@ export const usePosLogic = () => {
     openShiftModal 
   } = useUIStore();
 
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [isModeModalOpen, setIsModeModalOpen] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [
+    isPaymentModalOpen, 
+    setIsPaymentModalOpen,
+    isModeModalOpen, 
+    setIsModeModalOpen,
+    isProcessing, 
+    setIsProcessing,
+    isLoading,
+    setIsLoading
+    ] = useState(false);
 
   useEffect(() => {
     const unsubscribe = startListening();
@@ -48,16 +54,16 @@ export const usePosLogic = () => {
     navigateToGroup(null);
   }, [addItem, closeModals, setView, navigateToGroup]);
 
-  // --- FINALIZAR ORDEN (VERSIÓN BLINDADA) ---
   const handleFinalizeOrder = useCallback(async (
       paymentDetails?: PaymentDetails, 
       overrideMode?: OrderMode, 
       overrideName?: string
   ) => {
       if (isProcessing) return;
-
-      // TRUCO PRO: Leemos directo del Store, ignorando closures de React
-      // Esto garantiza que SIEMPRE tenemos los items reales en este milisegundo.
+      if (!activeBranchId) {
+        toast.error("ERROR: No hay sucursal seleccionada. Reinicia sesión.");
+        return;
+      }
       const currentItems = useTicketStore.getState().items;
 
       if (currentItems.length === 0) {
@@ -67,14 +73,12 @@ export const usePosLogic = () => {
 
       setIsProcessing(true);
 
-      // Usamos los overrides si existen, si no, leemos directo del store también para asegurar
       const currentMode = overrideMode || useTicketStore.getState().orderMode;
       const currentClientName = overrideName || useTicketStore.getState().customerName;
       
       const cashierName = currentUser?.name || 'Cajero';
-      // Recalculamos el total con los items frescos
       const total = currentItems.reduce((sum, item) => sum + item.finalPrice, 0);
-      
+
       const shouldPrint = currentUser?.role !== 'MESERO';
       const activeShiftId = (shouldPrint && currentShift) ? currentShift.id : undefined;
 
@@ -82,14 +86,15 @@ export const usePosLogic = () => {
           setIsPaymentModalOpen(false); 
           
           await orderService.createOrder(
-              currentItems, // Enviamos los items frescos
-              total, 
-              currentMode, 
-              cashierName,
-              currentClientName, 
-              shouldPrint, 
-              paymentDetails,
-              activeShiftId
+            activeBranchId,
+            currentItems, 
+            total, 
+            currentMode, 
+            cashierName,
+            currentClientName, 
+            shouldPrint, 
+            paymentDetails,
+            activeShiftId
           );
           
           clearTicket();
@@ -101,15 +106,20 @@ export const usePosLogic = () => {
               toast.success(`¡Enviado a cocina: ${currentClientName}! 👨‍🍳`);
           }
 
-      } catch (error) {
+      } catch (error: any) {
           console.error(error);
-          toast.error('Error al procesar la orden');
+          toast.error(error.message || 'Error al procesar la orden');
       } finally {
           setIsProcessing(false);
       }
-  }, [isProcessing, currentUser, currentShift, clearTicket, setView]);
+  }, [isProcessing, currentUser, currentShift, clearTicket, setView, activeBranchId]);
 
   const handleModeConfirmed = useCallback((selectedMode: OrderMode, finalName: string) => {
+    if (!activeBranchId) {
+        toast.error("No hay sucursal activa");
+        return;
+    }
+
       setOrderMode(selectedMode);
       setCustomerName(finalName);
       setIsModeModalOpen(false);
@@ -119,27 +129,24 @@ export const usePosLogic = () => {
 
       if (isTakeOut && !isMesero) {
           if (!currentShift) {
-              toast.error("⛔ CAJA CERRADA: Abre turno para cobrar.");
+              toast.error("CAJA CERRADA: Abre turno para cobrar.");
               openShiftModal(); 
               return;
           }
-          // Cajero: Pagar
+
           setTimeout(() => setIsPaymentModalOpen(true), 100); 
       } else {
-          // Mesero: Cocina
           handleFinalizeOrder(undefined, selectedMode, finalName); 
       }
-  }, [currentUser, currentShift, openShiftModal, setOrderMode, setCustomerName, handleFinalizeOrder]);
+  }, [currentUser, currentShift, openShiftModal, setOrderMode, setCustomerName, handleFinalizeOrder, activeBranchId]);
 
   const handleMainBtnClick = useCallback(() => {
-      // Verificamos items actuales para no abrir el modal si está vacío
-      if (useTicketStore.getState().items.length === 0) {
-          toast.warning("Agrega productos primero");
-          return;
-      }
-      setIsModeModalOpen(true);
-  }, []); // Sin dependencias, siempre lee fresco
-
+    if (useTicketStore.getState().items.length === 0) {
+        toast.warning("Agrega productos primero");
+        return;
+    }
+    setIsModeModalOpen(true);
+}, []);
   return {
     orderMode,
     customerName,

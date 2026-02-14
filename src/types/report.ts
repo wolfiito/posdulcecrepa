@@ -18,7 +18,6 @@ export interface Expense {
   description: string;
   amount: number;
   category: string;
-  // Permitimos Timestamp o Date para evitar errores
   createdAt: Timestamp | Date; 
 }
 

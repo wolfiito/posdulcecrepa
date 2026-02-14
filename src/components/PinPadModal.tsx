@@ -18,13 +18,12 @@ interface PinPadModalProps {
 export const PinPadModal: React.FC<PinPadModalProps> = ({ 
     isOpen, onClose, onSuccess, title = "Autorización Requerida", requireAdmin = false 
 }) => {
-    // --- LÓGICA (Igual que antes) ---
     const [step, setStep] = useState<'USERNAME' | 'PASSWORD'>('USERNAME');
     const [inputValue, setInputValue] = useState('');
     const [tempUser, setTempUser] = useState<{username: string, name: string, role: string} | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isShaking, setIsShaking] = useState(false);
-
+    const PIN_LENGTH = 4;
     const { currentUser } = useAuthStore();
 
     useEffect(() => {
@@ -58,17 +57,19 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
 
     const handleNumberClick = async (num: string) => {
         triggerHaptic();
-        if (inputValue.length >= 6 || isLoading) return;
+        if (inputValue.length >= PIN_LENGTH || isLoading) return;
 
         const newValue = inputValue + num;
         setInputValue(newValue);
 
-        if (newValue.length === 6) {
-            if (step === 'USERNAME') {
-                await verifyUsername(newValue);
-            } else {
-                await verifyPassword(newValue);
-            }
+        if (newValue.length === PIN_LENGTH) {
+            setTimeout(async () => {
+                if (step === 'USERNAME') {
+                    await verifyUsername(newValue);
+                } else {
+                    await verifyPassword(newValue);
+                }
+            }, 100);
         }
     };
 
@@ -129,10 +130,7 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
         <Modal
             isOpen={isOpen}
             onRequestClose={onClose}
-            // CAMBIO VISUAL CLAVE: Quitamos min-h-screen y bg-transparent.
-            // Ahora es solo el contenedor de la tarjeta con ancho máximo.
             className="w-full max-w-sm outline-none m-4 animate-pop-in"
-            // El overlay se encarga de centrarlo todo (flex items-center justify-center)
             overlayClassName="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center"
         >
             <style>{`
@@ -140,7 +138,6 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
                 .shake-anim { animation: shake 0.4s ease-in-out; border-color: #ff5252 !important; }
             `}</style>
 
-            {/* TARJETA IDÉNTICA AL LOGIN */}
             <div className="card w-full bg-base-100 shadow-2xl border border-base-200 overflow-hidden rounded-3xl">
                 
                 {/* Header Dinámico */}
@@ -154,21 +151,25 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
                     </h3>
                     
                     <p className="text-xs font-bold uppercase tracking-widest mt-1 opacity-60">
-                        {step === 'USERNAME' ? 'Ingrese ID Admin' : 'Ingrese Contraseña'}
+                        {step === 'USERNAME' ? 'Ingrese ID de Usuario' : 'Ingrese su PIN'}
                     </p>
                 </div>
 
-                {/* Input Visual */}
-                <div className="flex justify-center my-6">
-                     <div className={`flex gap-3 px-4 py-3 rounded-2xl bg-base-200/50 transition-all ${isShaking ? 'shake-anim bg-error/10' : ''}`}>
-                        {isLoading ? (
-                            <span className="loading loading-dots loading-md text-primary"></span>
-                        ) : (
-                            <div className="text-3xl font-black tracking-[0.5em] h-8 flex items-center text-base-content min-w-[120px] justify-center">
-                                {inputValue.split('').map(() => '•')}
-                            </div>
-                        )}
-                     </div>
+                {/* Input Visual (Bolitas) */}
+                <div className={`flex justify-center gap-4 my-8 transition-all ${isShaking ? 'shake-anim' : ''}`}>
+                     {isLoading ? (
+                        <span className="loading loading-dots loading-lg text-primary"></span>
+                     ) : (
+                        [...Array(PIN_LENGTH)].map((_, i) => (
+                            <div 
+                                key={i}
+                                className={`
+                                    w-5 h-5 rounded-full border-2 border-base-content/20 transition-all duration-200
+                                    ${i < inputValue.length ? 'bg-primary border-primary scale-110 shadow-sm' : 'bg-transparent'}
+                                `}
+                            />
+                        ))
+                     )}
                 </div>
 
                 {/* Teclado */}

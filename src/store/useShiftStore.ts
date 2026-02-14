@@ -35,25 +35,24 @@ export const useShiftStore = create<ShiftState>((set, get) => ({
       // Evitar dobles suscripciones
       if (get().unsubscribeShift) return;
 
-      const { currentUser } = useAuthStore.getState();
-      if (!currentUser?.id) return;
+      const { activeBranchId } = useAuthStore.getState();
+      if (!activeBranchId) return;
 
       set({ isLoading: true });
 
       // Query para buscar MI caja abierta
       const q = query(
-          collection(db, 'shifts'),
-          where('userId', '==', currentUser.id),
-          where('isOpen', '==', true),
-          orderBy('openedAt', 'desc'),
-          limit(1)
-      );
+        collection(db, 'shifts'),
+        where('branchId', '==', activeBranchId), 
+        where('isOpen', '==', true),
+        orderBy('openedAt', 'desc'),
+        limit(1)
+    );
 
       // onSnapshot se ejecuta cada vez que cambia algo en la BD
       const unsubscribe = onSnapshot(q, (snapshot) => {
           if (!snapshot.empty) {
               const docData = snapshot.docs[0].data();
-              // Convertir Timestamp a Date para evitar errores
               const safeShift = {
                   id: snapshot.docs[0].id,
                   ...docData,
@@ -83,10 +82,16 @@ export const useShiftStore = create<ShiftState>((set, get) => ({
   },
 
   openShift: async (amount) => {
-    // Ya no necesitamos setear loading manual, el listener lo hará al detectar el cambio
-    const { currentUser } = useAuthStore.getState();
-    if (!currentUser?.id) throw new Error("No usuario");
-    await shiftService.openShift(amount, currentUser.id, currentUser.name || 'Cajero');
+    const { currentUser, activeBranchId } = useAuthStore.getState();
+    if (!currentUser?.id || !activeBranchId) {
+        throw new Error("Faltan datos de usuario o sucursal");
+    }
+    await shiftService.openShift(
+        amount, 
+        currentUser.id, 
+        currentUser.name || 'Cajero', 
+        activeBranchId
+    );
   },
 
   closeShift: async (finalCount) => {
@@ -95,7 +100,5 @@ export const useShiftStore = create<ShiftState>((set, get) => ({
     
     const metrics = await shiftService.getShiftMetrics(currentShift);
     await shiftService.closeShift(currentShift.id, finalCount, metrics);
-    // Al escribirse en Firebase que isOpen=false, el listener (onSnapshot)
-    // se disparará automáticamente y pondrá currentShift = null. ¡Magia!
   }
 }));

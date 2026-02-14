@@ -1,3 +1,4 @@
+// src/components/ReportsScreen.tsx
 import React, { useEffect, useState } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend
@@ -7,13 +8,14 @@ import { Timestamp } from '../firebase';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
-// Servicios y Tipos
+// Servicios y Stores
 import { reportService } from '../services/reportService';
 import { orderService } from '../services/orderService';
 import { printService } from '../services/printService';
+import { useAuthStore } from '../store/useAuthStore'; // <--- IMPORTANTE
+
 import type { DailyReportData } from '../types/report';
-import type { Modifier } from '../types/menu';
-import type { Order, PaymentMethod } from '../types/order'; // Importamos PaymentMethod
+import type { Order, PaymentMethod } from '../types/order';
 
 // --- HELPER PARA FECHA LOCAL ---
 const getLocalToday = () => {
@@ -24,13 +26,13 @@ const getLocalToday = () => {
     return `${year}-${month}-${day}`;
 };
 
-// --- HELPER CORREGIDO PARA ETIQUETAS DE PAGO ---
+// --- HELPER DE ETIQUETAS DE PAGO ---
 const getPaymentLabel = (method?: PaymentMethod) => {
     if (!method) return '-';
     if (method === 'cash') return 'Efectivo';
     if (method === 'card') return 'Tarjeta';
     if (method === 'transfer') return 'Transferencia';
-    if (method === 'mixed') return 'Mixto'; // <--- ¡AHORA SÍ EXISTE!
+    if (method === 'mixed') return 'Mixto';
     return 'Otro';
 };
 
@@ -38,7 +40,7 @@ const getPaymentIcon = (method?: PaymentMethod) => {
     if (method === 'cash') return '💵';
     if (method === 'card') return '💳';
     if (method === 'transfer') return '📱';
-    if (method === 'mixed') return '🔀'; // Icono para mixto
+    if (method === 'mixed') return '🔀';
     return '❓';
 };
 
@@ -126,8 +128,10 @@ const BalanceCard = ({ data }: { data: DailyReportData }) => {
 };
 
 export const ReportsScreen: React.FC = () => {
-  const [inventory, setInventory] = useState<Modifier[]>([]);
-  const [tab, setTab] = useState<'ventas' | 'tickets' | 'inventario'>('ventas');
+  const { activeBranchId } = useAuthStore(); // <--- OBTENER SUCURSAL
+  
+  // Eliminamos 'inventario' de las opciones de tab
+  const [tab, setTab] = useState<'ventas' | 'tickets'>('ventas');
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<DailyReportData | null>(null);
   
@@ -156,13 +160,18 @@ export const ReportsScreen: React.FC = () => {
 
   const handleRefund = async () => {
       if (!selectedOrder || !selectedOrder.id) return;
+      // VALIDACIÓN IMPORTANTE: Pasamos branchId para restaurar stock en la sucursal correcta
+      if (!activeBranchId) {
+          toast.error("Error: No hay sucursal activa para procesar devolución");
+          return;
+      }
       
       const confirm = window.confirm(`¿Estás seguro de DEVOLVER el ticket #${selectedOrder.orderNumber}? \n\nEsta acción cancelará la venta y restaurará el inventario.`);
       if (!confirm) return;
 
       try {
           setLoading(true);
-          await orderService.cancelOrder(selectedOrder.id, selectedOrder.items);
+          await orderService.cancelOrder(activeBranchId, selectedOrder.id, selectedOrder.items);
           
           toast.success("Ticket devuelto y stock restaurado");
           setSelectedOrder(null); 
@@ -264,7 +273,6 @@ export const ReportsScreen: React.FC = () => {
             hora: dateObj.toLocaleTimeString(),
             cliente: order.customerName || "Cliente General",
             modo: order.mode,
-            // CORRECCIÓN AQUÍ: Usamos el helper getPaymentLabel para que salga "Mixto"
             metodo: getPaymentLabel(order.payment?.method), 
             total: order.total,
             cajero: order.cashier || "Sistema",
@@ -321,20 +329,17 @@ export const ReportsScreen: React.FC = () => {
     toast.success("Excel Profesional generado correctamente");
   };
 
-  const loadInventory = () => {
-      setLoading(true);
-      reportService.getInventoryReport()
-          .then(setInventory)
-          .catch(err => console.error(err))
-          .finally(() => setLoading(false));
-  };
-
   const handleSearch = () => {
+      // VALIDACIÓN: Si no hay sucursal, no cargamos nada
+      if (!activeBranchId) return;
+
       setLoading(true);
       const start = new Date(startDate + 'T00:00:00'); 
       const end = new Date(endDate + 'T23:59:59');
 
-      reportService.getRangeReport(start, end)
+      // IMPORTANTE: Aquí debemos pasar activeBranchId al servicio
+      // Nota: Necesitas actualizar getRangeReport en reportService para aceptar branchId
+      reportService.getRangeReport(start, end, activeBranchId) 
           .then(setData)
           .catch(() => toast.error("Error al cargar datos"))
           .finally(() => setLoading(false));
@@ -367,18 +372,11 @@ export const ReportsScreen: React.FC = () => {
       }
   };
 
-  useEffect(() => { handleSearch(); }, [startDate, endDate]);
-  useEffect(() => { if (tab === 'inventario') loadInventory(); }, [tab]);
+  useEffect(() => { handleSearch(); }, [startDate, endDate, activeBranchId]); // Se recarga si cambia sucursal
 
   const formatDateSafe = (dateVal: any) => {
       const date = getSafeDate(dateVal);
       return date.toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute:'2-digit' });
-  };
-
-  const getStockStatus = (stock: number) => {
-      if (stock <= 5) return { label: 'CRÍTICO', color: 'badge-error text-white animate-pulse', icon: '🚨' };
-      if (stock <= 20) return { label: 'BAJO', color: 'badge-warning', icon: '⚠️' };
-      return { label: 'OK', color: 'badge-success text-white', icon: '✅' };
   };
 
   const paymentData = data ? [
@@ -395,7 +393,13 @@ export const ReportsScreen: React.FC = () => {
         {/* HEADER & CONTROL */}
         <div className="flex flex-col gap-4 mb-6 mt-2">
             <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-black text-base-content">Reportes</h2>
+                <h2 className="text-2xl font-black text-base-content">
+                    Reportes 
+                    {/* Indicador visual de la sucursal activa */}
+                    <span className="ml-2 text-sm font-normal text-primary opacity-80 border border-primary/20 px-2 py-0.5 rounded-full">
+                         {activeBranchId ? 'Sucursal Activa' : 'Sin Sucursal'}
+                    </span>
+                </h2>
                 {data && (
                     <button onClick={exportToExcel} className="btn btn-success btn-sm text-white gap-2 shadow-sm font-bold">
                         <span className="text-lg">📊</span> <span className="hidden sm:inline">Excel Pro</span>
@@ -406,31 +410,29 @@ export const ReportsScreen: React.FC = () => {
             <div role="tablist" className="tabs tabs-boxed bg-base-200 shadow-sm">
                 <a role="tab" className={`tab flex-1 ${tab === 'ventas' ? 'tab-active bg-white shadow font-bold' : ''}`} onClick={() => setTab('ventas')}>💰 Finanzas</a>
                 <a role="tab" className={`tab flex-1 ${tab === 'tickets' ? 'tab-active bg-white shadow font-bold' : ''}`} onClick={() => setTab('tickets')}>🧾 Tickets</a>
-                <a role="tab" className={`tab flex-1 ${tab === 'inventario' ? 'tab-active bg-white shadow font-bold' : ''}`} onClick={() => setTab('inventario')}>📦 Stock</a>
+                {/* PESTAÑA INVENTARIO ELIMINADA */}
             </div>
         </div>
 
-        {tab !== 'inventario' && (
-            <div className="bg-base-100 p-3 rounded-xl shadow-sm border border-base-200 mb-6">
-                 <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-                    <div className="flex w-full lg:w-auto gap-2 overflow-x-auto pb-2 lg:pb-0 hide-scrollbar">
-                        {['today', 'yesterday', 'month'].map((r: any) => (
-                             <button key={r} onClick={() => setDateRange(r)} className={`btn btn-sm rounded-full capitalize ${activeRange === r ? 'btn-primary' : 'btn-ghost'}`}>
-                                {r === 'today' ? 'Hoy' : r === 'yesterday' ? 'Ayer' : 'Mes'}
-                             </button>
-                        ))}
-                    </div>
-                    <div className="flex items-center gap-2 w-full lg:w-auto bg-base-200/50 p-1.5 rounded-lg">
-                        <input type="date" className="input input-xs md:input-sm input-ghost w-full font-mono" value={startDate} onChange={e => { setStartDate(e.target.value); setActiveRange('custom'); }} />
-                        <span className="opacity-40">➜</span>
-                        <input type="date" className="input input-xs md:input-sm input-ghost w-full font-mono" value={endDate} onChange={e => { setEndDate(e.target.value); setActiveRange('custom'); }} />
-                        <button onClick={handleSearch} className="btn btn-primary btn-sm btn-square shadow-sm" disabled={loading}>
-                            {loading ? <span className="loading loading-spinner loading-xs"></span> : '🔍'}
-                        </button>
-                    </div>
+        <div className="bg-base-100 p-3 rounded-xl shadow-sm border border-base-200 mb-6">
+             <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
+                <div className="flex w-full lg:w-auto gap-2 overflow-x-auto pb-2 lg:pb-0 hide-scrollbar">
+                    {['today', 'yesterday', 'month'].map((r: any) => (
+                         <button key={r} onClick={() => setDateRange(r)} className={`btn btn-sm rounded-full capitalize ${activeRange === r ? 'btn-primary' : 'btn-ghost'}`}>
+                            {r === 'today' ? 'Hoy' : r === 'yesterday' ? 'Ayer' : 'Mes'}
+                         </button>
+                    ))}
+                </div>
+                <div className="flex items-center gap-2 w-full lg:w-auto bg-base-200/50 p-1.5 rounded-lg">
+                    <input type="date" className="input input-xs md:input-sm input-ghost w-full font-mono" value={startDate} onChange={e => { setStartDate(e.target.value); setActiveRange('custom'); }} />
+                    <span className="opacity-40">➜</span>
+                    <input type="date" className="input input-xs md:input-sm input-ghost w-full font-mono" value={endDate} onChange={e => { setEndDate(e.target.value); setActiveRange('custom'); }} />
+                    <button onClick={handleSearch} className="btn btn-primary btn-sm btn-square shadow-sm" disabled={loading}>
+                        {loading ? <span className="loading loading-spinner loading-xs"></span> : '🔍'}
+                    </button>
                 </div>
             </div>
-        )}
+        </div>
 
         {/* --- VISTA 1: DASHBOARD --- */}
         {tab === 'ventas' && data && (
@@ -488,7 +490,6 @@ export const ReportsScreen: React.FC = () => {
                                     </div>
 
                                     <div className="flex justify-between items-end pt-2 border-t border-base-200 mt-1">
-                                        {/* CORRECCIÓN AQUÍ: Usamos getPaymentLabel */}
                                         <div className="text-[10px] uppercase font-bold opacity-60 flex items-center gap-1">
                                             {getPaymentIcon(order.payment?.method)} {getPaymentLabel(order.payment?.method)}
                                         </div>
@@ -502,51 +503,6 @@ export const ReportsScreen: React.FC = () => {
                     ) : (
                         <div className="col-span-full text-center py-10 opacity-50">No hay tickets.</div>
                     )}
-                </div>
-            </div>
-        )}
-
-        {/* --- VISTA 3: INVENTARIO --- */}
-        {tab === 'inventario' && (
-            <div className="card bg-base-100 shadow border border-base-200 animate-fade-in">
-                <div className="card-body p-0">
-                    <div className="flex justify-between items-center p-4 border-b border-base-200 bg-base-200/50">
-                        <h3 className="font-bold text-sm uppercase">Stock Actual</h3>
-                        <button onClick={loadInventory} className="btn btn-sm btn-ghost gap-2">🔄 Actualizar</button>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="table w-full">
-                            <thead>
-                                <tr className="bg-base-200">
-                                    <th>Ingrediente</th>
-                                    <th className="hidden sm:table-cell">Grupo</th>
-                                    <th className="text-center">Stock</th>
-                                    <th className="text-center">Estado</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {inventory.map(item => {
-                                    const stock = item.currentStock || 0;
-                                    const status = getStockStatus(stock);
-                                    return (
-                                        <tr key={item.id}>
-                                            <td>
-                                                <div className="font-bold whitespace-normal">{item.name}</div>
-                                                <div className="sm:hidden text-xs opacity-50">{item.group}</div>
-                                            </td>
-                                            <td className="hidden sm:table-cell"><span className="badge badge-ghost badge-xs">{item.group}</span></td>
-                                            <td className="text-center font-mono text-lg font-bold">{stock}</td>
-                                            <td className="text-center">
-                                                <div className={`badge ${status.color} badge-sm font-bold shadow-sm whitespace-nowrap`}>
-                                                    {status.icon} <span className="hidden sm:inline ml-1">{status.label}</span>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
                 </div>
             </div>
         )}
@@ -612,7 +568,6 @@ export const ReportsScreen: React.FC = () => {
                                 <span>TOTAL</span>
                                 <span className="text-success">${selectedOrder.total.toFixed(2)}</span>
                             </div>
-                            {/* CORRECCIÓN AQUÍ TAMBIÉN: Usamos getPaymentLabel */}
                             <div className="text-xs text-right opacity-60 uppercase mt-1">
                                 Pagado con {getPaymentLabel(selectedOrder.payment?.method)}
                             </div>

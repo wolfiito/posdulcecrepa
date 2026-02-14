@@ -9,15 +9,16 @@ import type { Order } from '../types/order';
 // Stores
 import { useShiftStore } from '../store/useShiftStore';
 import { useUIStore } from '../store/useUIStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { printService } from '../services/printService';
 
 interface GroupedOrder {
-  id: string; // ID compuesto para la key
+  id: string;
   customerName: string;
   mode: string;
   orders: Order[];
   totalDebt: number;
-  oldestOrderTime: any; // Para calcular "Hace X min"
+  oldestOrderTime: any;
 }
 
 export const OrdersScreen: React.FC = () => {
@@ -32,11 +33,20 @@ export const OrdersScreen: React.FC = () => {
   // Seguridad
   const { currentShift } = useShiftStore();
   const { openShiftModal } = useUIStore();
+  const { activeBranchId } = useAuthStore();
 
   useEffect(() => {
     // Escuchar órdenes pendientes
+    if (!activeBranchId) {
+        setLoading(false);
+        return;
+    }
+
+    setLoading(true);
+
     const q = query(
       collection(db, "orders"),
+      where("branchId", "==", activeBranchId),
       where("status", "!=", "paid"), 
       orderBy("status", "asc"), 
       orderBy("createdAt", "asc") // Las más viejas primero (FIFO)
@@ -47,19 +57,21 @@ export const OrdersScreen: React.FC = () => {
       setActiveOrders(docs);
       setLoading(false);
     }, (error) => {
-      console.error(error);
+      console.error("Error cargando órdenes:", error);
+      if (error.code === 'failed-precondition') {
+          toast.error("Falta índice en Firebase. Revisa la consola.");
+      }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [activeBranchId]);
 
   // Agrupar
   useEffect(() => {
       const groups: Record<string, GroupedOrder> = {};
 
       activeOrders.forEach(order => {
-          // Agrupamos por Cliente + Modo (Ej: "Mesa 1-Mesa")
           const key = `${order.customerName || 'Anónimo'}-${order.mode}`;
           
           if (!groups[key]) {
@@ -109,13 +121,13 @@ export const OrdersScreen: React.FC = () => {
             items: allItems,
             total: selectedGroup.totalDebt,
             mode: selectedGroup.mode,
-            status: 'paid', // Ya está pagada
+            status: 'paid', 
             kitchenStatus: 'delivered',
-            orderNumber: selectedGroup.orders[0].orderNumber, // Usamos el folio de la primera orden como ref
+            orderNumber: selectedGroup.orders[0].orderNumber, 
             customerName: selectedGroup.customerName,
-            createdAt: new Date(), // Fecha del pago
+            createdAt: new Date(), 
             payment: paymentDetails,
-            cashier: "Cajero" // O podrías usar currentUser.name si lo traes del store
+            cashier: "Cajero"
         };
         
         printService.printReceipt(consolidatedOrder as any);
@@ -146,7 +158,9 @@ export const OrdersScreen: React.FC = () => {
       <div className="flex items-center gap-3 mb-8 mt-4">
         <h2 className="text-3xl font-black text-base-content flex items-center gap-2">
             🧾 Comandas Activas
-            <span className="badge badge-primary badge-lg text-white font-bold">{groupedOrders.length}</span>
+            {activeBranchId && groupedOrders.length > 0 && (
+                 <span className="badge badge-primary badge-lg text-white font-bold">{groupedOrders.length}</span>
+            )}
         </h2>
       </div>
 

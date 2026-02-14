@@ -1,10 +1,10 @@
-// src/utils/pricing.ts
+
 import { MODIFIER_GROUPS, EXCLUSIVE_BASE_GROUPS } from '../constants/menuConstants';
 import type { MenuGroup, Modifier, PriceRule } from '../types/menu';
 
 interface PriceResult {
   price: number;
-  cost: number; // <--- Nuevo output
+  cost: number; 
   ruleDescription: string;
   isValid: boolean;
 }
@@ -14,36 +14,29 @@ export const calculateCustomItemPrice = (
   selectedModifiers: Modifier[],
   priceRule?: PriceRule
 ): PriceResult => {
-  // 1. Validación básica
+
   if (!group) return { price: 0, cost: 0, ruleDescription: 'Error', isValid: false };
 
-  // 2. Contar ingredientes base, sumar extras y sumar COSTOS
   let baseIngredientCount = 0;
   let extraPrice = 0;
   
-  // Costo Base del Grupo (ej. Masa + Gas + Plato)
-  // Si no está definido en el JSON, asumimos 0 por ahora.
   let totalCost = group.cost || 0; 
 
   selectedModifiers.forEach(mod => {
-    // Lógica de Precio (Venta)
     if (mod.group === group.base_group) baseIngredientCount++;
     if (mod.price > 0) extraPrice += mod.price;
 
-    // Lógica de Costo (Insumos) - SIEMPRE se suma
     if (mod.cost && mod.cost > 0) {
         totalCost += mod.cost;
     }
   });
 
-  // 3. Determinar Precio Base de Venta
   let basePrice = 0;
   let isValid = true;
   let ruleDescription = '';
 
   const isBaseExclusive = group.base_group ? EXCLUSIVE_BASE_GROUPS.includes(group.base_group) : false;
 
-  // LÓGICA DE REGLAS (Sin cambios, solo determinan el precio de venta)
   if (isBaseExclusive) {
     ruleDescription = group.rules_ref === "regla_precio_fijo" ? group.name : 'Sabor Base';
     if (baseIngredientCount !== 1) {
@@ -80,7 +73,6 @@ export const calculateCustomItemPrice = (
       basePrice = group.price || 0;
   }
 
-  // 4. Validaciones
   if (group.extra_groups?.includes(MODIFIER_GROUPS.BEBIDA_LECHE)) {
     const hasMilk = selectedModifiers.some(m => m.group === MODIFIER_GROUPS.BEBIDA_LECHE);
     if (!hasMilk) {
@@ -91,7 +83,7 @@ export const calculateCustomItemPrice = (
 
   return {
     price: basePrice + extraPrice,
-    cost: totalCost, // <--- Retornamos el costo calculado
+    cost: totalCost, 
     ruleDescription,
     isValid
   };

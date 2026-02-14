@@ -1,17 +1,33 @@
 // src/services/userService.ts
 import { db, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where } from '../firebase';
-import type { User, UserRole } from '../types/user';
+import type { User } from '../types/user';
+import type { Branch } from '../types/branch';
 
 export const userService = {
-  // Obtener todos
-  async getUsers(): Promise<User[]> {
-    const snapshot = await getDocs(collection(db, 'users'));
+  
+  async getBranches(): Promise<Branch[]> {
+    const snapshot = await getDocs(collection(db, 'branches'));
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Branch));
+  },
+
+  async getUsers(branchId?: string): Promise<User[]> {
+    let q;
+    
+    if (branchId) {
+      // Si hay sucursal activa, traemos solo sus empleados
+      q = query(collection(db, 'users'), where('branchId', '==', branchId));
+    } else {
+      // (Opcional) Si es SuperAdmin global, podría ver todos, 
+      // pero por seguridad inicial traemos todos o manejamos lógica vacía
+      q = query(collection(db, 'users'));
+    }
+
+    const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
   },
 
-  // Crear con validación (Tu lógica original mejorada)
   async createUser(user: Omit<User, 'id'>): Promise<string> {
-    // 1. VALIDACIÓN ANTI-DUPLICADOS
+    // Validación Anti-Duplicados
     const q = query(collection(db, 'users'), where('username', '==', user.username));
     const querySnapshot = await getDocs(q);
 
@@ -19,26 +35,22 @@ export const userService = {
         throw new Error(`El usuario "${user.username}" ya está registrado.`);
     }
 
-    // 2. Crear
     const docRef = await addDoc(collection(db, 'users'), {
       name: user.name,
       username: user.username,
       password: user.password,
-      role: user.role
+      role: user.role,
+      branchId: user.branchId
     });
     
     return docRef.id;
   },
 
-  // Editar (Nuevo)
   async updateUser(id: string, data: Partial<User>): Promise<void> {
     const userRef = doc(db, 'users', id);
-    // Nota: Aquí podrías agregar validación si cambian el username, 
-    // pero por simplicidad permitimos editar sin checar duplicados en edición.
     await updateDoc(userRef, data);
   },
 
-  // Eliminar
   async deleteUser(userId: string) {
     await deleteDoc(doc(db, 'users', userId));
   }

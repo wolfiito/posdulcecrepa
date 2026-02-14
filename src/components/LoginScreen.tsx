@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { authService } from '../services/authService';
-import { toast } from 'sonner';
+import { toast, Toaster } from 'sonner';
 
 export const LoginScreen: React.FC = () => {
   const { loginWithCredentials, isLoading: isAuthLoading } = useAuthStore();
@@ -13,57 +13,59 @@ export const LoginScreen: React.FC = () => {
   const [isChecking, setIsChecking] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
 
-  // --- 1. FUNCIÓN DE VIBRACIÓN HÁPTICA (ANDROID & IOS) ---
+  // --- CONFIGURACIÓN ---
+  const PIN_LENGTH = 4; // Cambiado a 4 dígitos
+  // --------------------
+
+  // --- 1. FUNCIÓN DE VIBRACIÓN HÁPTICA ---
   const triggerHaptic = () => {
-    // Intenta vibrar (Funciona en Android y navegadores modernos)
-    if (navigator.vibrate) {
-        navigator.vibrate(10); // Vibración muy corta y seca (tipo teclado)
-    }
+    if (navigator.vibrate) navigator.vibrate(10); 
   };
 
   const handleNumber = async (num: string) => {
-    // Feedback táctil inmediato
     triggerHaptic();
 
     if (isShaking || isAuthLoading || isChecking) return;
-    if (inputValue.length >= 6) return; 
+    if (inputValue.length >= PIN_LENGTH) return; 
 
     const newValue = inputValue + num;
     setInputValue(newValue);
 
-    if (newValue.length === 6) {
-        if (step === 'USERNAME') {
-            setIsChecking(true);
-            try {
-                const userFound = await authService.checkUserExists(newValue);
-                if (userFound) {
-                    // Vibración de éxito (dos toques)
-                    if (navigator.vibrate) navigator.vibrate([10, 50, 10]);
-                    setTargetUser(userFound);
-                    setStep('PASSWORD');
-                    setInputValue('');
-                } else {
-                    triggerShake("Usuario no encontrado");
+    // Auto-submit al llegar a la longitud deseada
+    if (newValue.length === PIN_LENGTH) {
+        // Pequeño delay visual para ver el último círculo llenarse
+        setTimeout(async () => {
+            if (step === 'USERNAME') {
+                setIsChecking(true);
+                try {
+                    const userFound = await authService.checkUserExists(newValue);
+                    if (userFound) {
+                        if (navigator.vibrate) navigator.vibrate([10, 50, 10]);
+                        setTargetUser(userFound);
+                        setStep('PASSWORD');
+                        setInputValue('');
+                    } else {
+                        triggerShake("Usuario no encontrado");
+                    }
+                } catch (error) {
+                    console.error(error);
+                    triggerShake("Error de conexión");
+                } finally {
+                    setIsChecking(false);
                 }
-            } catch (error) {
-                console.error(error);
-                triggerShake("Error de conexión");
-            } finally {
-                setIsChecking(false);
+            } 
+            else if (step === 'PASSWORD' && targetUser) {
+                loginWithCredentials(targetUser.username, newValue)
+                    .catch(() => {
+                        triggerShake("Contraseña incorrecta");
+                    });
             }
-        } 
-        else if (step === 'PASSWORD' && targetUser) {
-            loginWithCredentials(targetUser.username, newValue)
-                .catch(() => {
-                    triggerShake("Contraseña incorrecta");
-                });
-        }
+        }, 100);
     }
   };
 
   const triggerShake = (msg: string) => {
     setIsShaking(true);
-    // Vibración de error (Larga y molesta)
     if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
     toast.error(msg, { duration: 2000 });
     
@@ -93,8 +95,9 @@ export const LoginScreen: React.FC = () => {
   const loading = isAuthLoading || isChecking;
 
   return (
-    // 2. CORRECCIÓN DE ALTURA: Usamos min-h-dvh para evitar recortes en Safari Mobile
     <div className="min-h-dvh w-full bg-base-200 flex flex-col items-center justify-center p-4 animate-fade-in select-none overflow-hidden touch-none safe-pt safe-pb">  
+      <Toaster position="top-center" richColors />
+      
       <style>{`
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
@@ -104,14 +107,14 @@ export const LoginScreen: React.FC = () => {
         .shake-anim { animation: shake 0.4s ease-in-out; border-color: #ff5252 !important; color: #ff5252; }
       `}</style>
 
-      <div className="card w-full max-w-sm bg-base-100 shadow-2xl border border-base-200">
+      <div className="card w-full max-w-sm bg-base-100 shadow-2xl border border-base-200 overflow-hidden rounded-3xl">
         <div className="card-body items-center text-center px-4 py-8">
           
           <div className="mb-6 min-h-[60px] flex flex-col justify-center items-center transition-all">
             <h1 className="text-3xl font-black text-primary font-serif italic mb-1">Dulce Crepa</h1>
             
             {step === 'USERNAME' ? (
-                <p className="text-xs opacity-50 uppercase tracking-widest font-medium">Ingrese ID (6 Dígitos)</p>
+                <p className="text-xs opacity-50 uppercase tracking-widest font-medium">Ingrese ID de Usuario</p>
             ) : (
                 <div className="flex flex-col items-center animate-fade-in-up">
                     <p className="text-sm font-bold text-base-content">
@@ -124,42 +127,32 @@ export const LoginScreen: React.FC = () => {
             )}
           </div>
 
-          {/* VISUALIZADOR */}
-          <div className={`w-full mb-8 transition-all duration-200 ${isShaking ? 'shake-anim' : ''}`}>
-             <div className={`
-                h-16 rounded-2xl flex items-center justify-center space-x-3 relative overflow-hidden
-                bg-base-200 border-2 ${isShaking ? 'border-error bg-error/10' : 'border-transparent'}
-             `}>
-                {loading && (
-                    <div className="absolute inset-0 bg-base-200/90 flex items-center justify-center z-10 backdrop-blur-sm">
-                        <span className="loading loading-dots loading-md text-primary"></span>
-                    </div>
+          {/* VISUALIZADOR DE BOLITAS */}
+          <div className={`w-full mb-8 flex justify-center transition-all duration-200 ${isShaking ? 'shake-anim' : ''}`}>
+             <div className="flex gap-4 p-4 rounded-2xl bg-base-200/50">
+                {loading ? (
+                    <span className="loading loading-dots loading-md text-primary"></span>
+                ) : (
+                    [...Array(PIN_LENGTH)].map((_, i) => (
+                        <div 
+                            key={i}
+                            className={`
+                                w-4 h-4 rounded-full border-2 border-base-content/20 transition-all duration-200
+                                ${i < inputValue.length ? 'bg-primary border-primary scale-125 shadow-sm' : 'bg-transparent'}
+                            `}
+                        />
+                    ))
                 )}
-
-                {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="flex items-center justify-center w-4 transition-all">
-                        {i < inputValue.length ? (
-                            step === 'USERNAME' ? (
-                                <span className="text-xl font-bold font-mono animate-pop">{inputValue[i]}</span>
-                            ) : (
-                                <div className="w-3 h-3 bg-primary rounded-full animate-pop shadow-sm shadow-primary/50"></div>
-                            )
-                        ) : (
-                            <div className="w-2 h-2 bg-base-300 rounded-full"></div>
-                        )}
-                    </div>
-                ))}
              </div>
           </div>
 
-          {/* TECLADO */}
+          {/* TECLADO NUMÉRICO */}
           <div className="grid grid-cols-3 gap-3 w-full max-w-[280px]">
             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
               <button 
                 key={num} 
                 onClick={() => handleNumber(num.toString())}
                 disabled={loading}
-                // 3. ESTILOS DE BOTÓN APP NATIVA (Tap Target grande y efecto active hundido)
                 className="btn btn-circle btn-lg h-16 w-16 sm:h-20 sm:w-20 text-3xl font-light bg-base-100 border-base-300 shadow-sm 
                            hover:bg-base-200 hover:border-primary 
                            active:scale-90 active:bg-base-300 transition-all duration-100 
@@ -171,7 +164,7 @@ export const LoginScreen: React.FC = () => {
             
             <div className="flex items-center justify-center">
                 {inputValue.length > 0 && !loading && (
-                     <button onClick={handleClear} className="btn btn-ghost btn-sm text-xs font-bold text-base-content/50 active:scale-90">C</button>
+                      <button onClick={handleClear} className="btn btn-ghost btn-sm text-xs font-bold text-base-content/50 active:scale-90">C</button>
                 )}
             </div>
             

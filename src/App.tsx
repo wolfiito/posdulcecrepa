@@ -18,7 +18,8 @@ import { ReportsScreen } from './components/ReportsScreen';
 import { UsersScreen } from './components/UsersScreen';
 import { AdminMenuScreen } from './components/AdminMenuScreen';
 import type { UserRole } from './types/user';
-
+import { BranchesManager } from './components/admin/BranchesManager';
+import { InventoryByBranchScreen } from './components/admin/InventoryByBranchScreen';
 function App() {
   const { currentUser } = useAuthStore();
 
@@ -82,7 +83,17 @@ function App() {
                <AdminMenuScreen />
             </ProtectedRoute>
           } />
+<Route path="/branches" element={
+            <ProtectedRoute allowedRoles={ADMIN_ONLY}>
+               <BranchesManager />
+            </ProtectedRoute>
+          } />
 
+          <Route path="/inventory-branch" element={
+            <ProtectedRoute allowedRoles={ADMIN_ONLY}>
+               <InventoryByBranchScreen />
+            </ProtectedRoute>
+          } />
           <Route path="*" element={<Navigate to="/" replace />} />
           
         </Route>

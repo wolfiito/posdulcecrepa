@@ -13,6 +13,7 @@ interface StockUpdate {
 
 export const orderService = {
   async createOrder(
+    branchId: string,
     items: TicketItem[], 
     total: number, 
     mode: OrderMode, 
@@ -30,12 +31,8 @@ export const orderService = {
       let finalOrderNumber = 0;
 
       await runTransaction(db, async (transaction) => {
-        // --- 1. LECTURAS (Todo lo que se lee debe ser antes de escribir) ---
-        
-        // A. Referencias
-        const counterRef = doc(db, "counters", "orders");
-        
-        // B. Preparar lecturas de stock
+        const counterRef = doc(db,"branches", branchId, "counters", "orders");
+
         const modifiersToDeduct = new Map<string, number>();
         const modIdsToRead = new Set<string>();
 
@@ -50,18 +47,13 @@ export const orderService = {
         });
 
         const uniqueModIds = Array.from(modIdsToRead);
-        const modRefs = uniqueModIds.map(id => doc(db, "modifiers", id));
+        const invRefs = uniqueModIds.map(id => doc(db, "branches", branchId, "inventory", id));
 
-        // C. EJECUCIÓN DE LECTURAS EN PARALELO (Optimización clave)
-        // Leemos el contador y todos los modificadores al mismo tiempo
-        const [counterSnap, ...modSnaps] = await Promise.all([
+        const [counterSnap, ...invSnaps] = await Promise.all([
             transaction.get(counterRef),
-            ...modRefs.map(ref => transaction.get(ref))
+            ...invRefs.map(ref => transaction.get(ref))
         ]);
 
-        // --- 2. LÓGICA DE NEGOCIO ---
-
-        // D. Calcular Stock y Validar
         const updates: StockUpdate[] = [];
         
         modSnaps.forEach((snap, index) => {
@@ -83,16 +75,15 @@ export const orderService = {
             }
         });
 
-        // E. Calcular Folio
-        let currentCount = 100;
+        let currentCount = 0;
         if (counterSnap.exists()) {
-            const data = counterSnap.data();
-            currentCount = data.count || 100;
+            currentCount = counterSnap.data().count || 0;
         }
         finalOrderNumber = currentCount + 1;
 
         // F. Preparar Objeto
         const firebaseOrderData: Order = {
+          branchId,
           items,
           total,
           mode,
@@ -106,9 +97,7 @@ export const orderService = {
           ...(shiftId && { shiftId })
         };
 
-        // --- 3. ESCRITURAS ---
         const newOrderRef = doc(collection(db, "orders")); 
-        
         transaction.set(newOrderRef, firebaseOrderData);
         transaction.set(counterRef, { count: finalOrderNumber }, { merge: true });
         
@@ -117,19 +106,18 @@ export const orderService = {
         });
       });
 
-      // --- 4. EFECTOS SECUNDARIOS (Fuera de transacción) ---
       if (shouldPrint) {
         printService.printReceipt({
-                items,
-                total,
-                mode,
-                status: initialStatus,
-                kitchenStatus: initialKitchenStatus,
-                orderNumber: finalOrderNumber,
-                customerName,
-                createdAt: new Date(),
-                payment,
-                cashier: cashierName
+            items,
+            total,
+            mode,
+            status: initialStatus,
+            kitchenStatus: initialKitchenStatus,
+            orderNumber: finalOrderNumber,
+            customerName,
+            createdAt: new Date(),
+            payment,
+            cashier: cashierName
         });
     }
 
@@ -137,7 +125,7 @@ export const orderService = {
 
     } catch (error) {
       console.error("Error crítico al crear orden:", error);
-      throw error; // Re-lanzamos para que la UI muestre el error (ej: "Stock insuficiente")
+      throw error;
     }
   },
 
@@ -150,7 +138,7 @@ export const orderService = {
         const updateData: any = {
             status: 'paid',
             payment: payment,
-            paidAt: serverTimestamp(), // Guardamos cuándo se pagó realmente
+            paidAt: serverTimestamp(), 
         };
         if (shiftId) {
             updateData.shiftId = shiftId; 
@@ -160,9 +148,8 @@ export const orderService = {
       });
       await batch.commit();
   },
-  // --- NUEVA FUNCIÓN: CANCELAR Y DEVOLVER STOCK ---
-  
-  async cancelOrder(orderId: string, items: TicketItem[]) {
+
+  async cancelOrder(branchId: string, orderId: string, items: TicketItem[]) {
     try {
         const batch = writeBatch(db);
         const orderRef = doc(db, "orders", orderId);
@@ -177,11 +164,9 @@ export const orderService = {
         items.forEach(item => {
             if (item.details?.selectedModifiers) {
                 item.details.selectedModifiers.forEach(mod => {
-                    // Solo restauramos si tenemos el ID del modificador
                     if (mod.id) {
-                        const modRef = doc(db, "modifiers", mod.id);
-                        // Incrementamos el stock atómicamente
-                        batch.update(modRef, {
+                        const invRef = doc(db, "branches", branchId, "inventory", mod.id);
+                        batch.update(invRef, {
                             currentStock: increment(1)
                         });
                     }

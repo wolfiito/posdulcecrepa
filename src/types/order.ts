@@ -2,17 +2,15 @@
 import { FieldValue, Timestamp } from '../firebase';
 import type { TicketItem } from './menu';
 
-// 1. CORRECCIÓN AQUÍ: Quitamos 'mixed' de las transacciones individuales
 export interface PaymentTransaction {
   method: 'cash' | 'card' | 'transfer'; 
   amount: number;
-  paidAt?: Timestamp | Date; // Mejor que 'any'
+  paidAt?: Timestamp | Date;
 }
 
 export type OrderMode = 'Mesa 1' | 'Mesa 2' | 'Para Llevar';
 export type OrderStatus = 'pending' | 'paid' | 'cancelled';
 
-// Aquí sí dejamos 'mixed' porque el pago global puede ser mixto
 export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'mixed';
 
 export type KitchenStatus = 'queued' | 'preparing' | 'ready' | 'delivered';
@@ -24,7 +22,6 @@ export interface PaymentDetails {
   amountPaid: number;     // El costo real cubierto (ej: $440)
   cardFee?: number;
   
-  // EL NUEVO CAMPO ESTRELLA
   transactions?: PaymentTransaction[];
 }
 
@@ -43,5 +40,7 @@ export interface Order {
   createdAt: Timestamp | FieldValue | Date; 
   payment?: PaymentDetails;
   cashier?: string;
-  shiftId?: string; // CRÍTICO: No borrar esto, es lo que arregló tu corte
+  shiftId?: string;
+
+  branchId: string;
 }

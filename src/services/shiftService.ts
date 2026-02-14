@@ -19,6 +19,7 @@ export interface ShiftMetrics extends DailyReportData {
 export interface Shift {
   id: string;
   userId: string;
+  branchId: string;
   isOpen: boolean;
   openedBy: string;
   openedAt: Timestamp | Date;
@@ -33,27 +34,37 @@ export interface Shift {
 
 export const shiftService = {
   // 1. Obtener turno (Igual)
-  async getCurrentShift(userId: string): Promise<Shift | null> {
-    if (!userId) return null;
+  async getCurrentShift(branchId: string): Promise<Shift | null> {
+    if (!branchId) return null;
+
     const q = query(
-        collection(db, 'shifts'), 
-        where('userId', '==', userId), 
-        where('isOpen', '==', true), 
-        orderBy('openedAt', 'desc'), 
-        limit(1)
+      collection(db, 'shifts'),
+      where('branchId', '==', branchId),
+      where('isOpen', '==', true),
+      orderBy('openedAt', 'desc'),
+      limit(1)
     );
+
     const snapshot = await getDocs(q);
     if (snapshot.empty) return null;
+
     const data = snapshot.docs[0].data();
     return { id: snapshot.docs[0].id, ...data } as Shift;
   },
 
   // 2. Abrir turno (Igual)
-  async openShift(initialFund: number, userId: string, userName: string): Promise<string> {
-    const current = await this.getCurrentShift(userId);
-    if (current) throw new Error("Ya tienes un turno abierto.");
+  async openShift(
+    initialFund: number, 
+    userId: string, 
+    userName: string,
+    branchId: string
+    ) : Promise<string> {
+
+    const current = await this.getCurrentShift(branchId);
+    if (current) throw new Error(`⛔ Ya hay un turno abierto en esta sucursal (abierto por ${current.openedBy}). Cierralo primero.`);
     
     const docRef = await addDoc(collection(db, 'shifts'), {
+      branchId,
       userId, 
       isOpen: true,
       openedBy: userName,
@@ -63,11 +74,8 @@ export const shiftService = {
     return docRef.id;
   },
 
-  // 3. OBTENER MÉTRICAS (AQUÍ ESTÁ LA CORRECCIÓN)
-  // Dejamos de usar fechas. Usamos el ID del turno.
   async getShiftMetrics(shift: Shift): Promise<ShiftMetrics> {
     
-    // 1. Buscamos por etiqueta (ESTO YA FUNCIONA)
     const q = query(collection(db, 'orders'), where('shiftId', '==', shift.id));
     const snapshot = await getDocs(q);
 
@@ -84,9 +92,6 @@ export const shiftService = {
       if (data.status === 'paid' && data.payment) {
           orders.push({ id: doc.id, ...data });
 
-          // --- LÓGICA HÍBRIDA (Soporta Mixto y Simple) ---
-          
-          // CASO 1: PAGO MIXTO (Tiene lista de transacciones)
           if (data.payment.transactions && Array.isArray(data.payment.transactions)) {
               data.payment.transactions.forEach((tx: any) => {
                   const amount = Number(tx.amount) || 0;
@@ -95,9 +100,7 @@ export const shiftService = {
                   if (tx.method === 'transfer') transferTotal += amount;
               });
           } 
-          // CASO 2: PAGO SIMPLE (Compatibilidad con lo que ya tienes)
           else {
-              // Recuperamos el monto total como lo hicimos antes
               let finalAmount = Number(data.total); 
               if (!finalAmount || finalAmount === 0) {
                    finalAmount = Number(data.payment.amount) || (Number(data.payment.amountPaid) - Number(data.payment.change || 0)) || 0;
@@ -109,8 +112,6 @@ export const shiftService = {
               if (method === 'card' || method === 'Tarjeta') cardTotal += finalAmount;
               if (method === 'transfer' || method === 'Transferencia') transferTotal += finalAmount;
           }
-
-          // ... (conteo de productos sigue igual)
       }
   });
 

@@ -1,4 +1,3 @@
-// src/components/MainLayout.tsx
 import React, { useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
@@ -15,17 +14,14 @@ export const MainLayout: React.FC = () => {
   const { startListeningToShift, stopListeningToShift } = useShiftStore(); 
   const location = useLocation();
 
-  // Cerrar drawer al navegar
   useEffect(() => {
     document.getElementById('main-drawer')?.click();
   }, [location.pathname]);
 
-  // Sincronizar tema
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // Escuchar caja
   useEffect(() => {
     if (currentUser) {
         startListeningToShift();
@@ -41,20 +37,9 @@ export const MainLayout: React.FC = () => {
     <div className="drawer h-dvh w-screen overflow-hidden">
       <input id="main-drawer" type="checkbox" className="drawer-toggle" />
       
-      {/* CONTENIDO PRINCIPAL */}
       <div className="drawer-content flex flex-col bg-base-200 h-full overflow-hidden">
-        
-        {/* --- HEADER NATIVO SOLIDO --- */}
         <div className="flex-none w-full flex flex-col z-40 shadow-sm">
-            
-            {/* 1. BARRA DE ESTADO (Notch/Hora) 
-                Esta barra solo existe para pintar el fondo detrás de la hora
-                y empujar el navbar hacia abajo. */}
             <div className="w-full bg-base-100" style={{ height: 'max(env(safe-area-inset-top), 20px)' }}></div>
-
-            {/* 2. NAVBAR REAL 
-                Quitamos transparencias (/90) para evitar el "rosa fuerte" raro.
-                Ahora es sólido y limpio. */}
             <div className="navbar bg-base-100 border-b border-base-200 h-16 min-h-[4rem] px-2 w-full">
                 <div className="navbar-start flex gap-1 items-center w-full">
                     {isPos && view === 'ticket' ? (
@@ -66,29 +51,31 @@ export const MainLayout: React.FC = () => {
                             <IconMenu />
                         </label>
                     )}
-                    <span className="text-lg font-black tracking-tight text-base-content ml-2 hidden sm:inline">
-                        DulceCrepa
-                    </span>
+                    <div className="flex flex-col ml-2">
+                        <span className="text-lg font-black tracking-tight text-base-content leading-tight">
+                            DulceCrepa
+                        </span>
+                        {/* Pequeño indicador de sucursal activa para el usuario */}
+                        {currentUser?.branchId && (
+                           <span className="text-[10px] font-bold text-primary opacity-80 leading-none">
+                              {currentUser.branch?.name || 'Sucursal Activa'}
+                           </span>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
 
-        {/* --- AREA DE CONTENIDO --- */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 w-full max-w-5xl mx-auto animate-fade-in safe-pb scroll-smooth">
             <Outlet />
-            {/* Espacio extra al final */}
             <div className="h-20"></div>
         </main>
       </div>
 
-      {/* SIDEBAR (Menú Lateral) */}
       <div className="drawer-side z-50">
         <label htmlFor="main-drawer" aria-label="close sidebar" className="drawer-overlay"></label>
         
-        {/* Agregamos safe-pt aquí también para que el menú baje */}
         <ul className="menu p-4 w-80 min-h-full bg-base-100 text-base-content gap-2">
-          
-          {/* Espaciador para el Notch en el menú */}
           <div className="safe-pt w-full"></div>
 
           <li className="mb-4 border-b border-base-200 pb-4 mt-2">
@@ -114,12 +101,16 @@ export const MainLayout: React.FC = () => {
             </>
           )}
 
-          {/* ... resto del menú igual ... */}
           <div className="divider my-1"></div>
-           {currentUser?.role === 'ADMIN' && (
+            {currentUser?.role === 'ADMIN' && (
             <>
                 <li className="menu-title opacity-50">Administración</li>
                 <li><Link to="/reports" className={getLinkClass('/reports')}><IconChart /> Reportes</Link></li>
+                
+                {/* --- NUEVOS ENLACES --- */}
+                <li><Link to="/branches" className={getLinkClass('/branches')}><span className="text-xl">🏢</span> Sucursales</Link></li>
+                <li><Link to="/inventory-branch" className={getLinkClass('/inventory-branch')}><span className="text-xl">📦</span> Inventario Global</Link></li>
+                
                 <li><Link to="/users" className={getLinkClass('/users')}><IconUsers /> Usuarios</Link></li>
                 <li><Link to="/admin-menu" className={getLinkClass('/admin-menu')}><span className="text-xl">🛠️</span> Editor de Menú</Link></li>
             </>
@@ -139,7 +130,6 @@ export const MainLayout: React.FC = () => {
               </button>
           </li>
           
-          {/* Espaciador inferior seguro */}
           <div className="safe-pb w-full"></div>
         </ul>
       </div>
