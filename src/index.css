@@ -4,7 +4,7 @@
 @tailwind utilities;
 
 /* ----------------------------------------------------
-   1. ESTILOS DE APP NATIVA (Bloqueo de gestos web)
+   1. ESTILOS DE APP NATIVA 
 ---------------------------------------------------- */
 html {
   /* Evita el rebote elástico al scrollear al tope */
