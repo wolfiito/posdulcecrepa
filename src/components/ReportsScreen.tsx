@@ -16,6 +16,7 @@ import { useAuthStore } from '../store/useAuthStore'; // <--- IMPORTANTE
 
 import type { DailyReportData } from '../types/report';
 import type { Order, PaymentMethod } from '../types/order';
+import { excelExportService } from '../services/excelExportService';
 
 // --- HELPER PARA FECHA LOCAL ---
 const getLocalToday = () => {
@@ -140,6 +141,7 @@ export const ReportsScreen: React.FC = () => {
   const [startDate, setStartDate] = useState(getLocalToday);
   const [endDate, setEndDate] = useState(getLocalToday);
   const [activeRange, setActiveRange] = useState<'today' | 'yesterday' | 'month' | 'custom'>('today');
+  const [isExporting, setIsExporting] = useState(false);
 
   const getSafeDate = (val: any): Date => {
       if (!val) return new Date(); 
@@ -186,147 +188,18 @@ export const ReportsScreen: React.FC = () => {
 
   // --- EXPORTAR EXCEL ---
   const exportToExcel = async () => {
-    if (!data) return;
-
-    const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'Dulce Crepa POS';
-    workbook.created = new Date();
-
-    const summarySheet = workbook.addWorksheet('Resumen Financiero', { properties: { tabColor: { argb: 'FF1E293B' } } });
-    const detailsSheet = workbook.addWorksheet('Detalle de Tickets', { properties: { tabColor: { argb: 'FF0F766E' } } });
-
-    // Hoja 1: Resumen
-    summarySheet.getColumn('A').width = 35;
-    summarySheet.getColumn('B').width = 25;
-
-    summarySheet.mergeCells('A1:B1');
-    const titleCell = summarySheet.getCell('A1');
-    titleCell.value = 'REPORTE FINANCIERO - DULCE CREPA';
-    titleCell.font = { name: 'Arial', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
-    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
-    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-
-    summarySheet.getCell('A2').value = 'Fecha de Generación:';
-    summarySheet.getCell('B2').value = new Date().toLocaleString();
-    summarySheet.getCell('A3').value = 'Periodo Analizado:';
-    summarySheet.getCell('B3').value = `${startDate} al ${endDate}`;
+    setIsExporting(true);
+    toast.info("Generando archivo multidimensional...", { duration: 3000 });
     
-    summarySheet.addRow([]); 
-
-    const addSummaryRow = (label: string, value: number, isHeader = false, isTotal = false, color = '000000') => {
-        const row = summarySheet.addRow([label, value]);
-        const labelCell = row.getCell(1);
-        const valueCell = row.getCell(2);
-
-        labelCell.font = { bold: isHeader || isTotal, color: { argb: isHeader ? 'FF1E293B' : 'FF000000' } };
-        valueCell.numFmt = '"$"#,##0.00';
-        valueCell.font = { bold: isHeader || isTotal, color: { argb: color ? 'FF' + color.replace('#','') : 'FF000000' } };
-
-        if (isHeader) {
-            labelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } }; 
-            valueCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
-            row.height = 25;
-            valueCell.alignment = { vertical: 'middle' };
-            labelCell.alignment = { vertical: 'middle' };
-        }
-        if (isTotal) {
-            row.height = 30;
-            labelCell.font = { size: 12, bold: true };
-            valueCell.font = { size: 12, bold: true, color: { argb: data.netBalance >= 0 ? 'FF16A34A' : 'FFDC2626' } };
-            labelCell.border = { top: { style: 'thick' } };
-            valueCell.border = { top: { style: 'thick' } };
-        }
-    };
-
-    addSummaryRow('(+) VENTAS TOTALES', data.totalSales, true);
-    addSummaryRow('    Efectivo', data.cashTotal);
-    addSummaryRow('    Tarjeta', data.cardTotal);
-    addSummaryRow('    Transferencia', data.transferTotal);
-    summarySheet.addRow([]); 
-    addSummaryRow('(-) GASTOS OPERATIVOS', data.totalExpenses, true, false, 'DC2626');
-    summarySheet.addRow([]); 
-    addSummaryRow('(=) UTILIDAD NETA', data.netBalance, false, true);
-
-
-    // Hoja 2: Detalle
-    detailsSheet.columns = [
-        { header: 'Folio', key: 'folio', width: 10 },
-        { header: 'Estado', key: 'estado', width: 12 },
-        { header: 'Fecha', key: 'fecha', width: 12 },
-        { header: 'Hora', key: 'hora', width: 10 },
-        { header: 'Cliente', key: 'cliente', width: 25 },
-        { header: 'Modo', key: 'modo', width: 15 },
-        { header: 'Método Pago', key: 'metodo', width: 15 },
-        { header: 'Total', key: 'total', width: 15 },
-        { header: 'Cajero', key: 'cajero', width: 15 },
-    ];
-
-    const rows: any[] = [];
-    data.orders.forEach(order => {
-        const dateObj = getSafeDate(order.createdAt);
-        const isCancelled = order.status === 'cancelled';
-
-        rows.push({
-            folio: order.orderNumber,
-            estado: isCancelled ? 'CANCELADO' : 'PAGADO',
-            fecha: dateObj.toLocaleDateString(),
-            hora: dateObj.toLocaleTimeString(),
-            cliente: order.customerName || "Cliente General",
-            modo: order.mode,
-            metodo: getPaymentLabel(order.payment?.method), 
-            total: order.total,
-            cajero: order.cashier || "Sistema",
-        });
-    });
-
-    detailsSheet.addRows(rows);
-
-    const tableRange = `A1:I${rows.length + 1}`;
-    detailsSheet.addTable({
-        name: 'VentasTable',
-        ref: tableRange,
-        headerRow: true,
-        totalsRow: false,
-        style: {
-            theme: 'TableStyleMedium2',
-            showRowStripes: true,
-        },
-        columns: [
-            { name: 'Folio', filterButton: true },
-            { name: 'Estado', filterButton: true },
-            { name: 'Fecha', filterButton: true },
-            { name: 'Hora', filterButton: false },
-            { name: 'Cliente', filterButton: true },
-            { name: 'Modo', filterButton: true },
-            { name: 'Método Pago', filterButton: true },
-            { name: 'Total', filterButton: true },
-            { name: 'Cajero', filterButton: true },
-        ],
-        rows: rows.map(r => Object.values(r))
-    });
-
-    // Pintar rojos
-    detailsSheet.eachRow((row, rowNumber) => {
-        if (rowNumber === 1) return;
-        const statusCell = row.getCell(2); 
-        if (statusCell.value === 'CANCELADO') {
-            row.eachCell((cell) => {
-                cell.font = { color: { argb: 'FFDC2626' }, strike: true }; 
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'OFFFEEF0' } }; 
-            });
-        }
-    });
-
-    detailsSheet.getColumn('H').numFmt = '"$"#,##0.00';
-    ['A','B','C','D','H'].forEach(col => {
-        detailsSheet.getColumn(col).alignment = { horizontal: 'center' };
-    });
-
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(blob, `Reporte_DulceCrepa_${startDate}_${endDate}.xlsx`);
-    
-    toast.success("Excel Profesional generado correctamente");
+    try {
+        await excelExportService.downloadGlobalReport(startDate, endDate);
+        toast.success("Excel Profesional generado correctamente");
+    } catch (error) {
+        console.error("Error al exportar a Excel:", error);
+        toast.error("Ocurrió un error al armar el Excel");
+    } finally {
+        setIsExporting(false);
+    }
   };
 
   const handleSearch = () => {

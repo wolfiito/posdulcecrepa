@@ -6,7 +6,10 @@ export interface FixedPriceItem {
     price: number;
     cost?: number;
     description?: string;
-    modifierGroups?: string[]; 
+    modifierGroups?: string[];
+    availableBranches?: string[]; 
+    disabledIn?: string[];        
+    branchPrices?: Record<string, number>;
   }
   
   export interface VariantPriceItem {
@@ -18,8 +21,11 @@ export interface FixedPriceItem {
       name: string;
       price: number;
       cost?: number;
+      branchPrices?: Record<string, number>;
     }[];
-    modifierGroups?: string[]; 
+    modifierGroups?: string[];
+    availableBranches?: string[]; 
+    disabledIn?: string[];
   }
   
   export type MenuItem = FixedPriceItem | VariantPriceItem;
@@ -32,6 +38,7 @@ export interface FixedPriceItem {
     group: string; 
     trackStock?: boolean;
     currentStock?: number;
+    disabledIn?: string[];
   }
   
   export interface PriceRule {
@@ -40,6 +47,7 @@ export interface FixedPriceItem {
     basePrices: {
       count: number;
       price: number;
+      branchPrices?: Record<string, number>;
     }[];
   }
   
@@ -57,7 +65,10 @@ export interface FixedPriceItem {
     extra_groups?: string[]; 
     topping_groups?: string[]; 
   }
-  
+  export interface ModifierGroup {
+    id: string;
+    name: string;
+  }
   export interface TicketItem {
     id: string; 
     baseName: string; 

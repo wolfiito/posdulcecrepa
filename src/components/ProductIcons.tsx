@@ -125,56 +125,63 @@ export function getIconForItem(item: MenuItem | MenuGroup): React.ReactNode {
     const name = item.name.toLowerCase(); 
 
     // 1. POSTRES ESPECÍFICOS
-    if (id === 'gelatina_rompope') return <IconGelatinaRompope />;
-    if (id === 'pay_limon') return <IconPayLimon />;
-    if (id === 'gelatina_mosaico') return <IconGelatinaMosaico />;
-    if (id === 'arroz_leche') return <IconArrozLeche />;
-    if (id === 'flan_napolitano') return <IconFlanNapolitano />;
-    if (id === 'flan_vainilla') return <IconFlanVainilla />;
-    if (id === 'uvas_verdes_crema') return <IconUvasVerdesCrema />;
-    if (id === 'frutos_rojos_crema') return <IconFrutosRojosCrema />;
-    if (id === 'duraznos_crema') return <IconDuraznosCrema />;
-    if (id === 'fresa_crema' || name.includes('fresas con crema')) return <IconFresaCrema />;
+    if (id === 'item_gelatina_rompope') return <IconGelatinaRompope />;
+    if (id === 'item_pay_limon') return <IconPayLimon />;
+    if (id === 'item_gelatina_mosaico') return <IconGelatinaMosaico />;
+    if (id === 'item_arroz_leche') return <IconArrozLeche />;
+    if (id === 'item_flan_napolitano') return <IconFlanNapolitano />;
+    if (id === 'item_flan_vainilla') return <IconFlanVainilla />;
+    if (id === 'item_uvas_verdes_crema') return <IconUvasVerdesCrema />;
+    if (id === 'item_frutos_rojos_crema') return <IconFrutosRojosCrema />;
+    if (id === 'item_duraznos_crema') return <IconDuraznosCrema />;
+    if (id === 'item_fresa_crema' || name.includes('fresas con crema')) return <IconFresaCrema />;
 
-    if (id === 'frutos_rojos') return <IconDulceFrutosRojos />
-    if (id === 'dulce_cajeta') return <IconDulceCajeta />
-    if (id === 'dulce_rompope') return <IconDulceRompope />
-    if (id === 'dulce_tentacion') return <IconDulceTentacion />
-    if (id === 'dulce_fresa') return <IconDulceFresa />
-    if (id === 'dulce_duraznos') return <IconDulceDuraznos />
-    if (id === 'delicia_casa') return <IconDeliciaCasa />
-    if (id === 'dulce_platano') return <IconDulcePlatano />
-    if (id === 'dulce_tropical') return <IconDulceTropical />
+    if (id === 'item_frutos_rojos') return <IconDulceFrutosRojos />
+    if (id === 'item_dulce_cajeta') return <IconDulceCajeta />
+    if (id === 'item_dulce_rompope') return <IconDulceRompope />
+    if (id === 'item_dulce_tentacion') return <IconDulceTentacion />
+    if (id === 'item_dulce_fresa') return <IconDulceFresa />
+    if (id === 'item_dulce_durazno') return <IconDulceDuraznos />
+    if (id === 'item_delicia_casa') return <IconDeliciaCasa />
+    if (id === 'item_dulce_platano') return <IconDulcePlatano />
+    if (id === 'item_dulce_tropical') return <IconDulceTropical />
+    if (id === 'item_dulce_nutella') return <IconDulceCajeta />
+    if (id === 'item_banana_caramel') return <IconDulcePlatano />
+    if (id === 'item_strudel_manzana') return <IconDulceTropical/>
 
-    if (id === 'hawaiana') return <IconSaladaHawaiana />
-    if (id === 'italiana') return <IconSaladaItaliana />
-    if (id === 'crepizza') return <IconSaladaCrepizza />
-    if (id === 'tres_quesos') return <IconSaladaTresQuesos />
-    if (id === 'suprema') return <IconSaladaSuprema />
-    if (id === 'clasica') return <IconSaladaClasica />
-    if (id === 'chicken_tender') return <IconSaladaChickenTender />
-    if (id === 'rajas_crema_esp') return <IconSaladaRajas />
+    if (id === 'item_hawaiana') return <IconSaladaHawaiana />
+    if (id === 'item_italiana') return <IconSaladaItaliana />
+    if (id === 'item_crepizza') return <IconSaladaCrepizza />
+    if (id === 'item_tres_quesos') return <IconSaladaTresQuesos />
+    if (id === 'item_suprema') return <IconSaladaSuprema />
+    if (id === 'item_clasica') return <IconSaladaClasica />
+    if (id === 'item_chiken_tender') return <IconSaladaChickenTender />
+    if (id === 'item_rajas_crema') return <IconSaladaRajas />
+    if (id === 'item_vegetariana') return <IconCrepaSalada/>
+    if (id === 'item_española') return <IconCrepaSalada/>
+    if (id === 'item_champiqueso') return <IconCrepaSalada />
+    if (id === 'item_carnes_frias') return <IconCrepaSalada />
 
-    if (id === 'americano') return <IconAmericano />
-    if (id === 'capuccino') return <IconCapuccino />
-    if (id === 'tisanas') return <IconTisanas />
-    if (id === 'te') return <IconTe />
-    if (id === 'chocolate') return <IconChocolate />
-    if (id === 'chocolate_blanco') return <IconChocolateBlanco />
-    if (id === 'vainilla_latte') return <IconVainillaLatte />
-    if (id === 'taro_latte') return <IconTaroLatte />
-    if (id === 'matcha_latte') return <IconMatchaLatte />
-    if (id === 'moka') return <IconMoka />
-    if (id === 'latte') return <IconLatte />
+    if (id === 'item_americano') return <IconAmericano />
+    if (id === 'item_capuchino') return <IconCapuccino />
+    if (id === 'item_tisanas') return <IconTisanas />
+    if (id === 'item_te') return <IconTe />
+    if (id === 'item_chocolate') return <IconChocolate />
+    if (id === 'item_chocolate_blanco') return <IconChocolateBlanco />
+    if (id === 'item_vainilla_latte') return <IconVainillaLatte />
+    if (id === 'item_taro_latte') return <IconTaroLatte />
+    if (id === 'item_matcha_latte') return <IconMatchaLatte />
+    if (id === 'item_moka') return <IconMoka />
+    if (id === 'item_latte') return <IconLatte />
 
-    if (id.includes('hotcake') || category.includes('hotcake') || name.includes('hot cake') || name.includes('hotcake')) return <IconHotcakes />;
-    if (id.includes('waffle') || category.includes('waffle') || name.includes('waffle')) return <IconWaffle />;
-    if (id.includes('chamoyada') || category.includes('chamoyada') || name.includes('chamoyada')) return <IconChamoyada />;
-    if (id.includes('frapp') || category.includes('frapp') || name.includes('frapp')) return <IconFrappe />;
-    if (id.includes('licuado') || category.includes('licuado') || name.includes('licuado')) return <IconLicuado />;
-    if (id.includes('malteada') || category.includes('malteada') || name.includes('malteada')) return <IconMalteada />;
-    if (id.includes('sodas_italianas_custom')) return <IconSoda />;
-    
+    if (id.includes('item_hotcake') || category.includes('hotcake') || name.includes('hot cake') || name.includes('hotcake')) return <IconHotcakes />;
+    if (id.includes('item_waffle') || category.includes('waffle') || name.includes('waffle')) return <IconWaffle />;
+    if (id.includes('item_chamoyada') || category.includes('chamoyada') || name.includes('chamoyada')) return <IconChamoyada />;
+    if (id.includes('item_frapp') || category.includes('frapp') || name.includes('frapp')) return <IconFrappe />;
+    if (id.includes('item_licuado') || category.includes('licuado') || name.includes('licuado')) return <IconLicuado />;
+    if (id.includes('item_malteada') || category.includes('malteada') || name.includes('malteada')) return <IconMalteada />;
+    if (id.includes('item_soda')) return <IconSoda />;
+    if (id.includes('item_bubble_tea') || category.includes('bubble tea') || name.includes('bubble tea') || name.includes('bublee')) return <IconBebidaFria />;
     // 2. CATEGORÍAS Y GRUPOS (IDs parciales)
     if (id.includes('postres_fijos')) return <IconPostre />;
     

@@ -8,11 +8,9 @@ export interface PaymentTransaction {
   paidAt?: Timestamp | Date;
 }
 
-export type OrderMode = 'Mesa 1' | 'Mesa 2' | 'Para Llevar';
+export type OrderMode = string;
 export type OrderStatus = 'pending' | 'paid' | 'cancelled';
-
 export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'mixed';
-
 export type KitchenStatus = 'queued' | 'preparing' | 'ready' | 'delivered';
 
 export interface PaymentDetails {

@@ -54,9 +54,13 @@ export const InventoryByBranchScreen: React.FC = () => {
         }
     };
 
-    const filteredInventory = inventory.filter(item => 
-        item.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredInventory = inventory.filter(item => {
+        const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        const isTracked = (item as any).trackStock === true;
+
+        return matchesSearch && isTracked;
+    });
 
     return (
         <div className="animate-fade-in max-w-5xl mx-auto pb-24 px-4">

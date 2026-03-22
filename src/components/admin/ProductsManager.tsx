@@ -1,324 +1,313 @@
 // src/components/admin/ProductsManager.tsx
 import React, { useState, useEffect } from 'react';
+import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { db } from '../../firebase';
 import { toast } from 'sonner';
-import { db, collection, getDocs, addDoc, updateDoc, doc, deleteDoc } from '../../firebase';
-import type { MenuItem, FixedPriceItem } from '../../types/menu';
-import { TableRowSkeleton } from '../../components/Skeletons';
+import type { MenuItem, VariantPriceItem, FixedPriceItem } from '../../types/menu';
+
+// Tipos auxiliares para el panel
+interface Branch { id: string; name: string; }
+interface ModGroup { id: string; name: string; }
 
 export const ProductsManager: React.FC = () => {
-  const [products, setProducts] = useState<MenuItem[]>([]);
-  // Estado para los grupos disponibles (leídos de la BD)
-  const [availableGroups, setAvailableGroups] = useState<{id: string, name: string}[]>([]);
-  
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-
-  // Estado del Formulario
-  const [editingId, setEditingId] = useState<string | null>(null);
-  
-  // Datos del ítem
-  const [name, setName] = useState('');
-  const [category, setCategory] = useState('');
-  const [description, setDescription] = useState('');
-  const [modifierGroups, setModifierGroups] = useState<string[]>([]);
-  
-  // Lógica de Precios
-  const [hasVariants, setHasVariants] = useState(false);
-  const [price, setPrice] = useState<number>(0); 
-  const [variants, setVariants] = useState<{name: string, price: number}[]>([{name: '', price: 0}]); 
-
-  // --- CARGA DE DATOS ---
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      // 1. Cargar Productos
-      const itemsSnap = await getDocs(collection(db, 'menu_items'));
-      const itemsData = itemsSnap.docs.map(d => ({ id: d.id, ...d.data() } as MenuItem));
-      setProducts(itemsData.sort((a, b) => a.name.localeCompare(b.name)));
-
-      // 2. Cargar Grupos de Opciones (Dinámicos)
-      const groupsSnap = await getDocs(collection(db, 'modifier_groups'));
-      const groupsData = groupsSnap.docs.map(d => ({ 
-          id: d.id, 
-          name: d.data().name || d.id 
-      }));
-      setAvailableGroups(groupsData);
-
-    } catch (error) {
-      console.error("Error cargando datos:", error);
-      toast.error("Error al cargar productos");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // --- MANEJADORES DEL FORMULARIO ---
-  const handleResetForm = () => {
-    setEditingId(null);
-    setName('');
-    setCategory('');
-    setDescription('');
-    setModifierGroups([]);
-    setHasVariants(false);
-    setPrice(0);
-    setVariants([{name: '', price: 0}]);
-  };
-
-  const handleEdit = (item: MenuItem) => {
-    setEditingId(item.id);
-    setName(item.name);
-    setCategory(item.category);
-    setDescription(item.description || '');
-    setModifierGroups(item.modifierGroups || []);
-
-    if ('variants' in item) {
-      setHasVariants(true);
-      setVariants(item.variants);
-      setPrice(0);
-    } else {
-      setHasVariants(false);
-      setPrice(item.price);
-      setVariants([{name: '', price: 0}]);
-    }
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-
-    const commonData = { name, category, description, modifierGroups };
-
-    let itemData: any;
-    if (hasVariants) {
-      const validVariants = variants.filter(v => v.name.trim() !== '');
-      if (validVariants.length === 0) {
-        toast.error("Agrega al menos una variante válida."); 
-        setSubmitting(false);
-        return;
-      }
-      itemData = { ...commonData, variants: validVariants };
-    } else {
-      itemData = { ...commonData, price };
-    }
-
-    const savePromise = async () => {
-      if (editingId) {
-        await updateDoc(doc(db, 'menu_items', editingId), itemData);
-        setProducts(prev => prev.map(p => p.id === editingId ? { ...itemData, id: editingId } : p));
-      } else {
-        const docRef = await addDoc(collection(db, 'menu_items'), itemData);
-        setProducts(prev => [...prev, { ...itemData, id: docRef.id }].sort((a, b) => a.name.localeCompare(b.name)));
-      }
-      handleResetForm();
-    }; 
-
-    toast.promise(savePromise(), {
-      loading: editingId ? 'Actualizando producto...' : 'Creando producto...',
-      success: '¡Producto guardado exitosamente!',
-      error: 'Error al guardar el producto',
-    });
+    const [items, setItems] = useState<MenuItem[]>([]);
+    const [branches, setBranches] = useState<Branch[]>([]);
+    const [modGroups, setModGroups] = useState<ModGroup[]>([]);
+    const [loading, setLoading] = useState(true);
     
-    setSubmitting(false);
-  };
+    // Estado del modal de edición
+    const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
 
-  const handleDelete = async (id: string) => {
-    toast("¿Eliminar este producto permanentemente?", {
-      action: {
-        label: 'Eliminar',
-        onClick: async () => {
-          try {
-              await deleteDoc(doc(db, 'menu_items', id));
-              setProducts(prev => prev.filter(p => p.id !== id));
-              toast.success("Producto eliminado");
-          } catch (error) {
-              toast.error("Error al eliminar");
-          }
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            // Cargamos productos, sucursales (para la tabla dinámica) y grupos de modificadores
+            const [itemsSnap, branchesSnap, modGroupsSnap] = await Promise.all([
+                getDocs(collection(db, 'menu_items')),
+                getDocs(collection(db, 'branches')),
+                getDocs(collection(db, 'modifier_groups'))
+            ]);
+
+            setItems(itemsSnap.docs.map(d => d.data() as MenuItem));
+            setBranches(branchesSnap.docs.map(d => ({ id: d.id, name: d.data().name })));
+            setModGroups(modGroupsSnap.docs.map(d => ({ id: d.id, name: d.data().name })));
+        } catch (error) {
+            toast.error("Error al cargar los datos.");
+        } finally {
+            setLoading(false);
         }
-      },
-      cancel: {
-        label: 'Cancelar',
-        onClick: () => {}, // <--- CORRECCIÓN AQUÍ: onClick vacío obligatorio
-      },
-      duration: 5000, 
-    });
-  };
+    };
 
-  // Helpers
-  const addVariantRow = () => setVariants([...variants, { name: '', price: 0 }]);
-  const updateVariant = (index: number, field: 'name' | 'price', value: any) => {
-    const newVars = [...variants];
-    newVars[index] = { ...newVars[index], [field]: value };
-    setVariants(newVars);
-  };
-  const removeVariant = (index: number) => setVariants(variants.filter((_, i) => i !== index));
-  
-  const toggleGroup = (groupId: string) => {
-    setModifierGroups(prev => prev.includes(groupId) ? prev.filter(g => g !== groupId) : [...prev, groupId]);
-  };
+    // --- MANEJO DEL FORMULARIO ---
+    const handleSave = async () => {
+        if (!editingItem || !editingItem.name) return toast.error("El nombre es obligatorio");
+        setIsSaving(true);
+        try {
+            const idToSave = editingItem.id || `item_${Date.now()}`;
+            const itemToSave = { ...editingItem, id: idToSave };
+            await setDoc(doc(db, 'menu_items', idToSave), itemToSave);
+            toast.success("Producto guardado correctamente");
+            setEditingItem(null);
+            fetchData();
+        } catch (error) {
+            toast.error("Error al guardar");
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
-  return (
-    <div className="grid lg:grid-cols-3 gap-6 h-[calc(100vh-250px)]">
-      
-      {/* --- PANEL IZQUIERDO: FORMULARIO --- */}
-      <div className="card bg-base-200 h-full overflow-y-auto shadow-inner border border-base-300">
-        <div className="card-body p-4">
-          <div className="flex justify-between items-center">
-            <h3 className="font-black text-lg">{editingId ? '✏️ Editando' : '✨ Nuevo Producto'}</h3>
-            {editingId && <button onClick={handleResetForm} className="btn btn-xs btn-ghost">Cancelar</button>}
-          </div>
+    const handleDelete = async (id: string) => {
+        if (!window.confirm("¿Seguro que deseas eliminar este producto?")) return;
+        try {
+            await deleteDoc(doc(db, 'menu_items', id));
+            toast.success("Producto eliminado");
+            fetchData();
+        } catch (error) {
+            toast.error("Error al eliminar");
+        }
+    };
 
-          <form onSubmit={handleSave} className="space-y-4 mt-2">
-            
-            <div className="form-control">
-              <label className="label-text text-xs font-bold mb-1">Nombre del Producto</label>
-              <input type="text" className="input input-sm input-bordered w-full font-bold" required value={name} onChange={e => setName(e.target.value)} placeholder="Ej. Soda Italiana" />
-            </div>
+    const openNewItem = (type: 'FIXED' | 'VARIANT') => {
+        if (type === 'FIXED') {
+            setEditingItem({ id: '', name: '', category: 'bebidas', price: 0, disabledIn: [], branchPrices: {}, modifierGroups: [] } as FixedPriceItem);
+        } else {
+            setEditingItem({ id: '', name: '', category: 'bebidas', variants: [{ name: 'Sencillo', price: 0, branchPrices: {} }], disabledIn: [], modifierGroups: [] } as VariantPriceItem);
+        }
+    };
 
-            <div className="form-control">
-              <label className="label-text text-xs font-bold mb-1">Categoría (Ticket)</label>
-              <input type="text" className="input input-sm input-bordered w-full" required value={category} onChange={e => setCategory(e.target.value)} placeholder="Ej. Bebidas" />
-            </div>
+    // --- RENDERIZADO DEL MODAL ---
+    const renderEditModal = () => {
+        if (!editingItem) return null;
+        const isVariant = 'variants' in editingItem;
 
-            <div className="form-control">
-              <label className="label-text text-xs font-bold mb-1">Descripción</label>
-              <textarea className="textarea textarea-sm textarea-bordered w-full" rows={2} value={description} onChange={e => setDescription(e.target.value)} placeholder="Detalles opcionales..." />
-            </div>
-
-            <div className="divider my-1"></div>
-
-            {/* PRECIO FIJO O VARIANTES */}
-            <div className="form-control">
-              <label className="label cursor-pointer justify-start gap-4 bg-base-100 p-2 rounded-lg border border-base-300">
-                <span className="label-text font-bold">¿Tiene tamaños diferentes?</span> 
-                <input type="checkbox" className="toggle toggle-primary toggle-sm" checked={hasVariants} onChange={e => setHasVariants(e.target.checked)} />
-              </label>
-            </div>
-
-            {!hasVariants ? (
-              <div className="form-control animate-fade-in">
-                <label className="label-text text-xs font-bold mb-1">Precio Fijo ($)</label>
-                <input type="number" className="input input-bordered w-full font-mono text-lg font-bold text-primary" value={price} onChange={e => setPrice(parseFloat(e.target.value) || 0)} />
-              </div>
-            ) : (
-              <div className="space-y-2 animate-fade-in bg-base-100 p-2 rounded-box border border-base-300">
-                <label className="label-text text-xs font-bold block mb-1">Lista de Tamaños</label>
-                {variants.map((v, idx) => (
-                  <div key={idx} className="flex gap-2 items-center">
-                    <input type="text" placeholder="Ej. Chico" className="input input-xs input-bordered flex-1" value={v.name} onChange={e => updateVariant(idx, 'name', e.target.value)} />
-                    <input type="number" placeholder="$0" className="input input-xs input-bordered w-20 font-mono" value={v.price} onChange={e => updateVariant(idx, 'price', parseFloat(e.target.value) || 0)} />
-                    <button type="button" onClick={() => removeVariant(idx)} className="btn btn-xs btn-square btn-ghost text-error">✕</button>
-                  </div>
-                ))}
-                <button type="button" onClick={addVariantRow} className="btn btn-xs btn-outline btn-block border-dashed border-base-300">+ Agregar Tamaño</button>
-              </div>
-            )}
-
-            <div className="divider my-1"></div>
-
-            {/* GRUPOS DINÁMICOS */}
-            <div className="form-control">
-              <label className="label-text text-xs font-bold mb-2">
-                  Grupos de Ingredientes (Modifiers)
-                  <span className="block font-normal text-[10px] opacity-60">Selecciona qué opciones salen al vender este producto</span>
-              </label>
-              
-              <div className="h-40 overflow-y-auto border border-base-300 rounded-box p-2 bg-base-100 grid grid-cols-1 gap-1">
-                {availableGroups.length === 0 && <p className="text-xs opacity-50 p-2 text-center">No hay grupos creados.<br/>Ve a la pestaña "Eq Grupos Opc."</p>}
-                
-                {availableGroups.map(g => (
-                  <label key={g.id} className="label cursor-pointer justify-start gap-3 hover:bg-base-200 rounded p-1 py-0 border border-transparent hover:border-base-300 transition-colors">
-                    <input 
-                      type="checkbox" 
-                      className="checkbox checkbox-xs checkbox-primary" 
-                      checked={modifierGroups.includes(g.id)} 
-                      onChange={() => toggleGroup(g.id)}
-                    />
-                    <div className="flex flex-col">
-                        <span className="label-text text-xs font-bold">{g.name}</span>
-                        <span className="label-text text-[9px] opacity-40 font-mono">{g.id}</span>
+        return (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="bg-base-100 w-full max-w-3xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-fade-in-up">
+                    
+                    {/* Header */}
+                    <div className="p-6 border-b border-base-200 bg-base-200/50">
+                        <h2 className="text-2xl font-black text-primary">
+                            {editingItem.id ? '✏️ Editar Producto' : '✨ Nuevo Producto'}
+                        </h2>
                     </div>
-                  </label>
-                ))}
-              </div>
-            </div>
 
-            <button type="submit" disabled={submitting} className="btn btn-primary btn-block shadow-lg mt-4">
-              {submitting ? <span className="loading loading-spinner"></span> : (editingId ? 'Guardar Cambios' : 'Crear Producto')}
-            </button>
-          </form>
-        </div>
-      </div>
+                    {/* Cuerpo Scrollable */}
+                    <div className="p-6 overflow-y-auto flex-1 space-y-8">
+                        
+                        {/* 1. DATOS BÁSICOS */}
+                        <section className="space-y-4">
+                            <h3 className="text-lg font-bold border-b border-base-300 pb-2">1. Datos Básicos</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="form-control">
+                                    <label className="label"><span className="label-text font-bold">Nombre del Producto</span></label>
+                                    <input type="text" className="input input-bordered" value={editingItem.name} onChange={e => setEditingItem({ ...editingItem, name: e.target.value })} placeholder="Ej. Capuchino" />
+                                </div>
+                                <div className="form-control">
+                                    <label className="label"><span className="label-text font-bold">Categoría (Para reportes)</span></label>
+                                    <select className="select select-bordered" value={editingItem.category} onChange={e => setEditingItem({ ...editingItem, category: e.target.value })}>
+                                        <option value="bebidas">Bebidas</option>
+                                        <option value="crepas">Crepas</option>
+                                        <option value="postres">Postres</option>
+                                        <option value="otros">Otros</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </section>
 
-      {/* --- PANEL DERECHO: LISTA CON SKELETONS --- */}
-      <div className="lg:col-span-2 bg-base-100 rounded-box border border-base-200 flex flex-col overflow-hidden shadow-sm h-full">
-        {/* Header simple */}
-        <div className="p-3 border-b border-base-200 bg-base-100 flex justify-between items-center">
-            <span className="text-xs font-bold opacity-50 uppercase">{products.length} Productos registrados</span>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-0">
-          <table className="table table-sm table-pin-rows w-full">
-            <thead className="bg-base-200 text-xs uppercase">
-              <tr>
-                <th>Producto</th>
-                <th>Tipo</th>
-                <th className="text-right">Precio</th>
-                <th className="text-center w-20">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                [...Array(8)].map((_, i) => <TableRowSkeleton key={i} />)
-              ) : (
-                products.map(p => {
-                  const isVar = 'variants' in p;
-                  return (
-                    <tr key={p.id} className="hover group transition-colors">
-                      <td>
-                        <div className="font-bold">{p.name}</div>
-                        <div className="text-[10px] opacity-50">{p.category}</div>
-                        {p.modifierGroups && p.modifierGroups.length > 0 && (
-                            <div className="flex gap-1 mt-1 flex-wrap">
-                                {p.modifierGroups.map(gid => {
-                                    const groupName = availableGroups.find(ag => ag.id === gid)?.name || gid;
-                                    return <span key={gid} className="badge badge-xs badge-ghost text-[9px] border-base-300">{groupName}</span>;
+                        {/* 2. OPCIONES / MODIFICADORES (Leches, Sabores, Toppings) */}
+                        <section className="space-y-4">
+                            <h3 className="text-lg font-bold border-b border-base-300 pb-2">2. Opciones de Armado (Checklist)</h3>
+                            <p className="text-xs opacity-70">Selecciona qué opciones se le deben preguntar al cliente al vender esto:</p>
+                            <div className="flex flex-wrap gap-2">
+                                {modGroups.map(mg => {
+                                    const isSelected = editingItem.modifierGroups?.includes(mg.id);
+                                    return (
+                                        <button key={mg.id} onClick={() => {
+                                                const current = editingItem.modifierGroups || [];
+                                                const updated = isSelected ? current.filter(id => id !== mg.id) : [...current, mg.id];
+                                                setEditingItem({ ...editingItem, modifierGroups: updated });
+                                            }}
+                                            className={`btn btn-sm ${isSelected ? 'btn-primary' : 'btn-outline border-base-300'}`}
+                                        >
+                                            {isSelected ? '✓ ' : '+ '} {mg.name}
+                                        </button>
+                                    )
                                 })}
                             </div>
-                        )}
-                      </td>
-                      <td>
-                        <span className={`badge badge-xs ${isVar ? 'badge-secondary' : 'badge-neutral'}`}>
-                          {isVar ? 'Variantes' : 'Fijo'}
-                        </span>
-                      </td>
-                      <td className="text-right font-mono font-bold text-success">
-                        {isVar 
-                          ? `${p.variants.length} tam.` 
-                          : `$${(p as FixedPriceItem).price.toFixed(2)}`
-                        }
-                      </td>
-                      <td className="text-center">
-                        <div className="join">
-                          <button onClick={() => handleEdit(p)} className="btn btn-xs join-item btn-ghost text-primary">✏️</button>
-                          <button onClick={() => handleDelete(p.id)} className="btn btn-xs join-item btn-ghost text-error">🗑️</button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-          
-          {!loading && products.length === 0 && (
-            <div className="text-center p-10 opacity-50 text-sm">No hay productos. ¡Crea uno a la izquierda!</div>
-          )}
-        </div>
+                        </section>
+
+                        {/* 3. MATRIZ DE PRECIOS Y SUCURSALES (¡La magia visual!) */}
+                        <section className="space-y-4">
+                            <h3 className="text-lg font-bold border-b border-base-300 pb-2">3. Precios y Sucursales</h3>
+                            <div className="overflow-x-auto bg-base-200/30 rounded-xl border border-base-300">
+                                <table className="table w-full">
+                                    <thead className="bg-base-200">
+                                        <tr>
+                                            <th>Variante / Tamaño</th>
+                                            <th>Precio Global</th>
+                                            {branches.map(b => <th key={b.id} className="text-center text-primary">{b.name}</th>)}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {/* SI ES PRECIO FIJO */}
+                                        {!isVariant && (
+                                            <tr>
+                                                <td className="font-bold">Único</td>
+                                                <td>
+                                                    <input type="number" className="input input-sm input-bordered w-24 font-bold" value={(editingItem as FixedPriceItem).price || 0} onChange={e => setEditingItem({ ...editingItem, price: Number(e.target.value) })} />
+                                                </td>
+                                                {branches.map(b => {
+                                                    const item = editingItem as FixedPriceItem;
+                                                    const isDisabled = item.disabledIn?.includes(b.id);
+                                                    const customPrice = item.branchPrices?.[b.id] ?? '';
+                                                    return (
+                                                        <td key={b.id} className="text-center bg-base-100/50 border-l border-base-200">
+                                                            <div className="flex flex-col items-center gap-2">
+                                                                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                                                                    <input type="checkbox" className="toggle toggle-sm toggle-success" checked={!isDisabled} onChange={() => {
+                                                                        const curr = item.disabledIn || [];
+                                                                        setEditingItem({ ...item, disabledIn: isDisabled ? curr.filter(id => id !== b.id) : [...curr, b.id] });
+                                                                    }} />
+                                                                    {isDisabled ? 'Oculto' : 'Visible'}
+                                                                </label>
+                                                                {!isDisabled && (
+                                                                    <div className="tooltip tooltip-bottom" data-tip="Deja en blanco para usar Precio Global">
+                                                                        <input type="number" placeholder="Ej. 75" className="input input-xs input-bordered w-20 text-center" value={customPrice} onChange={e => {
+                                                                            const newPrices = { ...(item.branchPrices || {}) };
+                                                                            if (e.target.value === '') delete newPrices[b.id];
+                                                                            else newPrices[b.id] = Number(e.target.value);
+                                                                            setEditingItem({ ...item, branchPrices: newPrices });
+                                                                        }} />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    )
+                                                })}
+                                            </tr>
+                                        )}
+
+                                        {/* SI TIENE VARIANTES (TAMAÑOS) */}
+                                        {isVariant && (editingItem as VariantPriceItem).variants.map((v, index) => (
+                                            <tr key={index}>
+                                                <td>
+                                                    <input type="text" className="input input-sm input-bordered w-full font-bold" value={v.name} onChange={e => {
+                                                        const newVariants = [...(editingItem as VariantPriceItem).variants];
+                                                        newVariants[index].name = e.target.value;
+                                                        setEditingItem({ ...editingItem, variants: newVariants } as VariantPriceItem);
+                                                    }} />
+                                                </td>
+                                                <td>
+                                                    <input type="number" className="input input-sm input-bordered w-24 font-bold" value={v.price || 0} onChange={e => {
+                                                        const newVariants = [...(editingItem as VariantPriceItem).variants];
+                                                        newVariants[index].price = Number(e.target.value);
+                                                        setEditingItem({ ...editingItem, variants: newVariants } as VariantPriceItem);
+                                                    }} />
+                                                </td>
+                                                {branches.map(b => {
+                                                    const customPrice = v.branchPrices?.[b.id] ?? '';
+                                                    return (
+                                                        <td key={b.id} className="text-center bg-base-100/50 border-l border-base-200">
+                                                            <div className="tooltip tooltip-bottom" data-tip="Precio especial sucursal">
+                                                                <input type="number" placeholder="Global" className="input input-xs input-bordered w-20 text-center" value={customPrice} onChange={e => {
+                                                                    const newVariants = [...(editingItem as VariantPriceItem).variants];
+                                                                    const newPrices = { ...(v.branchPrices || {}) };
+                                                                    if (e.target.value === '') delete newPrices[b.id];
+                                                                    else newPrices[b.id] = Number(e.target.value);
+                                                                    newVariants[index].branchPrices = newPrices;
+                                                                    setEditingItem({ ...editingItem, variants: newVariants } as VariantPriceItem);
+                                                                }} />
+                                                            </div>
+                                                        </td>
+                                                    )
+                                                })}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                {isVariant && (
+                                    <div className="p-2 border-t border-base-300">
+                                        <button onClick={() => {
+                                            const newVariants = [...(editingItem as VariantPriceItem).variants, { name: 'Nuevo Tamaño', price: 0, branchPrices: {} }];
+                                            setEditingItem({ ...editingItem, variants: newVariants } as VariantPriceItem);
+                                        }} className="btn btn-sm btn-ghost w-full">+ Agregar variante / tamaño</button>
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+                    </div>
+
+                    {/* Footer / Botones */}
+                    <div className="p-4 border-t border-base-200 bg-base-200/50 flex justify-end gap-3">
+                        <button onClick={() => setEditingItem(null)} className="btn btn-ghost">Cancelar</button>
+                        <button onClick={handleSave} disabled={isSaving} className="btn btn-primary px-8 shadow-lg shadow-primary/30">
+                            {isSaving ? 'Guardando...' : '💾 Guardar Producto'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    if (loading) return <div className="p-10 text-center"><span className="loading loading-spinner loading-lg text-primary"></span></div>;
+
+    return (
+      <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-base-200/50 p-4 rounded-xl border border-base-300">
+              <div>
+                  <h3 className="text-xl font-bold">Gestor de Productos</h3>
+                  <p className="text-xs opacity-70">Precios y disponibilidad por sucursal.</p>
+              </div>
+              <div className="flex gap-2 w-full sm:w-auto">
+                  <button onClick={() => openNewItem('FIXED')} className="btn btn-primary btn-sm flex-1 sm:flex-none">+ Fijo</button>
+                  <button onClick={() => openNewItem('VARIANT')} className="btn btn-secondary btn-sm flex-1 sm:flex-none">+ Tamaños</button>
+              </div>
+          </div>
+
+          {/* Listado Responsive */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {items.map(item => (
+                  <div key={item.id} className="card bg-base-100 border border-base-300 shadow-sm hover:shadow-md transition-all">
+                      <div className="card-body p-4">
+                          <div className="flex justify-between items-start">
+                              <h4 className="font-bold text-base leading-tight pr-2">{item.name}</h4>
+                              <span className="badge badge-outline badge-xs opacity-50 uppercase">{item.category}</span>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 mt-2">
+                              <span className="text-xl font-black text-primary">
+                                  ${'variants' in item ? item.variants[0]?.price : item.price}
+                              </span>
+                              {'variants' in item && <span className="text-[10px] opacity-50">(Precio base)</span>}
+                          </div>
+
+                          {/* Indicadores de Sucursal rápidos */}
+                          <div className="flex gap-2 mt-3">
+                              {branches.map(b => {
+                                  const isOff = item.disabledIn?.includes(b.id);
+                                  return (
+                                      <div key={b.id} className={`badge badge-xs ${isOff ? 'badge-ghost opacity-30' : 'badge-success text-white'}`}>
+                                          {b.name.substring(0,3)}
+                                      </div>
+                                  );
+                              })}
+                          </div>
+
+                          <div className="flex justify-between mt-4 pt-3 border-t border-base-200">
+                              <button onClick={() => setEditingItem(item)} className="btn btn-sm btn-ghost text-primary flex-1">✏️ Editar</button>
+                              <button onClick={() => handleDelete(item.id)} className="btn btn-sm btn-ghost text-error">🗑️</button>
+                          </div>
+                      </div>
+                  </div>
+              ))}
+          </div>
+          {/* El Modal ya es responsive por naturaleza al usar flex-col y overflow-y-auto */}
+          {renderEditModal()}
       </div>
-    </div>
   );
 };

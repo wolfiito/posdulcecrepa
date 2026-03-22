@@ -1,6 +1,7 @@
 import React from 'react'
 import type { MenuItem, MenuGroup } from '../types/menu';
 import { getIconForItem } from './ProductIcons';
+import { useAuthStore } from '../store/useAuthStore'; 
 
 function isGroup(item: MenuItem | MenuGroup): item is MenuGroup {
     return 'level' in item;
@@ -13,11 +14,26 @@ interface ProductCardProps {
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({ item, onClick, isLarge = false }) => {
+    const { activeBranchId } = useAuthStore();
     const isGrp = isGroup(item);
 
-    //Si es producto y tiene precio, lo mostramos.
-    const price = !isGrp && 'price' in item ? item.price : null;
+    // LÓGICA INTELIGENTE DE PRECIOS MULTI-SUCURSAL
+    let displayPrice: number | null = null;
+    let isFrom = false; // Para poner "Desde $X" si tiene tamaños
 
+    if (!isGrp) {
+        // 1. Si el producto tiene tamaños (variantes)
+        if ('variants' in item && item.variants && item.variants.length > 0) {
+            const firstVariant = item.variants[0];
+            // @ts-ignore - En caso de que el tipo aún marque error en tu editor
+            displayPrice = firstVariant.branchPrices?.[activeBranchId || ''] || firstVariant.price;
+            isFrom = true; 
+        } 
+        else if ('price' in item) {
+            // @ts-ignore
+            displayPrice = item.branchPrices?.[activeBranchId || ''] || item.price;
+        }
+    }
 
     const getIconSize = () => {
         if (isLarge) return 'w-24 h-24';
@@ -40,27 +56,18 @@ export const ProductCard: React.FC<ProductCardProps> = ({ item, onClick, isLarge
                 cursor-pointer transition-all duration-200
                 active:scale-95 border border-transparent
                 overflow-hidden select-none
-            
-            /* ESTILOS CONDICIONALES */
-                ${isGrp 
-                    ? 'bg-primary/5 border-primary/10 hover:border-primary/30' 
-                    : 'bg-base-100 border-base-200 hover:border-primary'       
-                }
-            `}  
+                ${isGrp ? 'bg-primary/5 hover:bg-primary/10 hover:border-primary/30' : 'bg-base-100 hover:border-base-300'}
+            `}
         >
-            <div className="card-body p-2 w-full h-full flex flex-col items-center justify-center relative">
-                
-                {/* 1. INDICADOR DE TIPO (Icono esquina) */}
+            <div className="card-body p-2 md:p-3 items-center justify-center text-center">
                 {isGrp && (
-                    <div className="absolute top-2 right-2 opacity-20 text-primary">
-                        {/* Icono de carpeta sutil */}
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                    <div className="absolute top-2 right-2 opacity-50">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                         </svg>
                     </div>
                 )}
 
-                {/* 2. ICONO PRINCIPAL */}
                 <div className={`
                     ${getIconSize()} 
                     flex items-center justify-center 
@@ -71,7 +78,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({ item, onClick, isLarge
                     {getIconForItem(item)}
                 </div>
                 
-                {/* 3. NOMBRE */}
                 <div className="w-full flex flex-col items-center justify-start z-10">
                     <h3 className={`
                         font-bold leading-tight text-center w-full line-clamp-2
@@ -82,13 +88,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({ item, onClick, isLarge
                     </h3>
                 </div>
 
-                {/* 4. PRECIO FLOTANTE (Solo Productos) */}
-                {price !== null && (
-                    <div className="mt-1 badge badge-sm font-bold bg-base-200 border-base-300 text-base-content/80">
-                        ${price}
+                {displayPrice !== null && (
+                    <div className="mt-1 badge badge-sm font-bold bg-base-200 border-base-300 text-base-content">
+                        {isFrom ? 'Desde ' : ''}${displayPrice.toFixed(2)}
                     </div>
                 )}
             </div>
         </div>
     );
-}
+};

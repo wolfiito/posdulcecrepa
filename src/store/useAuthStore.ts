@@ -32,9 +32,10 @@ export const useAuthStore = create<AuthState>()(
           const user = await authService.loginWithCredentials(username, pass);                      
           set({ 
             currentUser: user, 
-            activeBranchId: user.branchId,
+            activeBranchId: user.branchId || null,
             isAuthenticated: true, 
-            isLoading: false 
+            isLoading: false,
+            error: null
           });
         } catch (err: any) {
             set({ 
@@ -53,7 +54,7 @@ export const useAuthStore = create<AuthState>()(
 
       setUser: (user: User) => set({ 
         currentUser: user,
-        activeBranchId: user.branchId,
+        activeBranchId: user.branchId || null,
         isAuthenticated: true 
       }),
       

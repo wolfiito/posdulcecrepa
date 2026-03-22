@@ -4,6 +4,8 @@ import Modal from 'react-modal';
 import type { MenuGroup, Modifier, TicketItem, PriceRule } from '../types/menu';
 import { MODIFIER_GROUPS, EXCLUSIVE_GROUPS, EXCLUSIVE_BASE_GROUPS } from '../constants/menuConstants';
 import { calculateCustomItemPrice } from '../utils/pricing';
+import { useInventoryStore } from '../store/useInventoryStore';
+import { useAuthStore } from '../store/useAuthStore';
 
 Modal.setAppElement('#root');
 
@@ -33,6 +35,7 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
     if (!group || !group.rules_ref) return undefined;
     return allPriceRules.find(rule => rule.id === group.rules_ref);
   }, [group, allPriceRules]);
+
 
   // --- Lógica de Pasos (Wizard) ---
   const steps = useMemo(() => {
@@ -69,18 +72,55 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
 
   const currentStepInfo = steps[step];
   const isLastStep = step === steps.length - 1;
+// 1. Extraemos el inventario
+const { stockData } = useInventoryStore();
+const { activeBranchId } = useAuthStore();
+const branchAdjustedPriceRule = useMemo(() => {
+  if (!priceRule) return undefined;
+  return {
+      ...priceRule,
+      basePrices: priceRule.basePrices.map(bp => ({
+          ...bp, // Mantenemos el conteo (ej. 1 ing, 2 ing)
+          // Si la sucursal tiene un precio especial para este escalón, lo usamos. Si no, usamos el base.
+          price: bp.branchPrices?.[activeBranchId || ''] ?? bp.price 
+      }))
+  };
+}, [priceRule, activeBranchId]);
+// 2. Filtramos los ingredientes
+const modifiersForCurrentStep = useMemo(() => {
+  if (!currentStepInfo) return [];
+  
+  return allModifiers
+      .filter(mod => currentStepInfo.groups.includes(mod.group))
+      .filter(mod => {
+          // NUEVO: Si el ingrediente está prohibido en esta sucursal, lo ocultamos
+          if (activeBranchId && mod.disabledIn?.includes(activeBranchId)) {
+              return false;
+          }
 
-  const modifiersForCurrentStep = useMemo(() => {
-      if (!currentStepInfo) return [];
-      return allModifiers.filter(mod => currentStepInfo.groups.includes(mod.group));
-  }, [currentStepInfo, allModifiers]);
-
-  // --- USO DE LA NUEVA UTILIDAD DE PRECIOS ---
-  const { price: currentPrice, cost: currentCost, ruleDescription: currentRule, isValid } = useMemo(() => {
-      if (!group) return { price: 0, cost: 0, ruleDescription: '', isValid: false };
-      const modsList = Array.from(selectedModifiers.values());
-      return calculateCustomItemPrice(group, modsList, priceRule);
-  }, [group, selectedModifiers, priceRule]);
+          const inv = stockData[mod.id];
+          const isTracked = mod.trackStock === true || inv?.trackStock === true;
+          const realStock = Number(inv?.currentStock) || 0; 
+          
+          // (Mantenemos tu chismoso Turín intacto 🐰)
+          if (mod.name.toLowerCase().includes('turin') || mod.name.toLowerCase().includes('turín')) {
+              console.log(`🐰 CHISMOSO TURÍN:`, { mod, isTracked, realStock });
+          }
+          
+          if (isTracked && realStock <= 0) {
+              return false; 
+          }
+          return true; 
+      });
+}, [currentStepInfo, allModifiers, stockData, activeBranchId]);
+// --- USO DE LA NUEVA UTILIDAD DE PRECIOS ---
+const { price: currentPrice, cost: currentCost, ruleDescription: currentRule, isValid } = useMemo(() => {
+  if (!group) return { price: 0, cost: 0, ruleDescription: '', isValid: false };
+  const modsList = Array.from(selectedModifiers.values());
+  
+  // ¡AQUÍ ESTÁ EL TRUCO! Le mandamos la regla matemática ya ajustada por sucursal
+  return calculateCustomItemPrice(group, modsList, branchAdjustedPriceRule);
+}, [group, selectedModifiers, branchAdjustedPriceRule]);
 
   // Validaciones de UI
   const isStepValid = useMemo(() => {
@@ -159,6 +199,12 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
           </h4>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {modifiersForCurrentStep.map(mod => {
+                  // SEGURIDAD EXTRA: Si por alguna razón llegó aquí con stock 0 y trackeo activo, lo saltamos
+                  const inv = stockData[mod.id];
+                  if ((mod.trackStock || inv?.trackStock) && (inv?.currentStock ?? 0) <= 0) {
+                      return null; 
+                  }
+
                   const isSelected = selectedModifiers.has(mod.id);
                   const isCrepeOrPostreBase = mod.group === MODIFIER_GROUPS.CREPA_DULCE_BASE || mod.group === MODIFIER_GROUPS.CREPA_SALADA_BASE;
                   const shouldBeDisabled = isCrepeOrPostreBase && isCrepeLimitReached && !isSelected;

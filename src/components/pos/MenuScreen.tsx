@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useMenuStore } from '../../store/useMenuStore';
 import { useUIStore } from '../../store/useUIStore';
 import { useTicketStore } from '../../store/useTicketStore';
+import { useAuthStore } from '../../store/useAuthStore'; 
 import { ProductCard } from '../ProductCard';
 import { IconBack } from '../Icons';
 import type { MenuItem, MenuGroup } from '../../types/menu';
@@ -13,42 +14,55 @@ export const MenuScreen: React.FC = () => {
     const { currentGroup, navigateToGroup, openCustomModal, openVariantModal } = useUIStore();
     const { addItem } = useTicketStore();
     
-    // Determinamos si estamos en la raíz del menú
+    const { activeBranchId } = useAuthStore(); 
+    
     const isRoot = !currentGroup;
 
-    // Filtramos grupos según el nivel actual
     const groupsToShow = useMemo(() => {
         if (isRoot) return groups.filter(g => g.parent === 'root');
         return groups.filter(g => g.parent === currentGroup.id);
     }, [groups, currentGroup, isRoot]);
 
-    // Filtramos items según el grupo actual
     const itemsToShow = useMemo(() => {
         if (!currentGroup?.items_ref) return [];
+        
         return currentGroup.items_ref
             .map(refId => items.find(i => i.id === refId))
-            .filter((i): i is MenuItem => !!i);
-    }, [items, currentGroup]);
+            .filter((item): item is MenuItem => {
+                if (!item) return false;
+                if (activeBranchId && item.disabledIn?.includes(activeBranchId)) return false;
+                return true;
+            });
+    }, [currentGroup, items, activeBranchId]);
 
+    // --- LÓGICA CORREGIDA DE CLICS ---
     const handleProductClick = (item: MenuItem | MenuGroup) => {
-        // Lógica de navegación o selección
-        if ('level' in item) { 
-            const group = item as MenuGroup;
-            if (group.rules_ref) openCustomModal(group);
-            else navigateToGroup(group);
-        } else { 
+        if ('level' in item) {
+            // 1. ES UNA CARPETA (MenuGroup)
+            if (item.rules_ref) {
+                // Si la carpeta tiene una regla de precio (Ej. "Arma tu Crepa"), va al modal de armar.
+                openCustomModal(item);
+            } else {
+                // Si es una carpeta normal (Ej. "Bebidas Calientes"), entramos a ella.
+                navigateToGroup(item);
+            }
+        } else {
+            // 2. ES UN PRODUCTO (MenuItem)
             const menuItem = item as MenuItem;
-            const isVariant = 'variants' in menuItem;
-            const hasModifiers = menuItem.modifierGroups && menuItem.modifierGroups.length > 0;
-
-            if (isVariant || hasModifiers) {
+            
+            // Si el producto tiene Tamaños (variants) O tiene Opciones (modifierGroups)
+            if ('variants' in menuItem || (menuItem.modifierGroups && menuItem.modifierGroups.length > 0)) {
+                // Va al modal de Variantes (el que acabamos de actualizar para la leche y tamaños)
                 openVariantModal(menuItem);
             } else {
+                // Si es directo (Ej. "Fresas con crema"), se cobra directamente al ticket.
+                const branchPrice = menuItem.branchPrices?.[activeBranchId || ''] ?? (menuItem as any).price ?? 0;
+                
                 addItem({
-                    id: crypto.randomUUID(),
+                    id: Date.now().toString(),
                     baseName: menuItem.name,
-                    finalPrice: menuItem.price || 0,
-                    finalCost: menuItem.cost || 0,
+                    finalPrice: branchPrice,
+                    finalCost: menuItem.cost,
                     type: 'FIXED',
                     details: { itemId: menuItem.id, selectedModifiers: [] }
                 });
@@ -62,7 +76,6 @@ export const MenuScreen: React.FC = () => {
             <div className="flex items-center mb-4 px-1">
                 {!isRoot && (
                     <button 
-                        // --- CORRECCIÓN AQUÍ: Volver directo a INICIO (null) ---
                         onClick={() => navigateToGroup(null)} 
                         className="btn btn-circle btn-ghost btn-sm mr-2"
                     >
@@ -74,7 +87,6 @@ export const MenuScreen: React.FC = () => {
                 </h2>
             </div>
             
-            {/* GRID: Mantenemos tu configuración, pero usamos productCard para el tamaño interno */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {groupsToShow.map(group => (
                     <ProductCard key={group.id} item={group} onClick={() => handleProductClick(group)} isLarge={isRoot} />

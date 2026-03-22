@@ -1,206 +1,142 @@
 // src/components/admin/PriceRulesManager.tsx
 import React, { useState, useEffect } from 'react';
-import { db, collection, getDocs, doc, deleteDoc, setDoc } from '../../firebase';
+import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { db } from '../../firebase';
+import { toast } from 'sonner';
 import type { PriceRule } from '../../types/menu';
 
+interface Branch { id: string; name: string; }
+
 export const PriceRulesManager: React.FC = () => {
-  const [rules, setRules] = useState<PriceRule[]>([]);
-  const [loading, setLoading] = useState(false);
-  
-  // Estado del Formulario
-  const [isEditing, setIsEditing] = useState(false);
-  const [id, setId] = useState('');
-  const [name, setName] = useState('');
-  // Estado para la tabla de precios escalonados
-  const [basePrices, setBasePrices] = useState<{count: number, price: number}[]>([{ count: 1, price: 0 }]);
+    const [rules, setRules] = useState<PriceRule[]>([]);
+    const [branches, setBranches] = useState<Branch[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [editingRule, setEditingRule] = useState<PriceRule | null>(null);
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const snap = await getDocs(collection(db, 'price_rules'));
-      setRules(snap.docs.map(d => ({ id: d.id, ...d.data() } as PriceRule)));
-    } catch (e) { console.error(e); }
-    setLoading(false);
-  };
+    useEffect(() => { fetchData(); }, []);
 
-  useEffect(() => { loadData(); }, []);
+    const fetchData = async () => {
+        setLoading(true);
+        const [rulesSnap, branchesSnap] = await Promise.all([
+            getDocs(collection(db, 'price_rules')),
+            getDocs(collection(db, 'branches'))
+        ]);
+        setRules(rulesSnap.docs.map(d => d.data() as PriceRule));
+        setBranches(branchesSnap.docs.map(d => ({ id: d.id, name: d.data().name })));
+        setLoading(false);
+    };
 
-  // --- MANEJO DE LA TABLA DE PRECIOS ---
-  const addPriceRow = () => {
-    setBasePrices([...basePrices, { count: basePrices.length + 1, price: 0 }]);
-  };
+    const handleSave = async () => {
+        if (!editingRule?.name) return toast.error("Nombre obligatorio");
+        try {
+            await setDoc(doc(db, 'price_rules', editingRule.id), editingRule);
+            toast.success("Regla guardada correctamente");
+            setEditingRule(null);
+            fetchData();
+        } catch (e) { toast.error("Error al guardar"); }
+    };
 
-  const updatePriceRow = (index: number, field: 'count' | 'price', value: number) => {
-    const newPrices = [...basePrices];
-    newPrices[index] = { ...newPrices[index], [field]: value };
-    setBasePrices(newPrices);
-  };
+    if (loading) return <div className="p-10 text-center"><span className="loading loading-spinner text-warning"></span></div>;
 
-  const removePriceRow = (index: number) => {
-    setBasePrices(basePrices.filter((_, i) => i !== index));
-  };
-
-  // --- GUARDAR ---
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!id || !name || basePrices.length === 0) return alert("Completa todos los campos");
-
-    // Limpiar ID
-    const cleanId = isEditing ? id : id.toLowerCase().replace(/\s+/g, '_');
-
-    try {
-      // Ordenamos los precios por cantidad de ingredientes para evitar errores lógicos
-      const sortedPrices = [...basePrices].sort((a, b) => a.count - b.count);
-
-      await setDoc(doc(db, 'price_rules', cleanId), {
-        name,
-        basePrices: sortedPrices
-      });
-
-      alert("Regla guardada correctamente");
-      resetForm();
-      loadData();
-    } catch (e) {
-      console.error(e);
-      alert("Error al guardar");
-    }
-  };
-
-  const handleEdit = (rule: PriceRule) => {
-    setId(rule.id);
-    setName(rule.name);
-    setBasePrices(rule.basePrices || []);
-    setIsEditing(true);
-  };
-
-  const handleDelete = async (ruleId: string) => {
-    if (!confirm("¿Eliminar esta regla? Las categorías que la usen dejarán de calcular precios correctamente.")) return;
-    try {
-      await deleteDoc(doc(db, 'price_rules', ruleId));
-      loadData();
-    } catch (e) { alert("Error al eliminar"); }
-  };
-
-  const resetForm = () => {
-    setId('');
-    setName('');
-    setBasePrices([{ count: 1, price: 0 }]);
-    setIsEditing(false);
-  };
-
-  return (
-    <div className="grid lg:grid-cols-3 gap-6 h-[calc(100vh-250px)]">
-      
-      {/* FORMULARIO */}
-      <div className="card bg-base-200 h-full overflow-y-auto border border-base-300 shadow-inner">
-        <div className="card-body p-4">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="font-black text-lg">{isEditing ? '✏️ Editar Regla' : '✨ Nueva Regla'}</h3>
-            {isEditing && <button onClick={resetForm} className="btn btn-xs btn-ghost">Cancelar</button>}
-          </div>
-
-          <form onSubmit={handleSave} className="space-y-4">
-            
-            {/* ID y Nombre */}
-            <div className="form-control">
-              <label className="label-text text-xs font-bold">ID Interno</label>
-              <input 
-                className="input input-sm input-bordered font-mono text-xs" 
-                value={id} onChange={e => setId(e.target.value)} 
-                disabled={isEditing} 
-                placeholder="ej. regla_licuados" required 
-              />
-              {!isEditing && <span className="text-[10px] opacity-50 mt-1">Sin espacios (ej. regla_crepas_dulces)</span>}
-            </div>
-
-            <div className="form-control">
-              <label className="label-text text-xs font-bold">Nombre Visible</label>
-              <input 
-                className="input input-sm input-bordered" 
-                value={name} onChange={e => setName(e.target.value)} 
-                placeholder="ej. Precios de Licuados" required 
-              />
-            </div>
-
-            <div className="divider my-1 text-xs font-bold opacity-50">ESCALA DE PRECIOS</div>
-
-            {/* Tabla de Precios Dinámica */}
-            <div className="bg-base-100 rounded-box p-2 border border-base-300 space-y-2">
-              <div className="grid grid-cols-3 gap-2 text-[10px] font-bold text-center opacity-60 uppercase mb-1">
-                <span>Ingredientes</span>
-                <span>Precio ($)</span>
-                <span></span>
-              </div>
-              
-              {basePrices.map((bp, index) => (
-                <div key={index} className="flex gap-2 items-center">
-                  <input 
-                    type="number" 
-                    className="input input-xs input-bordered w-full text-center"
-                    value={bp.count}
-                    onChange={e => updatePriceRow(index, 'count', parseInt(e.target.value) || 0)}
-                  />
-                  <input 
-                    type="number" 
-                    className="input input-xs input-bordered w-full text-center font-bold text-success"
-                    value={bp.price}
-                    onChange={e => updatePriceRow(index, 'price', parseFloat(e.target.value) || 0)}
-                  />
-                  <button type="button" onClick={() => removePriceRow(index)} className="btn btn-xs btn-square btn-ghost text-error">✕</button>
+    return (
+        <div className="space-y-6">
+            <div className="flex justify-between items-center bg-base-200/50 p-4 rounded-xl border border-base-300">
+                <div>
+                    <h3 className="text-xl font-bold text-warning">Configuración de Precios (Reglas)</h3>
+                    <p className="text-sm opacity-70">Define cuánto cuesta el armado de productos (1 ing, 2 ing, etc.)</p>
                 </div>
-              ))}
-              
-              <button type="button" onClick={addPriceRow} className="btn btn-xs btn-outline btn-block border-dashed mt-2">
-                + Agregar Nivel
-              </button>
             </div>
 
-            <button type="submit" className="btn btn-primary btn-block mt-4 shadow-md">
-              {isEditing ? 'Actualizar Regla' : 'Guardar Regla'}
-            </button>
-          </form>
-        </div>
-      </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {rules.map(rule => (
+                    <div key={rule.id} className="card bg-base-100 border border-base-300 shadow-sm hover:border-warning/50 transition-colors">
+                        <div className="card-body p-5">
+                            <div className="flex justify-between items-center">
+                                <h4 className="font-black text-lg">{rule.name}</h4>
+                                <button onClick={() => setEditingRule(JSON.parse(JSON.stringify(rule)))} className="btn btn-sm btn-warning">✏️ Editar Precios</button>
+                            </div>
+                            <div className="mt-2 space-y-1">
+                                {rule.basePrices.slice(0, 3).map(bp => (
+                                    <div key={bp.count} className="text-sm flex justify-between border-b border-base-200 pb-1">
+                                        <span>{bp.count} ingrediente(s):</span>
+                                        <span className="font-bold">${bp.price}</span>
+                                    </div>
+                                ))}
+                                {rule.basePrices.length > 3 && <p className="text-xs opacity-50 text-center">... y {rule.basePrices.length - 3} niveles más</p>}
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
 
-      {/* LISTA */}
-      <div className="lg:col-span-2 bg-base-100 rounded-box border border-base-200 overflow-hidden shadow-sm h-full overflow-y-auto">
-        <table className="table table-sm table-pin-rows">
-          <thead className="bg-base-200">
-            <tr>
-              <th>ID / Nombre</th>
-              <th>Escala de Precios</th>
-              <th className="text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? <tr><td colSpan={3} className="text-center p-10"><span className="loading loading-spinner"></span></td></tr> :
-             rules.length === 0 ? <tr><td colSpan={3} className="text-center p-10 opacity-50">No hay reglas definidas.</td></tr> :
-             rules.map(r => (
-              <tr key={r.id} className="hover">
-                <td>
-                  <div className="font-bold text-sm">{r.name}</div>
-                  <div className="font-mono text-[10px] opacity-40">{r.id}</div>
-                </td>
-                <td>
-                  <div className="flex flex-wrap gap-1">
-                    {r.basePrices?.sort((a,b) => a.count - b.count).map((bp, idx) => (
-                      <span key={idx} className="badge badge-sm badge-ghost font-mono text-[10px]">
-                        {bp.count} x ${bp.price}
-                      </span>
-                    ))}
-                  </div>
-                </td>
-                <td className="text-right">
-                  <div className="join">
-                    <button onClick={() => handleEdit(r)} className="btn btn-xs join-item btn-ghost">✏️</button>
-                    <button onClick={() => handleDelete(r.id)} className="btn btn-xs join-item btn-ghost text-error">🗑️</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+            {editingRule && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-base-100 w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+                        <div className="p-6 border-b border-base-200 bg-warning/10">
+                            <h2 className="text-2xl font-black text-warning">Editar Regla: {editingRule.name}</h2>
+                            <p className="text-xs opacity-70">Modifica los precios base y las excepciones por sucursal.</p>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto">
+                            <table className="table w-full">
+                                <thead>
+                                    <tr className="bg-base-200">
+                                        <th>Cantidad</th>
+                                        <th>Precio Base (General)</th>
+                                        {branches.map(b => (
+                                            <th key={b.id} className="text-center text-primary">{b.name}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {editingRule.basePrices.map((bp, idx) => (
+                                        <tr key={bp.count} className="hover:bg-base-200/30">
+                                            <td className="font-black text-lg">{bp.count} Ing.</td>
+                                            <td>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="opacity-50">$</span>
+                                                    <input type="number" className="input input-bordered input-sm w-24 font-bold" 
+                                                        value={bp.price} 
+                                                        onChange={e => {
+                                                            const newBase = [...editingRule.basePrices];
+                                                            newBase[idx].price = Number(e.target.value);
+                                                            setEditingRule({...editingRule, basePrices: newBase});
+                                                        }} 
+                                                    />
+                                                </div>
+                                            </td>
+                                            {branches.map(b => (
+                                                <td key={b.id} className="bg-base-200/20 border-l border-base-300">
+                                                    <div className="flex flex-col items-center">
+                                                        <input type="number" placeholder={bp.price.toString()} 
+                                                            className="input input-bordered input-xs w-20 text-center"
+                                                            value={bp.branchPrices?.[b.id] ?? ''} 
+                                                            onChange={e => {
+                                                                const newBase = [...editingRule.basePrices];
+                                                                const newBranchPrices = { ...(newBase[idx].branchPrices || {}) };
+                                                                if (e.target.value === '') delete newBranchPrices[b.id];
+                                                                else newBranchPrices[b.id] = Number(e.target.value);
+                                                                newBase[idx].branchPrices = newBranchPrices;
+                                                                setEditingRule({...editingRule, basePrices: newBase});
+                                                            }} 
+                                                        />
+                                                        <span className="text-[10px] mt-1 opacity-40">Precio Especial</span>
+                                                    </div>
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="p-4 border-t border-base-200 flex justify-end gap-3 bg-base-200/50">
+                            <button onClick={() => setEditingRule(null)} className="btn btn-ghost">Cancelar</button>
+                            <button onClick={handleSave} className="btn btn-warning px-10">💾 Guardar Cambios</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 };

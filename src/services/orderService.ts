@@ -3,13 +3,26 @@ import { db, collection, serverTimestamp, runTransaction, doc, writeBatch, incre
 import { printService } from './printService';
 import type { TicketItem } from '../types/menu';
 import type { Order, PaymentDetails, OrderMode, KitchenStatus } from '../types/order';
-import type { DocumentReference } from 'firebase/firestore'; // Importamos el tipo estricto
+import type { DocumentReference } from 'firebase/firestore'; 
 
-// Interfaz interna para asegurar que no usamos 'any'
 interface StockUpdate {
     ref: DocumentReference;
     newStock: number;
 }
+
+const cleanUndefined = (obj: any): any => {
+    if (Array.isArray(obj)) {
+        return obj.map(cleanUndefined);
+    }
+    if (obj !== null && typeof obj === 'object') {
+        return Object.fromEntries(
+            Object.entries(obj)
+                .filter(([_, value]) => value !== undefined)
+                .map(([key, value]) => [key, cleanUndefined(value)])
+        );
+    }
+    return obj;
+};
 
 export const orderService = {
   async createOrder(
@@ -26,10 +39,9 @@ export const orderService = {
 
     const initialStatus = payment ? 'paid' : 'pending';
     const initialKitchenStatus: KitchenStatus = 'queued';
+    let finalOrderNumber = 0;
 
     try {
-      let finalOrderNumber = 0;
-
       await runTransaction(db, async (transaction) => {
         const counterRef = doc(db,"branches", branchId, "counters", "orders");
 
@@ -49,6 +61,7 @@ export const orderService = {
         const uniqueModIds = Array.from(modIdsToRead);
         const invRefs = uniqueModIds.map(id => doc(db, "branches", branchId, "inventory", id));
 
+        // Descargamos como invSnaps
         const [counterSnap, ...invSnaps] = await Promise.all([
             transaction.get(counterRef),
             ...invRefs.map(ref => transaction.get(ref))
@@ -56,7 +69,8 @@ export const orderService = {
 
         const updates: StockUpdate[] = [];
         
-        modSnaps.forEach((snap, index) => {
+        // CORRECCIÓN AQUÍ: Cambiamos modSnaps por invSnaps
+        invSnaps.forEach((snap, index) => {
             if (snap.exists()) {
                 const data = snap.data();
                 if (data.trackStock) {
@@ -67,7 +81,7 @@ export const orderService = {
 
                     // HARDENING: Evitar stock negativo
                     if (newStock < 0) {
-                        throw new Error(`Stock insuficiente: ${data.name} (Quedan: ${currentStock})`);
+                        throw new Error(`Stock insuficiente: ${data.name || 'Ingrediente'} (Quedan: ${currentStock})`);
                     }
 
                     updates.push({ ref: snap.ref, newStock });
@@ -81,22 +95,26 @@ export const orderService = {
         }
         finalOrderNumber = currentCount + 1;
 
+        const cleanItems = cleanUndefined(items);
+        const cleanPayment = payment ? cleanUndefined(payment) : undefined;
+        
         // F. Preparar Objeto
-        const firebaseOrderData: Order = {
-          branchId,
-          items,
-          total,
-          mode,
-          status: initialStatus,
-          kitchenStatus: initialKitchenStatus,
-          orderNumber: finalOrderNumber,
-          customerName,
-          createdAt: serverTimestamp(),
-          cashier: cashierName,
-          ...(payment && { payment }),
-          ...(shiftId && { shiftId })
+        const firebaseOrderData: any = {
+            branchId: branchId || 'sin-sucursal',
+            items: cleanItems,
+            total: total || 0,
+            mode: mode || 'Para Llevar',
+            status: initialStatus,
+            kitchenStatus: initialKitchenStatus,
+            orderNumber: finalOrderNumber,
+            customerName: customerName || 'Cliente Anónimo',
+            createdAt: serverTimestamp(),
+            cashier: cashierName || 'Cajero',
         };
 
+        if (cleanPayment) firebaseOrderData.payment = cleanPayment;
+        if (shiftId) firebaseOrderData.shiftId = shiftId;
+        
         const newOrderRef = doc(collection(db, "orders")); 
         transaction.set(newOrderRef, firebaseOrderData);
         transaction.set(counterRef, { count: finalOrderNumber }, { merge: true });
@@ -106,8 +124,10 @@ export const orderService = {
         });
       });
 
+      // Fuera de la transacción para no bloquear la BD si la impresora falla
       if (shouldPrint) {
         printService.printReceipt({
+            branchId,
             items,
             total,
             mode,
@@ -182,4 +202,3 @@ export const orderService = {
     }
   }
 };
-

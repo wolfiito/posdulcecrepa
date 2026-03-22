@@ -1,180 +1,196 @@
 // src/components/admin/ModifiersManager.tsx
 import React, { useState, useEffect } from 'react';
-import { db, collection, getDocs, addDoc, updateDoc, doc, deleteDoc } from '../../firebase';
-import type { Modifier } from '../../types/menu';
+import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { db } from '../../firebase';
+import { toast } from 'sonner';
+import type { Modifier, ModifierGroup } from '../../types/menu';
+
+interface Branch { id: string; name: string; }
 
 export const ModifiersManager: React.FC = () => {
-  const [modifiers, setModifiers] = useState<Modifier[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [availableGroups, setAvailableGroups] = useState<{id: string, name: string}[]>([]);
-  
-  // Formulario
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ 
-    name: '', 
-    price: 0, 
-    group: 'crepa_dulce_base',
-    trackStock: false, // <--- NUEVO: ¿Controlamos inventario?
-    currentStock: 0    // <--- NUEVO: ¿Cuántos hay?
-  });
+    const [modifiers, setModifiers] = useState<Modifier[]>([]);
+    const [groups, setGroups] = useState<ModifierGroup[]>([]);
+    const [branches, setBranches] = useState<Branch[]>([]);
+    const [loading, setLoading] = useState(true);
+    
+    // Estado para el modal
+    const [editingMod, setEditingMod] = useState<Modifier | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
 
-  // Cargar datos
-  const loadData = async () => {
-    setLoading(true);
-    const snap = await getDocs(collection(db, 'modifiers'));
-    setModifiers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Modifier)));
+    useEffect(() => {
+        fetchData();
+    }, []);
 
-    const groupsSnap = await getDocs(collection(db, 'modifier_groups'));
-    setAvailableGroups(groupsSnap.docs.map(d => ({ id: d.id, name: d.data().name })));
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const [modsSnap, groupsSnap, branchesSnap] = await Promise.all([
+                getDocs(collection(db, 'modifiers')),
+                getDocs(collection(db, 'modifier_groups')),
+                getDocs(collection(db, 'branches'))
+            ]);
 
-    setLoading(false);
-  };
+            setModifiers(modsSnap.docs.map(d => d.data() as Modifier));
+            setGroups(groupsSnap.docs.map(d => d.data() as ModifierGroup));
+            setBranches(branchesSnap.docs.map(d => ({ id: d.id, name: d.data().name })));
+        } catch (error) {
+            toast.error("Error al cargar ingredientes");
+        } finally {
+            setLoading(false);
+        }
+    };
 
-  useEffect(() => { loadData(); }, []);
+    const handleSave = async () => {
+        if (!editingMod || !editingMod.name || !editingMod.group) {
+            return toast.error("Nombre y Grupo son obligatorios");
+        }
+        setIsSaving(true);
+        try {
+            const idToSave = editingMod.id || `mod_${Date.now()}`;
+            await setDoc(doc(db, 'modifiers', idToSave), { ...editingMod, id: idToSave });
+            toast.success("Ingrediente guardado");
+            setEditingMod(null);
+            fetchData();
+        } catch (error) {
+            toast.error("Error al guardar");
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (editingId) {
-        // Editar
-        await updateDoc(doc(db, 'modifiers', editingId), formData);
-        alert("Ingrediente actualizado (Stock ajustado)");
-      } else {
-        // Crear
-        await addDoc(collection(db, 'modifiers'), formData);
-        alert("Ingrediente creado");
-      }
-      // Resetear
-      setFormData({ name: '', price: 0, group: 'crepa_dulce_base', trackStock: false, currentStock: 0 });
-      setEditingId(null);
-      loadData(); 
-    } catch (error) {
-      console.error(error);
-      alert("Error al guardar");
-    }
-  };
+    const handleDelete = async (id: string) => {
+        if (!window.confirm("¿Eliminar este ingrediente?")) return;
+        try {
+            await deleteDoc(doc(db, 'modifiers', id));
+            toast.success("Eliminado");
+            fetchData();
+        } catch (error) {
+            toast.error("Error al eliminar");
+        }
+    };
 
-  const handleEdit = (mod: Modifier) => {
-    setEditingId(mod.id);
-    setFormData({ 
-        name: mod.name, 
-        price: mod.price, 
-        group: mod.group,
-        trackStock: mod.trackStock || false, // Si no existe, asume false
-        currentStock: mod.currentStock || 0 
-    });
-  };
+    const renderEditModal = () => {
+        if (!editingMod) return null;
 
-  const handleDelete = async (id: string) => {
-    if(!confirm("¿Seguro? Esto afectará a los productos que usen este ingrediente.")) return;
-    await deleteDoc(doc(db, 'modifiers', id));
-    loadData();
-  };
-
-  return (
-    <div className="grid md:grid-cols-3 gap-6">
-      {/* --- FORMULARIO --- */}
-      <div className="card bg-base-200 h-fit shadow-sm">
-        <div className="card-body p-4">
-          <h3 className="font-bold mb-2 text-lg">{editingId ? '✏️ Editar / Ajustar Stock' : '✨ Nuevo Ingrediente'}</h3>
-          <form onSubmit={handleSave} className="space-y-3">
-            
-            {/* Nombre y Precio */}
-            <div>
-              <label className="label-text text-xs font-bold">Nombre</label>
-              <input className="input input-sm input-bordered w-full font-bold" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Ej. Kinder Delice" required />
-            </div>
-            <div>
-              <label className="label-text text-xs font-bold">Precio Extra ($)</label>
-              <input type="number" className="input input-sm input-bordered w-full" value={formData.price} onChange={e => setFormData({...formData, price: parseFloat(e.target.value) || 0})} />
-            </div>
-            <div>
-              <label className="label-text text-xs font-bold">Grupo</label>
-              <select className="select select-sm select-bordered w-full" value={formData.group} onChange={e => setFormData({...formData, group: e.target.value})}>
-              <option value="">-- Selecciona un Grupo --</option>
-                {availableGroups.map(g => (
-                    <option key={g.id} value={g.id}>{g.name} ({g.id})</option>
-                ))}
-              </select>
-              {availableGroups.length === 0 && <span className="text-[10px] text-error">¡Crea grupos en la pestaña "Grupos de Opciones" primero!</span>} 
-            </div>
-
-            <div className="divider my-1 text-xs opacity-50">INVENTARIO</div>
-
-            {/* CONTROL DE STOCK */}
-            <div className="form-control bg-base-100 p-2 rounded-box border border-base-300">
-                <label className="label cursor-pointer py-0 mb-2">
-                    <span className="label-text text-xs font-bold">¿Controlar Stock?</span>
-                    <input type="checkbox" className="toggle toggle-xs toggle-success" checked={formData.trackStock} onChange={e => setFormData({...formData, trackStock: e.target.checked})} />
-                </label>
-                
-                {formData.trackStock && (
-                    <div className="animate-fade-in">
-                        <label className="label-text text-xs font-bold text-success">Existencia Actual (Piezas)</label>
-                        <input 
-                            type="number" 
-                            className="input input-sm input-bordered input-success w-full font-black text-lg text-center" 
-                            value={formData.currentStock} 
-                            onChange={e => setFormData({...formData, currentStock: parseFloat(e.target.value) || 0})} 
-                            placeholder="0"
-                        />
-                        <p className="text-[10px] opacity-60 mt-1 text-center">
-                            Ingresa el total real que tienes físicamente.
-                        </p>
+        return (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="bg-base-100 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-fade-in-up">
+                    <div className="p-6 border-b border-base-200 bg-base-200/50">
+                        <h2 className="text-2xl font-black text-secondary">
+                            {editingMod.id ? '✏️ Editar Ingrediente' : '🥦 Nuevo Ingrediente'}
+                        </h2>
                     </div>
-                )}
-            </div>
 
-            <div className="flex gap-2 mt-4 pt-2">
-               {editingId && <button type="button" onClick={() => {setEditingId(null); setFormData({name:'', price:0, group:'crepa_dulce_base', trackStock:false, currentStock:0})}} className="btn btn-sm btn-ghost">Cancelar</button>}
-               <button type="submit" className="btn btn-sm btn-primary flex-1 shadow-md">
-                   {editingId ? 'Guardar Cambios' : 'Crear'}
-               </button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      {/* --- TABLA --- */}
-      <div className="md:col-span-2 overflow-x-auto h-[600px] bg-base-100 rounded-box border border-base-200 shadow-sm">
-        <table className="table table-xs table-pin-rows">
-          <thead className="bg-base-200">
-            <tr>
-              <th>Nombre</th>
-              <th>Grupo</th>
-              <th className="text-center">Stock</th>
-              <th className="text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {modifiers.map(mod => (
-              <tr key={mod.id} className="hover">
-                <td>
-                    <div className="font-bold">{mod.name}</div>
-                    <div className="text-[10px] opacity-50">{mod.price > 0 ? `+$${mod.price}` : 'Gratis'}</div>
-                </td>
-                <td><span className="badge badge-ghost badge-xs">{mod.group}</span></td>
-                
-                {/* Columna de Stock Visual */}
-                <td className="text-center">
-                    {mod.trackStock ? (
-                        <div className={`badge badge-md font-bold ${mod.currentStock! > 10 ? 'badge-success text-white' : mod.currentStock! > 0 ? 'badge-warning' : 'badge-error text-white'}`}>
-                            {mod.currentStock} pzas
+                    <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+                        {/* DATOS BÁSICOS */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="form-control">
+                                <label className="label-text font-bold mb-1">Nombre</label>
+                                <input type="text" className="input input-bordered" value={editingMod.name} onChange={e => setEditingMod({...editingMod, name: e.target.value})} placeholder="Ej. Mora Azul" />
+                            </div>
+                            <div className="form-control">
+                                <label className="label-text font-bold mb-1">Lista / Grupo</label>
+                                <select className="select select-bordered" value={editingMod.group} onChange={e => setEditingMod({...editingMod, group: e.target.value})}>
+                                    <option value="">Selecciona una lista...</option>
+                                    {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                                </select>
+                            </div>
+                            <div className="form-control">
+                                <label className="label-text font-bold mb-1">Precio Extra ($)</label>
+                                <input type="number" className="input input-bordered" value={editingMod.price} onChange={e => setEditingMod({...editingMod, price: Number(e.target.value)})} />
+                            </div>
+                            <div className="form-control flex flex-row items-center gap-4 mt-8">
+                                <input type="checkbox" className="toggle toggle-primary" checked={editingMod.trackStock} onChange={e => setEditingMod({...editingMod, trackStock: e.target.checked})} />
+                                <span className="label-text font-bold">¿Controlar Inventario?</span>
+                            </div>
                         </div>
-                    ) : (
-                        <span className="text-[10px] opacity-30">--</span>
-                    )}
-                </td>
 
-                <td className="text-right">
-                  <button onClick={() => handleEdit(mod)} className="btn btn-square btn-ghost btn-xs text-primary">✏️</button>
-                  <button onClick={() => handleDelete(mod.id)} className="btn btn-square btn-ghost btn-xs text-error opacity-50 hover:opacity-100">🗑️</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                        {/* DISPONIBILIDAD POR SUCURSAL */}
+                        <div className="bg-base-200/50 p-4 rounded-xl space-y-3">
+                            <h3 className="font-bold text-sm uppercase opacity-60">Disponibilidad por Sucursal</h3>
+                            <div className="grid grid-cols-1 gap-2">
+                                {branches.map(b => {
+                                    const isDisabled = editingMod.disabledIn?.includes(b.id);
+                                    return (
+                                        <div key={b.id} className="flex items-center justify-between bg-base-100 p-3 rounded-lg border border-base-300">
+                                            <span className="font-medium">{b.name}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-xs ${isDisabled ? 'text-error' : 'text-success font-bold'}`}>
+                                                    {isDisabled ? 'Agotado/Desactivado' : 'Disponible'}
+                                                </span>
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="toggle toggle-sm" 
+                                                    checked={!isDisabled} 
+                                                    onChange={() => {
+                                                        const curr = editingMod.disabledIn || [];
+                                                        setEditingMod({
+                                                            ...editingMod,
+                                                            disabledIn: isDisabled ? curr.filter(id => id !== b.id) : [...curr, b.id]
+                                                        });
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="p-4 border-t border-base-200 bg-base-200/50 flex justify-end gap-3">
+                        <button onClick={() => setEditingMod(null)} className="btn btn-ghost">Cancelar</button>
+                        <button onClick={handleSave} disabled={isSaving} className="btn btn-secondary px-8">
+                            {isSaving ? 'Guardando...' : 'Guardar Ingrediente'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    if (loading) return <div className="p-10 text-center"><span className="loading loading-spinner text-secondary"></span></div>;
+
+    return (
+      <div className="space-y-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-base-200/50 p-4 rounded-xl border border-base-300">
+              <h3 className="text-xl font-bold">Ingredientes</h3>
+              <button 
+                  onClick={() => setEditingMod({ id: '', name: '', price: 0, group: '', trackStock: false, disabledIn: [] })}
+                  className="btn btn-secondary btn-sm w-full sm:w-auto"
+              >
+                  + Nuevo Ingrediente
+              </button>
+          </div>
+
+          {groups.map(group => (
+              <div key={group.id} className="space-y-3">
+                  <h4 className="text-xs font-black uppercase tracking-widest text-secondary/70 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-secondary"></span>
+                      {group.name}
+                  </h4>
+                  
+                  {/* Grid responsivo: 1 col en movil, 2 en tablet, 4 en PC */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                      {modifiers.filter(m => m.group === group.id).map(mod => (
+                          <div key={mod.id} className="group bg-base-100 border border-base-300 rounded-2xl p-3 flex justify-between items-center hover:border-secondary/50 transition-all">
+                              <div className="flex flex-col">
+                                  <span className="font-bold text-sm">{mod.name}</span>
+                                  <div className="flex items-center gap-2">
+                                      <span className="text-[10px] opacity-60">{mod.price > 0 ? `+$${mod.price}` : 'Gratis'}</span>
+                                      {mod.trackStock && <span className="badge badge-xs badge-info text-[9px]">📦 Stock</span>}
+                                  </div>
+                              </div>
+                              <div className="flex gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button onClick={() => setEditingMod(mod)} className="btn btn-square btn-ghost btn-sm">✏️</button>
+                                  <button onClick={() => handleDelete(mod.id)} className="btn btn-square btn-ghost btn-sm text-error">🗑️</button>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          ))}
+          {renderEditModal()}
       </div>
-    </div>
   );
 };

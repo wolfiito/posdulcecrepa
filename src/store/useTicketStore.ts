@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { TicketItem } from '../types/menu';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
-type OrderMode = 'Mesa 1' | 'Mesa 2' | 'Para Llevar';
+type OrderMode = string;
 
 interface TicketState {
   items: TicketItem[];

@@ -190,12 +190,24 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     ))}
                     
                     <div className="divider my-1"></div>
-                    <div className="flex justify-between items-end px-1">
-                        <div className="text-xs font-bold text-base-content/60">Restante</div>
+                    <div className="flex justify-between items-center px-1">
+                        <div className="text-xs font-bold text-base-content/60">
+                            {remaining > 0 ? 'Falta Pagar' : (mixedChange > 0 ? 'Dar Cambio' : 'Estado')}
+                        </div>
+                        
                         {remaining > 0 ? (
-                            <div className="text-lg font-black text-error">${remaining.toFixed(2)}</div>
+                            <div className="text-xl font-black text-error">
+                                ${remaining.toFixed(2)}
+                            </div>
+                        ) : mixedChange > 0 ? (
+                            // NUEVO: Mostrar el cambio a devolver en verde gigante
+                            <div className="text-2xl font-black text-success animate-pulse">
+                                ${mixedChange.toFixed(2)}
+                            </div>
                         ) : (
-                            <div className="text-lg font-black text-success">¡Cubierto!</div>
+                            <div className="text-xl font-black text-success">
+                                ¡Cubierto Exacto!
+                            </div>
                         )}
                     </div>
                 </div>

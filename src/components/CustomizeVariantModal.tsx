@@ -3,6 +3,8 @@ import { useState, useMemo, useEffect } from 'react';
 import Modal from 'react-modal';
 import type { VariantPriceItem, FixedPriceItem, Modifier, TicketItem, MenuItem } from '../types/menu'; 
 import { EXCLUSIVE_GROUPS } from '../constants/menuConstants'; // Usamos tu lista maestra de exclusividad
+import { useInventoryStore } from '../store/useInventoryStore';
+import { useAuthStore } from '../store/useAuthStore';
 
 Modal.setAppElement('#root');
 
@@ -31,7 +33,14 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
     const [step, setStep] = useState(0);
     const [selectedVariant, setSelectedVariant] = useState(isVariantPrice(item) ? item.variants[0] : initialVariant);
     const [selectedModifiers, setSelectedModifiers] = useState<Map<string, Modifier>>(new Map());
-    
+    const { stockData } = useInventoryStore();
+    const { activeBranchId } = useAuthStore();
+
+    const getPrice = (obj: any) => {
+        if (!obj) return 0;
+        return obj.branchPrices?.[activeBranchId || ''] ?? obj.price ?? 0;
+    };
+
     useEffect(() => {
         if (isOpen && item) {
             setStep(0);
@@ -52,7 +61,7 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
             price: variantPrice + extraPrice,
             cost: baseCost + extraCost 
         };
-    }, [item, selectedVariant, selectedModifiers]);
+    }, [item, selectedVariant, selectedModifiers, activeBranchId]);
 
     // --- GENERACIÓN DINÁMICA DE PASOS (WIZARD) ---
     const steps = useMemo(() => {
@@ -76,26 +85,37 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
         
         productGroups.forEach(groupId => {
             // Buscamos los ingredientes que pertenecen a este grupo
-            const options = allModifiers.filter(mod => mod.group === groupId);
+            const options = allModifiers
+            .filter(mod => mod.group === groupId)
+            .filter(mod => {
+                if (activeBranchId && mod.disabledIn?.includes(activeBranchId)) {
+                    return false; 
+                }
+                const inv = stockData[mod.id];
+                const isTracked = mod.trackStock === true || inv?.trackStock === true;
+                const realStock = inv?.currentStock ?? 0;
+                if (isTracked && realStock <= 0) {
+                    return false; 
+                }
+                return true;
+            });
             
             if (options.length > 0) {
-                // Determinamos si es selección única (Radio) o múltiple (Checkbox)
-                // Usando tu constante EXCLUSIVE_GROUPS
-                const isExclusive = EXCLUSIVE_GROUPS.includes(groupId);
-                
+                const isExclusive = EXCLUSIVE_GROUPS.includes(groupId) || groupId === 'tipo_leche' || groupId === 'bubble_estilo';
+
                 stepList.push({
                     id: groupId,
-                    name: formatGroupName(groupId), // "soda_sabores" -> "Soda Sabores"
+                    name: formatGroupName(groupId),
                     options: options,
                     isExclusive: isExclusive,
-                    isRequired: isExclusive, // Si es exclusivo (ej. sabor), solemos obligar a elegir uno
+                    isRequired: isExclusive, 
                     type: 'modifier_selector'
                 });
             }
         });
 
         return stepList;
-    }, [item, allModifiers]);
+    }, [item, allModifiers, stockData]);
 
     const currentStep = steps[step];
     const isLastStep = step === steps.length - 1;
@@ -106,7 +126,7 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
         if (!currentStep.isRequired) return true;
 
         if (currentStep.type === 'variant_selector') {
-            return selectedVariant.price > 0; // Debe tener variante seleccionada
+            return !!selectedVariant.name; // Debe tener un tamaño seleccionado
         }
         
         // Verificar si hay al menos un modificador seleccionado para este grupo
@@ -165,24 +185,18 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
             className="bg-base-100 w-full max-w-lg max-h-[90dvh] rounded-box shadow-2xl flex flex-col overflow-hidden outline-none animate-pop-in border border-base-200"
             overlayClassName="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
         >
-            {/* Header */}
             <div className="p-5 border-b border-base-200 bg-base-100 text-center relative">
                 <h2 className="text-xl font-bold text-base-content">{item.name}</h2>
-                
-                {/* Steps Indicator */}
                 <div className="flex gap-1 justify-center my-3 h-1.5 w-full max-w-xs mx-auto">
                     {steps.map((s, index) => (
                         <div key={s.id} className={`flex-1 rounded-full transition-colors duration-300 ${index <= step ? 'bg-primary' : 'bg-base-300'}`} />
                     ))}
                 </div>
-                
-                {/* Precio Dinámico */}
                  <div className={`badge badge-lg font-bold transition-colors duration-300 ${isStepValid ? 'badge-success text-success-content' : 'badge-ghost opacity-50'}`}>
                     Total: ${currentPrice.toFixed(2)}
                 </div>
             </div>
             
-            {/* Contenido Dinámico */}
             <div className="flex-1 overflow-y-auto p-4 bg-base-200/50">
                 <h4 className="text-sm font-bold uppercase tracking-wide opacity-70 mb-3 flex justify-between">
                     {currentStep.name} 
@@ -190,10 +204,10 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
                 </h4>
                 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    
-                    {/* CASO 1: SELECCIONAR TAMAÑO (VARIANTE) */}
+                    {/* TAMAÑOS */}
                     {currentStep.type === 'variant_selector' && (currentStep.options as any[]).map(variant => {
                         const isSelected = selectedVariant.name === variant.name;
+                        const vPrice = getPrice(variant); // <--- LEE EL PRECIO DE SUCURSAL
                         return (
                             <button
                                 key={variant.name}
@@ -205,13 +219,13 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
                             >
                                 <span className="text-sm font-semibold">{variant.name}</span>
                                 <span className={`text-xs font-normal mt-1 ${isSelected ? 'text-primary-content/90' : 'text-base-content/60'}`}>
-                                    ${variant.price.toFixed(2)}
+                                    ${vPrice.toFixed(2)}
                                 </span>
                             </button>
                         )
                     })}
                     
-                    {/* CASO 2: SELECCIONAR MODIFICADORES (SABORES, LECHES, ETC) */}
+                    {/* MODIFICADORES */}
                     {currentStep.type === 'modifier_selector' && (currentStep.options as Modifier[]).map(mod => {
                         const isSelected = selectedModifiers.has(mod.id);
                         return (
@@ -235,7 +249,6 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
                 </div>
             </div>
             
-            {/* Footer */}
             <div className="p-4 border-t border-base-200 bg-base-100 flex gap-3">
                 <button onClick={step === 0 ? onClose : handlePrev} className="btn btn-ghost text-base-content/70">
                     {step === 0 ? 'Cancelar' : 'Atrás'}

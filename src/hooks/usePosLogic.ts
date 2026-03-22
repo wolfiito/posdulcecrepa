@@ -1,3 +1,4 @@
+// src/hooks/usePosLogic.ts
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useTicketStore } from '../store/useTicketStore';
@@ -31,16 +32,11 @@ export const usePosLogic = () => {
     openShiftModal 
   } = useUIStore();
 
-  const [
-    isPaymentModalOpen, 
-    setIsPaymentModalOpen,
-    isModeModalOpen, 
-    setIsModeModalOpen,
-    isProcessing, 
-    setIsProcessing,
-    isLoading,
-    setIsLoading
-    ] = useState(false);
+  // CORRECCIÓN: Declarar cada estado individualmente
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isModeModalOpen, setIsModeModalOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); 
 
   useEffect(() => {
     const unsubscribe = startListening();
@@ -114,13 +110,13 @@ export const usePosLogic = () => {
       }
   }, [isProcessing, currentUser, currentShift, clearTicket, setView, activeBranchId]);
 
-  const handleModeConfirmed = useCallback((selectedMode: OrderMode, finalName: string) => {
+  const handleModeConfirmed = useCallback((selectedMode: string, finalName: string) => {
     if (!activeBranchId) {
         toast.error("No hay sucursal activa");
         return;
     }
 
-      setOrderMode(selectedMode);
+      setOrderMode(selectedMode as OrderMode);
       setCustomerName(finalName);
       setIsModeModalOpen(false);
 
@@ -147,6 +143,7 @@ export const usePosLogic = () => {
     }
     setIsModeModalOpen(true);
 }, []);
+
   return {
     orderMode,
     customerName,

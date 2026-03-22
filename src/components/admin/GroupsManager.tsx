@@ -1,211 +1,99 @@
 // src/components/admin/GroupsManager.tsx
 import React, { useState, useEffect } from 'react';
-import { db, collection, getDocs, addDoc, updateDoc, doc, deleteDoc } from '../../firebase';
-import type { MenuGroup, MenuItem, Modifier, PriceRule } from '../../types/menu';
+import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { db } from '../../firebase';
+import { toast } from 'sonner';
+import type { MenuGroup, MenuItem } from '../../types/menu';
 
 export const GroupsManager: React.FC = () => {
-  const [groups, setGroups] = useState<MenuGroup[]>([]);
-  const [items, setItems] = useState<MenuItem[]>([]);
-  const [rules, setRules] = useState<PriceRule[]>([]);
-  
-  // Lista de grupos de opciones disponibles (ej. "Sabores de Soda")
-  const [availableOptionGroups, setAvailableOptionGroups] = useState<{id: string, name: string}[]>([]);
+    const [groups, setGroups] = useState<MenuGroup[]>([]);
+    const [allItems, setAllItems] = useState<MenuItem[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [editingGroup, setEditingGroup] = useState<MenuGroup | null>(null);
 
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+    useEffect(() => { fetchData(); }, []);
 
-  // Formulario
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [name, setName] = useState('');
-  const [parent, setParent] = useState('root');
-  const [selectedItems, setSelectedItems] = useState<string[]>([]);
-  
-  // Avanzado
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [rulesRef, setRulesRef] = useState('');
-  const [baseGroup, setBaseGroup] = useState('');
-  // Ahora sí manejamos estos arrays
-  const [extraGroups, setExtraGroups] = useState<string[]>([]); 
-  const [toppingGroups, setToppingGroups] = useState<string[]>([]);
+    const fetchData = async () => {
+        setLoading(true);
+        const [groupsSnap, itemsSnap] = await Promise.all([
+            getDocs(collection(db, 'menu_groups')),
+            getDocs(collection(db, 'menu_items'))
+        ]);
+        setGroups(groupsSnap.docs.map(d => d.data() as MenuGroup));
+        setAllItems(itemsSnap.docs.map(d => d.data() as MenuItem));
+        setLoading(false);
+    };
 
-  useEffect(() => { loadAllData(); }, []);
+    const handleSave = async () => {
+        if (!editingGroup?.name) return toast.error("Nombre obligatorio");
+        try {
+            const id = editingGroup.id || `group_${Date.now()}`;
+            await setDoc(doc(db, 'menu_groups', id), { ...editingGroup, id });
+            toast.success("Categoría guardada");
+            setEditingGroup(null);
+            fetchData();
+        } catch (e) { toast.error("Error al guardar"); }
+    };
 
-  const loadAllData = async () => {
-    setLoading(true);
-    try {
-      const [gSnap, iSnap, rSnap, modGroupsSnap] = await Promise.all([
-        getDocs(collection(db, 'menu_groups')),
-        getDocs(collection(db, 'menu_items')),
-        getDocs(collection(db, 'price_rules')),
-        getDocs(collection(db, 'modifier_groups')) // Leemos los grupos creados
-      ]);
+    if (loading) return <div className="p-10 text-center"><span className="loading loading-spinner text-primary"></span></div>;
 
-      setGroups(gSnap.docs.map(d => ({ id: d.id, ...d.data() } as MenuGroup)));
-      setItems(iSnap.docs.map(d => ({ id: d.id, ...d.data() } as MenuItem)).sort((a,b) => a.name.localeCompare(b.name)));
-      setRules(rSnap.docs.map(d => ({ id: d.id, ...d.data() } as PriceRule)));
-      setAvailableOptionGroups(modGroupsSnap.docs.map(d => ({ id: d.id, name: d.data().name })));
-
-    } catch (error) { console.error(error); } finally { setLoading(false); }
-  };
-
-  // ... (Reset y Edit handlers) ...
-  const handleReset = () => {
-    setEditingId(null); setName(''); setParent('root'); setSelectedItems([]);
-    setRulesRef(''); setBaseGroup(''); setExtraGroups([]); setToppingGroups([]); setShowAdvanced(false);
-  };
-
-  const handleEdit = (g: MenuGroup) => {
-    setEditingId(g.id); setName(g.name); setParent(g.parent || 'root'); setSelectedItems(g.items_ref || []);
-    setRulesRef(g.rules_ref || ''); setBaseGroup(g.base_group || '');
-    setExtraGroups(g.extra_groups || []); setToppingGroups(g.topping_groups || []);
-    if(g.rules_ref) setShowAdvanced(true);
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    const parentGroup = groups.find(g => g.id === parent);
-    const level = parent === 'root' ? 1 : (parentGroup?.level || 0) + 1;
-
-    const groupData: any = { name, parent, level, items_ref: selectedItems };
-    
-    // Solo guardamos config avanzada si hay regla seleccionada
-    if (rulesRef) {
-        groupData.rules_ref = rulesRef;
-        groupData.base_group = baseGroup;
-        if(extraGroups.length) groupData.extra_groups = extraGroups;
-        if(toppingGroups.length) groupData.topping_groups = toppingGroups;
-    }
-
-    try {
-      if (editingId) await updateDoc(doc(db, 'menu_groups', editingId), groupData);
-      else await addDoc(collection(db, 'menu_groups'), groupData);
-      alert("Guardado"); handleReset(); loadAllData();
-    } catch (e) { alert("Error"); } finally { setSubmitting(false); }
-  };
-
-  const handleDelete = async (id: string) => {
-      if(!confirm("¿Borrar?")) return;
-      try { await deleteDoc(doc(db, 'menu_groups', id)); loadAllData(); } catch(e) { alert("Error"); }
-  }
-
-  // Helper para checkboxes de grupos opcionales
-  const toggleArrayItem = (item: string, setter: React.Dispatch<React.SetStateAction<string[]>>) => {
-      setter(prev => prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]);
-  };
-
-  return (
-    <div className="grid lg:grid-cols-3 gap-6 h-[calc(100vh-250px)]">
-      <div className="lg:col-span-1 card bg-base-200 h-full overflow-y-auto p-4">
-          <h3 className="font-bold text-lg mb-2">{editingId ? 'Editar' : 'Nueva'} Categoría</h3>
-          <form onSubmit={handleSave} className="space-y-3">
-            <div>
-                <label className="text-xs font-bold">Nombre</label>
-                <input className="input input-sm input-bordered w-full" value={name} onChange={e=>setName(e.target.value)} required placeholder="ej. Crepas Dulces" />
-            </div>
-            <div>
-                <label className="text-xs font-bold">Padre</label>
-                <select className="select select-sm select-bordered w-full" value={parent} onChange={e=>setParent(e.target.value)}>
-                    <option value="root">🌟 PRINCIPAL</option>
-                    {groups.filter(g=>g.id!==editingId).map(g=><option key={g.id} value={g.id}>{'-'.repeat(g.level)} 📂 {g.name}</option>)}
-                </select>
-            </div>
-            
-            <div className="divider my-1 text-[10px]">CONTENIDO FIJO</div>
-            <div className="form-control">
-                <label className="text-xs font-bold mb-1">Productos (Items)</label>
-                <div className="h-32 overflow-y-auto bg-base-100 border rounded p-2 grid gap-1">
-                    {items.map(i => (
-                        <label key={i.id} className="cursor-pointer label justify-start gap-2 p-0">
-                            <input type="checkbox" className="checkbox checkbox-xs" checked={selectedItems.includes(i.id)} onChange={()=>toggleArrayItem(i.id, setSelectedItems)} />
-                            <span className="text-xs">{i.name}</span>
-                        </label>
-                    ))}
-                </div>
+    return (
+        <div className="space-y-6">
+            <div className="flex justify-between items-center bg-base-200/50 p-4 rounded-xl border border-base-300">
+                <h3 className="text-xl font-bold">Gestor de Categorías (Carpetas)</h3>
+                <button onClick={() => setEditingGroup({ id: '', name: '', level: 1, parent: 'root', items_ref: [] })} className="btn btn-primary btn-sm">+ Nueva Categoría</button>
             </div>
 
-            <div className="divider my-1 text-[10px]">CONFIGURACIÓN ARMABLE</div>
-            <div className="bg-base-100 p-3 rounded-box border border-base-300">
-                <div className="form-control mb-2">
-                    <label className="label cursor-pointer justify-start gap-2 p-0">
-                        <input type="checkbox" className="toggle toggle-xs toggle-warning" checked={showAdvanced} onChange={e => setShowAdvanced(e.target.checked)} />
-                        <span className="text-xs font-bold">¿Es un producto "Armable"?</span>
-                    </label>
-                </div>
-
-                {showAdvanced && (
-                    <div className="space-y-3 animate-fade-in">
-                        <div>
-                            <label className="text-[10px] font-bold">Regla de Precio (Escala)</label>
-                            <select className="select select-xs select-bordered w-full" value={rulesRef} onChange={e=>setRulesRef(e.target.value)} required={showAdvanced}>
-                                <option value="">-- Selecciona Regla --</option>
-                                {rules.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="text-[10px] font-bold">Grupo Base (Ingredientes)</label>
-                            <select className="select select-xs select-bordered w-full" value={baseGroup} onChange={e=>setBaseGroup(e.target.value)} required={showAdvanced}>
-                                <option value="">-- Selecciona Grupo Base --</option>
-                                {availableOptionGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                            </select>
-                        </div>
-                        
-                        <div>
-                            <label className="text-[10px] font-bold">Grupos Extras (Costo Adicional)</label>
-                            <div className="h-20 overflow-y-auto border rounded p-1 bg-base-200">
-                                {availableOptionGroups.map(g => (
-                                    <label key={g.id} className="cursor-pointer label justify-start gap-2 p-0">
-                                        <input type="checkbox" className="checkbox checkbox-xs" checked={extraGroups.includes(g.id)} onChange={()=>toggleArrayItem(g.id, setExtraGroups)} />
-                                        <span className="text-[10px]">{g.name}</span>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="text-[10px] font-bold">Grupos Toppings (Salsas/Decoración)</label>
-                            <div className="h-20 overflow-y-auto border rounded p-1 bg-base-200">
-                                {availableOptionGroups.map(g => (
-                                    <label key={g.id} className="cursor-pointer label justify-start gap-2 p-0">
-                                        <input type="checkbox" className="checkbox checkbox-xs" checked={toppingGroups.includes(g.id)} onChange={()=>toggleArrayItem(g.id, setToppingGroups)} />
-                                        <span className="text-[10px]">{g.name}</span>
-                                    </label>
-                                ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {groups.map(g => (
+                    <div key={g.id} className="card bg-base-100 border border-base-300 shadow-sm">
+                        <div className="card-body p-4">
+                            <h4 className="font-bold">{g.name}</h4>
+                            <p className="text-xs opacity-50">Padre: {g.parent} | Productos: {g.items_ref?.length || 0}</p>
+                            <div className="card-actions justify-end mt-2">
+                                <button onClick={() => setEditingGroup(g)} className="btn btn-xs btn-ghost text-primary">Editar</button>
                             </div>
                         </div>
                     </div>
-                )}
+                ))}
             </div>
 
-            <button disabled={submitting} className="btn btn-primary btn-block mt-2">{submitting ? '...' : 'Guardar'}</button>
-          </form>
-      </div>
-
-      <div className="lg:col-span-2 bg-base-100 rounded-box border p-4 overflow-y-auto">
-          {/* Aquí va la tabla de lista de grupos (igual que antes) */}
-          <table className="table table-sm">
-            <thead><tr><th>Nombre</th><th>Tipo</th><th>Contenido</th><th></th></tr></thead>
-            <tbody>
-                {groups.sort((a,b)=>(a.parent||'').localeCompare(b.parent||'') || a.name.localeCompare(b.name)).map(g=>(
-                    <tr key={g.id} className="hover">
-                        <td>
-                            <div className="flex items-center gap-2">
-                                <div style={{width: g.level * 15}} />
-                                <span className="text-lg">{g.level===0?'📂':'Lr'}</span>
-                                <span className="font-bold text-xs">{g.name}</span>
+            {editingGroup && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+                    <div className="bg-base-100 w-full max-w-2xl rounded-2xl p-6 shadow-2xl space-y-4">
+                        <h2 className="text-xl font-black">Configurar Carpeta</h2>
+                        <div className="form-control">
+                            <label className="label-text font-bold">Nombre de la carpeta</label>
+                            <input type="text" className="input input-bordered" value={editingGroup.name} onChange={e => setEditingGroup({...editingGroup, name: e.target.value})} />
+                        </div>
+                        
+                        {/* Selector de Productos (Checklist) */}
+                        <div className="form-control">
+                            <label className="label-text font-bold mb-2">Productos dentro de esta carpeta:</label>
+                            <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 bg-base-200 rounded-lg">
+                                {allItems.map(item => (
+                                    <label key={item.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-base-300 p-1 rounded">
+                                        <input type="checkbox" className="checkbox checkbox-xs" 
+                                            checked={editingGroup.items_ref?.includes(item.id)}
+                                            onChange={() => {
+                                                const current = editingGroup.items_ref || [];
+                                                const updated = current.includes(item.id) ? current.filter(id => id !== item.id) : [...current, item.id];
+                                                setEditingGroup({...editingGroup, items_ref: updated});
+                                            }}
+                                        />
+                                        {item.name}
+                                    </label>
+                                ))}
                             </div>
-                        </td>
-                        <td>{g.rules_ref ? <span className="badge badge-warning badge-xs">Armable</span> : <span className="badge badge-ghost badge-xs">Carpeta</span>}</td>
-                        <td className="text-xs opacity-60">{g.items_ref?.length || 0} items</td>
-                        <td className="text-right">
-                            <button onClick={()=>handleEdit(g)} className="btn btn-xs btn-square btn-ghost">✏️</button>
-                            <button onClick={()=>handleDelete(g.id)} className="btn btn-xs btn-square btn-ghost text-error">🗑️</button>
-                        </td>
-                    </tr>
-                ))}
-            </tbody>
-          </table>
-      </div>
-    </div>
-  );
+                        </div>
+
+                        <div className="flex justify-end gap-2 mt-6">
+                            <button onClick={() => setEditingGroup(null)} className="btn btn-ghost">Cancelar</button>
+                            <button onClick={handleSave} className="btn btn-primary">Guardar Cambios</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 };

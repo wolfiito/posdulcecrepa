@@ -25,7 +25,8 @@ export const authService = {
         name: userData.name,
         role: userData.role,
         username: userData.username,
-        password: userData.password
+        password: userData.password,
+        branchId: userData.branchId
     } as User;
   },
 
@@ -36,6 +37,6 @@ export const authService = {
     if (snapshot.empty) return null;
 
     const data = snapshot.docs[0].data();
-    return { name: data.name, username: data.username, role: data.role }; // <--- Agregamos role
+    return { name: data.name, username: data.username, role: data.role };
   }
 };
