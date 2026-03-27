@@ -3,6 +3,10 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import './index.css' // Solo mantenemos los estilos globales de Tailwind
 import App from './App.tsx'
+import { registerSW } from 'virtual:pwa-register'
+
+// Registro automático del Service Worker para actualizaciones inmediatas
+registerSW({ immediate: true })
 
 // Asegurarnos de que el elemento root existe antes de renderizar
 const rootElement = document.getElementById('root');

@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User } from '../types/user';
 import { authService } from '../services/authService';
+import { useTicketStore } from './useTicketStore';
+import { useUIStore } from './useUIStore';
 
 interface AuthState {
 
@@ -45,12 +47,17 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      logout: () => set({ 
-        currentUser: null, 
-        activeBranchId: null,
-        isAuthenticated: false, 
-        error: null 
-      }),
+      logout: () => {
+        // Limpiar estado transitorio antes de borrar la sesión
+        useTicketStore.getState().clearTicket();
+        useUIStore.getState().setView('menu');
+        set({ 
+          currentUser: null, 
+          activeBranchId: null,
+          isAuthenticated: false, 
+          error: null 
+        });
+      },
 
       setUser: (user: User) => set({ 
         currentUser: user,
