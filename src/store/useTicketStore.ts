@@ -15,6 +15,7 @@ interface TicketState {
   clearTicket: () => void;
   setOrderMode: (mode: OrderMode) => void;
   setCustomerName: (name: string) => void;
+  loadTicket: (items: TicketItem[], mode: OrderMode, name: string) => void;
   getTotal: () => number;
 }
 
@@ -36,6 +37,8 @@ export const useTicketStore = create<TicketState>()(
   setOrderMode: (mode) => set({ orderMode: mode }),
 
   setCustomerName: (name) => set({ customerName: name }),
+
+  loadTicket: (items, mode, name) => set({ items, orderMode: mode, customerName: name }),
 
   getTotal: () => {
     return get().items.reduce((sum, item) => sum + item.finalPrice, 0);

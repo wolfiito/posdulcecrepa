@@ -1,5 +1,4 @@
 // src/App.tsx
-import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { useAuthStore } from './store/useAuthStore';
@@ -22,6 +21,8 @@ import type { UserRole } from './types/user';
 import { BranchesManager } from './components/admin/BranchesManager';
 import { BackupDatabase } from './components/admin/BackupDatabase';
 import { InventoryByBranchScreen } from './components/admin/InventoryByBranchScreen';
+import ImagePreloader from './components/ImagePreloader';
+
 function App() {
   const { currentUser } = useAuthStore();
 
@@ -40,6 +41,7 @@ function App() {
 
   return (
     <>
+      <ImagePreloader />
       <Toaster position="top-center" richColors closeButton />
 
       <Routes>

@@ -29,10 +29,11 @@ export const MovementsScreen: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false); // Control del Modal
 
     const { currentShift } = useShiftStore();
+    const { activeBranchId, currentUser } = useAuthStore();
 
     const loadData = () => {
         setLoading(true);
-        movementService.getDailyMovements()
+        movementService.getDailyMovements(activeBranchId || undefined)
             .then(data => {
                 // Ordenar: más recientes primero
                 const sorted = data.filter(m => m.type === 'OUT').sort((a,b) => {
@@ -165,7 +166,7 @@ const NewExpenseModal = ({ isOpen, onClose, onSuccess }: { isOpen: boolean, onCl
     const [description, setDescription] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
-    const { currentUser } = useAuthStore();
+    const { currentUser, activeBranchId } = useAuthStore();
     const { currentShift } = useShiftStore();
 
     // Resetear al abrir
@@ -186,7 +187,7 @@ const NewExpenseModal = ({ isOpen, onClose, onSuccess }: { isOpen: boolean, onCl
         const userName = currentUser?.name || 'Staff';
 
         try {
-            await movementService.addMovement('OUT', category, parseFloat(amount), description, shiftId, userName);
+            await movementService.addMovement('OUT', category, parseFloat(amount), description, shiftId, userName, activeBranchId || undefined);
             toast.success('Gasto registrado');
             onSuccess();
             onClose();

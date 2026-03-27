@@ -14,7 +14,16 @@ export const MODIFIER_GROUPS = {
     "frappe_especial_sabores", 
     "soda_sabores", 
     "chamoyada_sabores", 
-    "icee_sabores"
+    "icee_sabores",
+    "te_sabor", 
+    "tisanas_sabor", 
+    "soda_sabor", 
+    "chamoy_sabor", 
+    "malt_sen_sabor", 
+    "malt_esp_sabor", 
+    "frap_sen_sabor", 
+    "frap_esp_sabor", 
+    "bubble_sabor"
   ];
   
   export const EXCLUSIVE_GROUPS = [

@@ -1,10 +1,11 @@
-// src/components/OrdersScreen.tsx
 import React, { useEffect, useState } from 'react';
-import { db, collection, query, where, orderBy, onSnapshot, Timestamp } from '../firebase';
+import { db, collection, query, where, orderBy, onSnapshot, Timestamp, doc, getDoc } from '../firebase';
+import { OrderTicketItem } from './OrderTicketItem';
 import { orderService } from '../services/orderService';
 import { PaymentModal } from './PaymentModal';
 import { toast } from 'sonner';
 import type { Order } from '../types/order';
+import type { TicketItem } from '../types/menu';
 
 // Stores
 import { useShiftStore } from '../store/useShiftStore';
@@ -29,6 +30,7 @@ export const OrdersScreen: React.FC = () => {
   // Pago
   const [selectedGroup, setSelectedGroup] = useState<GroupedOrder | null>(null);
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
 
   // Seguridad
   const { currentShift } = useShiftStore();
@@ -47,8 +49,7 @@ export const OrdersScreen: React.FC = () => {
     const q = query(
       collection(db, "orders"),
       where("branchId", "==", activeBranchId),
-      where("status", "!=", "paid"), 
-      orderBy("status", "asc"), 
+      where("status", "==", "pending"), // <--- Fix: Solo mostrar las que están realmente pendientes
       orderBy("createdAt", "asc") // Las más viejas primero (FIFO)
     );
 
@@ -104,6 +105,57 @@ export const OrdersScreen: React.FC = () => {
       }
       setSelectedGroup(group);
       setIsPayModalOpen(true);
+  };
+
+  const handleRemoveItem = async (itemToRemove: TicketItem, orderId: string) => {
+    try {
+        const orderRef = doc(db, "orders", orderId);
+        const orderSnapshot = await getDoc(orderRef);
+        if (!orderSnapshot.exists()) return;
+        
+        const orderData = orderSnapshot.data();
+        const currentItems: TicketItem[] = orderData.items || [];
+        
+        // Encontrar el item exacto
+        const itemIndex = currentItems.findIndex(i => 
+            i.id === itemToRemove.id && i.finalPrice === itemToRemove.finalPrice
+        );
+
+        if (itemIndex === -1) {
+            toast.error("No se encontró el producto en la orden");
+            return;
+        }
+
+        const remainingItems = [...currentItems];
+        remainingItems.splice(itemIndex, 1);
+        
+        const newTotal = remainingItems.reduce((acc, i) => acc + (i.finalPrice || 0), 0);
+        
+        // IMPORTANTE: Al eliminar desde la UI (swipe), eliminamos de a 1 unidad.
+        // Creamos una copia del item con quantity = 1 para que el servicio restaure solo eso.
+        const itemWithSingleQty = { ...itemToRemove, quantity: 1 };
+        
+        await orderService.removeItemFromOrder(activeBranchId!, orderId, itemWithSingleQty, remainingItems, newTotal);
+        toast.success("Producto eliminado e inventario restaurado");
+    } catch (error) {
+        console.error(error);
+        toast.error("Error al eliminar producto");
+    }
+  };
+
+  const handleDeleteGroup = async (group: GroupedOrder) => {
+    if (!activeBranchId) return;
+    if (!window.confirm(`¿Estás seguro de que quieres eliminar TODAS las órdenes de ${group.customerName}?`)) return;
+    
+    try {
+        for (const order of group.orders) {
+            await orderService.cancelOrder(activeBranchId, order.id!, order.items);
+        }
+        toast.success(`Cuenta de ${group.customerName} eliminada`);
+    } catch (error) {
+        console.error(error);
+        toast.error("Error al eliminar la cuenta");
+    }
   };
 
   const confirmPayment = async (paymentDetails: any) => {
@@ -182,10 +234,30 @@ export const OrdersScreen: React.FC = () => {
                   const accentColor = isTakeout ? 'border-orange-400' : 'border-blue-500';
                   const badgeColor = isTakeout ? 'badge-warning' : 'badge-info';
 
-                  // Juntamos todos los items de todas las ordenes del grupo para mostrarlos
-                  const allItems = group.orders.flatMap(o => o.items);
-                  const displayItems = allItems.slice(0, 4); // Solo mostramos 4
-                  const remaining = allItems.length - 4;
+                  // Juntamos todos los items de cada orden
+                  const groupId = group.id;
+                  const allRawItems = group.orders.flatMap(o => o.items.map(i => ({ ...i, orderRefId: o.id })));
+                  
+                  // Consolidación por Producto + Detalles (IGNORAMOS id ya que es único por línea)
+                  const consolidatedItems = allRawItems.reduce((acc, current) => {
+                      // Signature: productId/baseName + price + details stringified
+                      const detailsSig = current.details ? JSON.stringify(current.details) : "";
+                      const sig = (current.productId || current.baseName) + current.finalPrice + detailsSig;
+                      
+                      const existingIndex = acc.findIndex(i => {
+                          const iDetailsSig = i.details ? JSON.stringify(i.details) : "";
+                          const iSig = (i.productId || i.baseName) + i.finalPrice + iDetailsSig;
+                          return iSig === sig;
+                      });
+
+                      if (existingIndex > -1) {
+                          acc[existingIndex].quantity = (acc[existingIndex].quantity || 1) + (current.quantity || 1);
+                      } else {
+                          // Quitamos el id de la signature para que agrupe, pero mantenemos una referencia para delete
+                          acc.push({ ...current, quantity: current.quantity || 1 });
+                      }
+                      return acc;
+                  }, [] as any[]);
 
                   return (
                     <div 
@@ -214,23 +286,22 @@ export const OrdersScreen: React.FC = () => {
 
                         {/* CUERPO TICKET (Lista) */}
                         <div className="p-4 flex-1 bg-[linear-gradient(transparent_95%,rgba(0,0,0,0.02)_100%)] bg-[length:100%_20px]">
-                            <ul className="space-y-1.5">
-                                {displayItems.map((item, idx) => (
-                                    <li key={`${item.id}-${idx}`} className="text-sm flex justify-between items-start leading-tight">
-                                        <span className="font-medium text-gray-700 w-full truncate">
-                                            <span className="font-bold text-gray-900 mr-1">1x</span> 
-                                            {item.baseName}
-                                            {item.type === 'CUSTOM' && ' (Armada)'}
-                                        </span>
-                                    </li>
+                            {/* PRODUCTOS */}
+                            <ul className="space-y-0 relative">
+                                {consolidatedItems.map((item, idx) => (
+                                    <OrderTicketItem 
+                                        key={`${item.productId || item.baseName}-${item.quantity}-${idx}`}
+                                        item={item}
+                                        orderId={item.orderRefId!} 
+                                        isEditable={editingGroupId === groupId}
+                                        onRemove={handleRemoveItem}
+                                    />
                                 ))}
+                                
+                                {consolidatedItems.length === 0 && (
+                                    <li className="text-xs text-gray-400 italic py-2 text-center">Sin productos</li>
+                                )}
                             </ul>
-                            
-                            {remaining > 0 && (
-                                <div className="mt-2 text-xs text-center font-bold text-gray-400 italic bg-gray-50 rounded py-1">
-                                    + {remaining} productos más...
-                                </div>
-                            )}
                         </div>
 
                         {/* FOOTER TICKET (Total + Cobrar) */}
@@ -247,23 +318,41 @@ export const OrdersScreen: React.FC = () => {
                             {/* Separador */}
                             <div className="border-t-2 border-dashed border-gray-300 mb-3 mx-2"></div>
 
-                            <div className="flex justify-between items-end mb-3">
-                                <span className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1">Total</span>
+                            <div className="flex justify-between items-end mb-3 px-1">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Total a cobrar</span>
                                 <span className="text-3xl font-mono font-black text-gray-900 tracking-tighter">
                                     ${group.totalDebt.toFixed(2)}
                                 </span>
                             </div>
 
-                            <button 
-                                onClick={() => handlePayGroup(group)}
-                                className={`
-                                    btn btn-block border-none text-white shadow-lg
-                                    ${isTakeout ? 'btn-warning' : 'btn-primary'}
-                                    hover:scale-[1.02] active:scale-95 transition-all
-                                `}
-                            >
-                                COBRAR
-                            </button>
+                            <div className="flex flex-col gap-2">
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button 
+                                        onClick={() => setEditingGroupId(editingGroupId === groupId ? null : groupId)}
+                                        className={`btn btn-outline border-none text-[10px] font-bold h-10 min-h-0 ${editingGroupId === groupId ? 'btn-success bg-green-50' : 'bg-gray-50'}`}
+                                        title="Activar edición de productos"
+                                    >
+                                        {editingGroupId === groupId ? '✅ LISTO' : '✏️ EDITAR'}
+                                    </button>
+                                    <button 
+                                        onClick={() => handleDeleteGroup(group)}
+                                        className="btn btn-outline btn-error border-none bg-red-50 hover:bg-red-100 text-[10px] font-bold h-10 min-h-0"
+                                        title="Eliminar toda la comanda"
+                                    >
+                                        🗑️ ELIMINAR
+                                    </button>
+                                </div>
+                                <button 
+                                    onClick={() => handlePayGroup(group)}
+                                    className={`
+                                        w-full btn border-none text-white shadow-lg h-12 min-h-0 text-sm font-black
+                                        ${isTakeout ? 'btn-warning' : 'btn-primary'}
+                                        hover:scale-[1.01] active:scale-95 transition-all
+                                    `}
+                                >
+                                    COBRAR ${group.totalDebt.toFixed(2)}
+                                </button>
+                            </div>
                         </div>
                     </div>
                   );
@@ -276,6 +365,7 @@ export const OrdersScreen: React.FC = () => {
           isOpen={isPayModalOpen} 
           onClose={() => setIsPayModalOpen(false)} 
           total={selectedGroup?.totalDebt || 0} 
+          items={selectedGroup?.orders.flatMap(o => o.items) || []}
           onConfirm={confirmPayment} 
       />
     </div>

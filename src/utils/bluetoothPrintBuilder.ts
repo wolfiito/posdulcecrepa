@@ -227,3 +227,103 @@ export const buildReceiptString = (order: Order) => {
   str += "<010>\n<010>¡Gracias por su compra!\n\n\n\n";
   return str;
 };
+
+// ==========================================
+// 3. CONSTRUCTORES PARA CORTE Z
+// ==========================================
+
+const formatReportDate = (val: any) => {
+    if (!val) return '--/-- --:--';
+    const d = val instanceof Timestamp ? val.toDate() : new Date(val);
+    return d.toLocaleString('es-MX', { 
+        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' 
+    });
+};
+
+export const buildZReportJSON = (shift: any, metrics: any, finalCount: number) => {
+    const data: Record<string, any> = {};
+    let index = 0;
+    const add = (item: any) => {
+      const key = index.toString().padStart(3, '0'); 
+      data[key] = item;
+      index++;
+    };
+
+    const difference = finalCount - metrics.expectedCash;
+
+    add({ type: 0, content: "CORTE Z", bold: 1, align: 1, format: 2 });
+    add({ type: 0, content: "DULCE CREPA", bold: 1, align: 1, format: 0 });
+    add({ type: 0, content: `Cajero: ${shift.openedBy}`, bold: 0, align: 0, format: 0 });
+    add({ type: 0, content: `Apertura: ${formatReportDate(shift.openedAt)}`, bold: 0, align: 0, format: 0 });
+    add({ type: 0, content: `Cierre: ${formatReportDate(new Date())}`, bold: 0, align: 0, format: 0 });
+    add({ type: 0, content: "--------------------------------", bold: 1, align: 1, format: 0 });
+
+    add({ type: 0, content: "BALANCE FINANCIERO", bold: 1, align: 1, format: 0 });
+    add({ type: 0, content: formatLine("(+) Ventas Totales:", `$${metrics.totalSales.toFixed(2)}`), bold: 0, align: 0, format: 0 });
+    add({ type: 0, content: formatLine("(-) Gastos Totales:", `-$${metrics.totalExpenses.toFixed(2)}`), bold: 0, align: 0, format: 0 });
+    add({ type: 0, content: formatLine("UTILIDAD NETA:", `$${metrics.netBalance.toFixed(2)}`), bold: 1, align: 0, format: 0 });
+    add({ type: 0, content: "--------------------------------", bold: 0, align: 1, format: 0 });
+
+    add({ type: 0, content: "CUADRE DE EFECTIVO", bold: 1, align: 1, format: 0 });
+    add({ type: 0, content: formatLine("Fondo Inicial:", `$${shift.initialFund.toFixed(2)}`), bold: 0, align: 0, format: 0 });
+    add({ type: 0, content: formatLine("(+) Venta Efec:", `$${metrics.cashTotal.toFixed(2)}`), bold: 0, align: 0, format: 0 });
+    add({ type: 0, content: formatLine("(-) Gastos Efec:", `-$${metrics.totalExpenses.toFixed(2)}`), bold: 0, align: 0, format: 0 });
+    add({ type: 0, content: formatLine("DEBE HABER:", `$${metrics.expectedCash.toFixed(2)}`), bold: 1, align: 0, format: 0 });
+    add({ type: 0, content: formatLine("REAL (CONTADO):", `$${finalCount.toFixed(2)}`), bold: 1, align: 0, format: 0 });
+    add({ type: 0, content: formatLine("DIFERENCIA:", `${difference >= 0 ? '+' : ''}$${difference.toFixed(2)}`), bold: 1, align: 0, format: 0 });
+    add({ type: 0, content: "--------------------------------", bold: 0, align: 1, format: 0 });
+
+    if (metrics.productBreakdown && metrics.productBreakdown.length > 0) {
+        add({ type: 0, content: "PRODUCTOS VENDIDOS", bold: 1, align: 1, format: 0 });
+        metrics.productBreakdown.forEach((p: any) => {
+            add({ type: 0, content: formatLine(`${p.quantity}x ${p.name}`, `$${p.total.toFixed(2)}`), bold: 0, align: 0, format: 0 });
+        });
+        add({ type: 0, content: "--------------------------------", bold: 0, align: 1, format: 0 });
+    }
+
+    add({ type: 0, content: "\n\n__________________________", bold: 0, align: 1, format: 0 });
+    add({ type: 0, content: "Firma de Conformidad", bold: 1, align: 1, format: 0 });
+    add({ type: 0, content: "\n\n\n\n", bold: 0, align: 0, format: 0 });
+
+    return JSON.stringify(data);
+};
+
+export const buildZReportString = (shift: any, metrics: any, finalCount: number) => {
+    let str = "";
+    const difference = finalCount - metrics.expectedCash;
+
+    str += "<112>CORTE Z\n"; 
+    str += "<110>DULCE CREPA\n";
+    str += `<000>Cajero: ${shift.openedBy}\n`;
+    str += `<000>Apertura: ${formatReportDate(shift.openedAt)}\n`;
+    str += `<000>Cierre: ${formatReportDate(new Date())}\n`;
+    str += "<110>--------------------------------\n";
+
+    str += "<110>BALANCE FINANCIERO\n";
+    str += `<000>${formatLine("(+) Ventas Totales:", `$${metrics.totalSales.toFixed(2)}`)}\n`;
+    str += `<000>${formatLine("(-) Gastos Totales:", `-$${metrics.totalExpenses.toFixed(2)}`)}\n`;
+    str += `<100>${formatLine("UTILIDAD NETA:", `$${metrics.netBalance.toFixed(2)}`)}\n`;
+    str += "<110>--------------------------------\n";
+
+    str += "<110>CUADRE DE EFECTIVO\n";
+    str += `<000>${formatLine("Fondo Inicial:", `$${shift.initialFund.toFixed(2)}`)}\n`;
+    str += `<000>${formatLine("(+) Venta Efec:", `$${metrics.cashTotal.toFixed(2)}`)}\n`;
+    str += `<000>${formatLine("(-) Gastos Efec:", `-$${metrics.totalExpenses.toFixed(2)}`)}\n`;
+    str += `<100>${formatLine("DEBE HABER:", `$${metrics.expectedCash.toFixed(2)}`)}\n`;
+    str += `<100>${formatLine("REAL (CONTADO):", `$${finalCount.toFixed(2)}`)}\n`;
+    str += `<120>${formatLine("DIFERENCIA:", `${difference >= 0 ? '+' : ''}$${difference.toFixed(2)}`)}\n`;
+    str += "<110>--------------------------------\n";
+
+    if (metrics.productBreakdown && metrics.productBreakdown.length > 0) {
+        str += "<110>PRODUCTOS VENDIDOS\n";
+        metrics.productBreakdown.forEach((p: any) => {
+            str += `<100>${formatLine(`${p.quantity}x ${p.name}`, `$${p.total.toFixed(2)}`)}\n`;
+        });
+        str += "<110>--------------------------------\n";
+    }
+
+    str += "\n\n<010>__________________________\n";
+    str += "<110>Firma de Conformidad\n\n\n\n\n";
+
+    return str;
+};

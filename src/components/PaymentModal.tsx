@@ -1,6 +1,7 @@
 // src/components/PaymentModal.tsx
 import React, { useState, useEffect } from 'react';
 import type { PaymentMethod, PaymentDetails, PaymentTransaction } from '../types/order';
+import type { TicketItem } from '../types/menu';
 import { toast } from 'sonner';
 
 interface PaymentModalProps {
@@ -8,10 +9,11 @@ interface PaymentModalProps {
   onClose: () => void;
   total: number;
   onConfirm: (details: PaymentDetails) => void;
+  items?: TicketItem[];
 }
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({ 
-  isOpen, onClose, total, onConfirm 
+  isOpen, onClose, total, onConfirm, items = []
 }) => {
   const [isMixedMode, setIsMixedMode] = useState(false);
 
@@ -98,6 +100,52 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         {/* BODY (Flexible) */}
         <div className="flex-1 overflow-y-auto px-4 py-2 relative">
             
+            {/* DETALLE DE PRODUCTOS (BREAKDOWN) */}
+            {items.length > 0 && (
+                <div className="mb-4 bg-base-200/50 rounded-xl overflow-hidden border border-base-200">
+                    <div className="bg-base-200 px-3 py-1.5 flex justify-between items-center">
+                        <span className="text-[10px] font-black uppercase opacity-50">Resumen de Cuenta</span>
+                        <span className="badge badge-ghost badge-xs font-bold">{items.length} items</span>
+                    </div>
+                    <div className="max-h-32 overflow-y-auto p-2 space-y-1">
+                        {(() => {
+                            const consolidated = items.reduce((acc, current) => {
+                                const detailsSig = current.details ? JSON.stringify(current.details) : "";
+                                const sig = (current.productId || current.baseName) + current.finalPrice + detailsSig;
+                                
+                                const existingIndex = acc.findIndex(i => {
+                                    const iDetailsSig = i.details ? JSON.stringify(i.details) : "";
+                                    const iSig = (i.productId || i.baseName) + i.finalPrice + iDetailsSig;
+                                    return iSig === sig;
+                                });
+
+                                if (existingIndex > -1) {
+                                    acc[existingIndex].quantity = (acc[existingIndex].quantity || 1) + (current.quantity || 1);
+                                } else {
+                                    acc.push({ ...current, quantity: current.quantity || 1 });
+                                }
+                                return acc;
+                            }, [] as TicketItem[]);
+
+                            return consolidated.map((item, idx) => (
+                                <div key={`${item.id}-${idx}`} className="flex justify-between items-start text-xs">
+                                    <span className="flex-1 pr-2 line-clamp-1">
+                                        <span className="font-bold opacity-60 mr-1">{item.quantity || 1}x</span>
+                                        {item.baseName}
+                                        {item.details?.selectedModifiers && item.details.selectedModifiers.length > 0 && (
+                                            <span className="text-[10px] block opacity-50 ml-5">
+                                                {item.details.selectedModifiers.map(m => m.name).join(', ')}
+                                            </span>
+                                        )}
+                                    </span>
+                                    <span className="font-mono font-bold">${item.finalPrice.toFixed(2)}</span>
+                                </div>
+                            ));
+                        })()}
+                    </div>
+                </div>
+            )}
+
             {/* TABS COMPACTOS */}
             <div className="bg-base-200 p-1 rounded-xl flex mb-4 shrink-0">
                 <button 

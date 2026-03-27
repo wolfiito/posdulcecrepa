@@ -2,7 +2,7 @@
 import { db, collection, serverTimestamp, runTransaction, doc, writeBatch, increment } from '../firebase';
 import { printService } from './printService';
 import type { TicketItem } from '../types/menu';
-import type { Order, PaymentDetails, OrderMode, KitchenStatus } from '../types/order';
+import type { PaymentDetails, OrderMode, KitchenStatus } from '../types/order';
 import type { DocumentReference } from 'firebase/firestore'; 
 
 interface StockUpdate {
@@ -49,10 +49,19 @@ export const orderService = {
         const modIdsToRead = new Set<string>();
 
         items.forEach(item => {
+            // 1. Deducir el producto base si existe en inventario
+            const baseId = item.details?.itemId || item.productId;
+            if (baseId) {
+                const currentQty = modifiersToDeduct.get(baseId) || 0;
+                modifiersToDeduct.set(baseId, currentQty + (item.quantity || 1));
+                modIdsToRead.add(baseId);
+            }
+
+            // 2. Deducir los modificadores
             if (item.details?.selectedModifiers) {
                 item.details.selectedModifiers.forEach(mod => {
                     const currentQty = modifiersToDeduct.get(mod.id) || 0;
-                    modifiersToDeduct.set(mod.id, currentQty + 1);
+                    modifiersToDeduct.set(mod.id, currentQty + (item.quantity || 1));
                     modIdsToRead.add(mod.id);
                 });
             }
@@ -69,23 +78,30 @@ export const orderService = {
 
         const updates: StockUpdate[] = [];
         
-        // CORRECCIÓN AQUÍ: Cambiamos modSnaps por invSnaps
+        // 5. Procesar los resultados del inventario
         invSnaps.forEach((snap, index) => {
+            const modId = uniqueModIds[index];
+            const qtyToDeduct = modifiersToDeduct.get(modId) || 0;
+
             if (snap.exists()) {
                 const data = snap.data();
-                if (data.trackStock) {
-                    const modId = uniqueModIds[index];
-                    const qtyToDeduct = modifiersToDeduct.get(modId) || 0;
-                    const currentStock = data.currentStock || 0;
+                const isTracked = data.trackStock !== false;
+                
+                if (isTracked) {
+                    const currentStock = Number(data.currentStock) || 0;
                     const newStock = currentStock - qtyToDeduct;
 
-                    // HARDENING: Evitar stock negativo
+                    // HARDENING: Evitar stock negativo si está activado el rastreo
                     if (newStock < 0) {
-                        throw new Error(`Stock insuficiente: ${data.name || 'Ingrediente'} (Quedan: ${currentStock})`);
+                        throw new Error(`Stock insuficiente: ${data.name || 'Ingrediente'} (Disponible: ${currentStock}, Necesario: ${qtyToDeduct})`);
                     }
 
                     updates.push({ ref: snap.ref, newStock });
                 }
+            } else {
+                // Si el documento de inventario local no existe, 
+                // simplemente no lo descontamos (se asume que no se rastrea en esta sucursal)
+                console.log(`Inventory doc missing for ${modId}, skipping deduction.`);
             }
         });
 
@@ -182,13 +198,25 @@ export const orderService = {
 
         // 2. Restaurar Stock (Inventario Inverso)
         items.forEach(item => {
+            const qty = item.quantity || 1;
+
+            // Restaurar Base
+            const baseId = item.details?.itemId || item.productId;
+            if (baseId) {
+                const invRef = doc(db, "branches", branchId, "inventory", baseId);
+                batch.set(invRef, {
+                    currentStock: increment(qty)
+                }, { merge: true });
+            }
+
+            // Restaurar Modificadores
             if (item.details?.selectedModifiers) {
                 item.details.selectedModifiers.forEach(mod => {
                     if (mod.id) {
                         const invRef = doc(db, "branches", branchId, "inventory", mod.id);
-                        batch.update(invRef, {
-                            currentStock: increment(1)
-                        });
+                        batch.set(invRef, {
+                            currentStock: increment(qty)
+                        }, { merge: true });
                     }
                 });
             }
@@ -198,6 +226,48 @@ export const orderService = {
         return true;
     } catch (error) {
         console.error("Error al cancelar orden:", error);
+        throw error;
+    }
+  },
+
+  async removeItemFromOrder(branchId: string, orderId: string, itemToRemove: TicketItem, remainingItems: TicketItem[], newTotal: number) {
+    try {
+        const batch = writeBatch(db);
+        const orderRef = doc(db, "orders", orderId);
+
+        // 1. Actualizar la orden
+        if (remainingItems.length === 0) {
+            batch.update(orderRef, { 
+                status: 'cancelled',
+                cancelledAt: serverTimestamp(),
+                items: [],
+                total: 0
+            });
+        } else {
+            batch.update(orderRef, { 
+                items: remainingItems,
+                total: newTotal
+            });
+        }
+
+        // 2. Restaurar Stock del item eliminado
+        const qty = itemToRemove.quantity || 1;
+        const baseId = itemToRemove.details?.itemId || itemToRemove.productId;
+        if (baseId) {
+            const invRef = doc(db, "branches", branchId, "inventory", baseId);
+            batch.set(invRef, { currentStock: increment(qty) }, { merge: true });
+        }
+        if (itemToRemove.details?.selectedModifiers) {
+            itemToRemove.details.selectedModifiers.forEach(mod => {
+                const invRef = doc(db, "branches", branchId, "inventory", mod.id);
+                batch.set(invRef, { currentStock: increment(qty) }, { merge: true });
+            });
+        }
+
+        await batch.commit();
+        return true;
+    } catch (error) {
+        console.error("Error al eliminar item de orden:", error);
         throw error;
     }
   }

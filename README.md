@@ -1,73 +1,88 @@
-# React + TypeScript + Vite
+# PosDulceCrepa - Sistema de Punto de Venta (POS)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## 📖 Descripción General
+**PosDulceCrepa** es una aplicación web tipo *Single Page Application (SPA)* diseñada para gestionar las operaciones diarias de un Punto de Venta (POS). Su propósito es centralizar la gestión de ventas, el control de inventario en tiempo real, administración de turnos y la emisión de comprobantes, proporcionando una interfaz rápida e intuitiva para los cajeros y administradores.
 
-Currently, two official plugins are available:
+El sistema está construido con un enfoque *API-less* delegando la capa de backend a Firebase, lo que permite operaciones en tiempo real, sincronización en múltiples pestañas y soporte de almacenamiento para funcionamiento sin conexión.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## 🛠️ Stack Tecnológico (Tech Stack)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Frontend
+* **Core:** [React 18](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
+* **Bundler:** [Vite](https://vitejs.dev/) (Rápido empaquetado y HMR)
+* **Estilos:** [Tailwind CSS](https://tailwindcss.com/) + [daisyUI](https://daisyui.com/) (Sistema de componentes UI)
+* **Estado Global:** [Zustand](https://github.com/pmndrs/zustand) (Ligero y escalable)
+* **Enrutamiento:** [React Router v6](https://reactrouter.com/)
+* **Animaciones y Gráficos:** Framer Motion, Recharts
+* **Exportables:** ExcelJS, xlsx, file-saver
 
-## Expanding the ESLint configuration
+### Backend (Backend-as-a-Service)
+* **Infraestructura:** [Firebase](https://firebase.google.com/)
+* **Autenticación:** Firebase Authentication
+* **Base de Datos:** Cloud Firestore (NoSQL, transacciones atómicas, soporte offline)
+* **Archivos:** Firebase Storage
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+---
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## 🚀 Entorno de Desarrollo Local
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Prerrequisitos
+1. **Node.js** (v18 o superior recomendado).
+2. **NPM** (v9 o superior) o **Yarn** / **pnpm**.
+3. Un proyecto en Firebase creado y configurado.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Instalación y Ejecución
+
+1. **Clonar el repositorio** e ir al directorio:
+   ```bash
+   git clone <URL_DEL_REPOSITORIO>
+   cd posdulcecrepa
+   ```
+
+2. **Instalar las dependencias:**
+   ```bash
+   npm install
+   ```
+
+3. **Configurar las Variables de Entorno:**
+   Crea un archivo `.env` en la raíz del proyecto (basado en un `.env.example` si existe) con las credenciales de tu proyecto de Firebase. Debe lucir similar a esto:
+   ```env
+   VITE_FIREBASE_API_KEY="tu_api_key"
+   VITE_FIREBASE_AUTH_DOMAIN="tu_auth_domain"
+   VITE_FIREBASE_PROJECT_ID="tu_project_id"
+   VITE_FIREBASE_STORAGE_BUCKET="tu_storage_bucket"
+   VITE_FIREBASE_MESSAGING_SENDER_ID="tu_messaging_sender_id"
+   VITE_FIREBASE_APP_ID="tu_app_id"
+   ```
+
+4. **Levantar el servidor de desarrollo:**
+   ```bash
+   npm run dev
+   ```
+   La aplicación estará disponible usualmente en `http://localhost:5173`.
+
+---
+
+## 📂 Estructura de Carpetas (`/src`)
+
+La arquitectura del código fuente (`src/`) sigue un patrón modular por responsabilidades técnicas:
+
+```text
+src/
+├── components/   # Componentes UI reutilizables (Botones, Modales, Tarjetas).
+├── constants/    # Variables de configuración, enums y valores fijos.
+├── hooks/        # React Hooks personalizados.
+├── pages/        # Pantallas completas de la aplicación (Views) asociadas al Router.
+├── services/     # Capa abstracta de lógica de negocio y comunicación con Firebase.
+├── store/        # Stores de Zustand para gestionar el estado global (Sesión, Carrito, Inventario).
+├── types/        # Definiciones de interfaces y tipos estrictos de TypeScript.
+├── utils/        # Funciones auxiliares y formateadores (fecha, moneda, etc.).
+├── firebase.ts   # Inicialización y configuración del SDK de Firebase.
+├── App.tsx       # Componente raíz que maneja el enrutamiento (Router).
+└── main.tsx      # Punto de entrada principal (Entry point) de React.
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+### Notas Adicionales de Arquitectura
+Para mantener la escalabilidad, **ningún componente de React realiza llamadas directas a Firebase**. Toda la comunicación a la base de datos se delega a la carpeta `/services/`, y el estado de la UI reacciona a través de los *stores* definidos en `/store/`.

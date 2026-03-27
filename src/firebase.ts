@@ -1,12 +1,12 @@
 // src/firebase.ts
 import { initializeApp } from "firebase/app";
 import { 
-  getFirestore,
   collection, 
   addDoc, 
   serverTimestamp, 
   runTransaction, 
   doc, 
+  getDoc,
   getDocs,
   initializeFirestore, 
   persistentLocalCache, 
@@ -60,6 +60,7 @@ export {
   serverTimestamp, 
   runTransaction, 
   doc, 
+  getDoc,
   getDocs, 
   ref, 
   uploadString, 

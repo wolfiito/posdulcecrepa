@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useShiftStore } from '../store/useShiftStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { shiftService, type ShiftMetrics } from '../services/shiftService';
+import { printService } from '../services/printService';
 import { PinPadModal } from './PinPadModal'; // <--- CAMBIO: Usamos el Modal Premium
 import { ZReportTemplate } from './ZReportTemplate';
 import { Timestamp } from '../firebase';
@@ -74,7 +75,11 @@ export const ShiftsScreen: React.FC = () => {
       
       setPrintZReport(true);
       setTimeout(async () => {
-          window.print();
+          try {
+              await printService.printZReport(currentShift, closingSummary, finalCash);
+          } catch (e) {
+              console.error(e);
+          }
           await closeShift(finalCash);
           setClosingSummary(null);
           setInputAmount('');

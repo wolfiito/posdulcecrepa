@@ -42,7 +42,8 @@ export const inventoryService = {
     // Usamos setDoc con merge para crear el documento si es la primera vez que se asigna stock
     await setDoc(ref, {
         currentStock: newStock,
-        name: modifierName, // Guardamos el nombre por redundancia/lectura rápida
+        name: modifierName, 
+        trackStock: true, // NUEVO: Evita que sea ignorado en el ticket
         lastUpdated: new Date()
     }, { merge: true });
   },

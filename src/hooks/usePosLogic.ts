@@ -75,7 +75,8 @@ export const usePosLogic = () => {
       const cashierName = currentUser?.name || 'Cajero';
       const total = currentItems.reduce((sum, item) => sum + item.finalPrice, 0);
 
-      const shouldPrint = currentUser?.role !== 'MESERO';
+      const isTakeOut = currentMode === 'Para Llevar';
+      const shouldPrint = currentUser?.role !== 'MESERO' && isTakeOut;
       const activeShiftId = (shouldPrint && currentShift) ? currentShift.id : undefined;
 
       try {

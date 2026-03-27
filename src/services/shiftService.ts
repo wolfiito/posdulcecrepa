@@ -115,8 +115,38 @@ export const shiftService = {
       }
   });
 
+    // Consultar Gastos (Movements) relacionados a este turno
+    const qExpenses = query(collection(db, 'movements'), where('shiftId', '==', shift.id));
+    const snapExpenses = await getDocs(qExpenses);
+    
+    let totalExpenses = 0;
+    const expenses: any[] = [];
+
+    snapExpenses.docs.forEach(doc => {
+        const d = doc.data();
+        expenses.push({ id: doc.id, ...d });
+        totalExpenses += Number(d.amount) || 0;
+    });
+
+    const productMap = new Map<string, { name: string, quantity: number, total: number }>();
+    
+    orders.forEach(order => {
+        order.items.forEach((item: any) => {
+            const name = item.baseName;
+            const qty = item.quantity || 1;
+            const price = item.finalPrice || 0;
+            const existing = productMap.get(name) || { name, quantity: 0, total: 0 };
+            productMap.set(name, {
+                name,
+                quantity: existing.quantity + qty,
+                total: existing.total + price
+            });
+        });
+    });
+
+    const productBreakdown = Array.from(productMap.values()).sort((a, b) => b.total - a.total);
+
     const totalSales = cashTotal + cardTotal + transferTotal;
-    const totalExpenses = 0; 
     const expectedCash = shift.initialFund + cashTotal - totalExpenses;
     const netTotal = totalSales - totalExpenses;
 
@@ -131,10 +161,10 @@ export const shiftService = {
       netTotal,
       totalOrders: orders.length,
       orders: orders,
-      expenses: [],
+      expenses: expenses,
       netBalance: netTotal,
       productCount: productCount,
-      productBreakdown: [], 
+      productBreakdown: productBreakdown, 
       ingredientBreakdown: [] 
     };
   },

@@ -100,9 +100,10 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
                 return true;
             });
             
-            if (options.length > 0) {
-                const isExclusive = EXCLUSIVE_GROUPS.includes(groupId) || groupId === 'tipo_leche' || groupId === 'bubble_estilo';
-
+            const isExclusive = EXCLUSIVE_GROUPS.includes(groupId) || groupId === 'tipo_leche' || groupId === 'bubble_estilo';
+            
+            // Renderizamos la capa de opciones si tiene valores, O bien, SI ES OBLIGATORIA.
+            if (options.length > 0 || isExclusive) {
                 stepList.push({
                     id: groupId,
                     name: formatGroupName(groupId),

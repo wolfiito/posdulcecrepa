@@ -1,6 +1,6 @@
 // src/services/printService.ts
 
-import { buildReceiptJSON, buildReceiptString } from '../utils/bluetoothPrintBuilder';
+import { buildReceiptJSON, buildReceiptString, buildZReportJSON, buildZReportString } from '../utils/bluetoothPrintBuilder';
 import type { Order } from '../types/order';
 
 // --- TRUCO PARA PWA (Pantalla de Inicio) ---
@@ -53,6 +53,37 @@ export const printService = {
     } catch (error) {
       console.error("Error al intentar imprimir:", error);
       throw new Error("Error de impresión o bloqueo de navegador"); 
+    }
+  },
+
+  printZReport: async (shift: any, metrics: any, finalCount: number) => {
+    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+    const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream;
+    const isAndroid = /android/i.test(userAgent);
+    
+    try {
+      if (isIOS) {
+        const jsonString = buildZReportJSON(shift, metrics, finalCount);
+        const encodedData = encodeURIComponent(jsonString);
+        openDeepLink(`thermer://?data=${encodedData}`);
+      } else if (isAndroid) {
+        const reportText = buildZReportString(shift, metrics, finalCount);
+        if (navigator.share) {
+          await navigator.share({
+            text: reportText,
+            title: `Corte Z - ${new Date().toLocaleDateString()}`
+          });
+        } else {
+          alert("Tu dispositivo no soporta la función de compartir nativa.");
+        }
+      } else {
+        const jsonString = buildZReportJSON(shift, metrics, finalCount);
+        const encodedData = encodeURIComponent(jsonString);
+        openDeepLink(`thermer://?data=${encodedData}`);
+      }
+    } catch (error) {
+      console.error("Error al imprimir Corte Z:", error);
+      throw new Error("Error de impresión");
     }
   }
 };

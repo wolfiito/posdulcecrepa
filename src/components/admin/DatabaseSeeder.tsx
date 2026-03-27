@@ -372,6 +372,18 @@ export const DatabaseSeeder: React.FC = () => {
     //     toast.info("Inyectando Lógica Matemática para Waffles y Hot Cakes...");
 
     //     try {
+    //         // 1. LA REGLA MATEMÁTICA (Sube de $5 en $5)
+    //         const priceRules = [
+    //             { 
+    //                 id: "rule_waffles_hc", 
+    //                 name: "Regla Waffles/HotCakes (Salto $5)", 
+    //                 basePrices: [
+    //                     { count: 1, price: 60 }, { count: 2, price: 65 }, 
+    //                     { count: 3, price: 70 }, { count: 4, price: 75 }, 
+    //                     { count: 5, price: 80 }, { count: 6, price: 85 }
+    //                 ] 
+    //             }
+    //         ];
 
     //         // 2. LAS CARPETAS DE INGREDIENTES (Los 3 pasos del modal)
     //         const modifierGroups = [
@@ -417,9 +429,9 @@ export const DatabaseSeeder: React.FC = () => {
     //             { id: "mod_ext_kbueno", name: "Kinder Bueno", price: 30, group: "crepa_dulce_extra", trackStock: true, disabledIn: [] },
     //             { id: "mod_ext_hersheys_blanco", name: "Hershey's blanco", price: 10, group: "crepa_dulce_extra", trackStock: true, disabledIn: [] },
     //             { id: "mod_ext_mini_conejo_turin", name: "Mini conejo", price: 10, group: "crepa_dulce_extra", trackStock: true, disabledIn: [] },
-    //             { id: "mod_ext_helado", name: "Bola de helado", price: 10, group: "crepa_dulce_extra", trackStock: false, disabledIn: [] },
-    //             { id: "mod_ext_baileys", name: "Baileys", price: 30, group: "crepa_dulce_extra", trackStock: false, disabledIn: [] },
-    //             { id: "mod_ext_kahlua", name: "Kahlua", price: 30, group: "crepa_dulce_extra", trackStock: false, disabledIn: [] },
+    //             { id: "mod_ext_helado", name: "Bola de helado", price: 10, group: "crepa_dulce_extra", trackStock: true, disabledIn: [] },
+    //             { id: "mod_ext_baileys", name: "Baileys", price: 30, group: "crepa_dulce_extra", trackStock: true, disabledIn: [] },
+    //             { id: "mod_ext_kahlua", name: "Kahlua", price: 30, group: "crepa_dulce_extra", trackStock: true, disabledIn: [] },
                 
     //             // Toppings (100% Gratis)
     //             { id: "top_lechera", name: "Lechera", price: 0, group: "crepa_dulce_topping", trackStock: false, disabledIn: [] },
@@ -464,6 +476,7 @@ export const DatabaseSeeder: React.FC = () => {
     //         ];
 
     //         // Inyectamos todo en la base de datos
+    //         for (const rule of priceRules) await setDoc(doc(db, "price_rules", rule.id), rule);
     //         for (const mg of modifierGroups) await setDoc(doc(db, "modifier_groups", mg.id), mg);
     //         for (const mod of modifiers) await setDoc(doc(db, "modifiers", mod.id), mod);
     //         for (const grp of groups) await setDoc(doc(db, "menu_groups", grp.id), grp);
@@ -482,6 +495,28 @@ export const DatabaseSeeder: React.FC = () => {
     //     toast.info("Inyectando Crepas Dulces, Saladas y Especiales...");
 
     //     try {
+    //         // 1. LAS REGLAS MATEMÁTICAS EXACTAS
+            // const priceRules = [
+            //     { 
+            //         id: "rule_crepa_dulce", 
+            //         name: "Regla Crepa Dulce", 
+            //         basePrices: [
+            //             { count: 1, price: 60 }, { count: 2, price: 70 }, 
+            //             { count: 3, price: 75 }, { count: 4, price: 85 }, 
+            //             { count: 5, price: 95 }, { count: 6, price: 105 }
+            //         ] 
+            //     },
+            //     { 
+            //         id: "rule_crepa_salada", 
+            //         name: "Regla Crepa Salada", 
+            //         basePrices: [
+            //             { count: 1, price: 60 }, { count: 2, price: 70 }, 
+            //             { count: 3, price: 80 }, { count: 4, price: 90 }, 
+            //             { count: 5, price: 100 }, { count: 6, price: 110 }
+            //         ] 
+            //     }
+            // ];
+
     //         // 2. LAS CARPETAS DE INGREDIENTES SALADOS
     //         // (Los dulces ya los creamos en la fase de Waffles: "crepa_dulce_base", etc.)
     //         const modifierGroups = [
@@ -601,8 +636,6 @@ export const DatabaseSeeder: React.FC = () => {
     //         ];
 
     //         // 3. EJECUCIÓN
-    //         for (const mg of modifierGroups) await setDoc(doc(db, "modifier_groups", mg.id), mg);
-    //         for (const mod of modifiers) await setDoc(doc(db, "modifiers", mod.id), mod);
     //         for (const item of items) await setDoc(doc(db, "menu_items", item.id), item);
     //         for (const grp of groups) await setDoc(doc(db, "menu_groups", grp.id), grp);
 
@@ -615,140 +648,140 @@ export const DatabaseSeeder: React.FC = () => {
     //     }
     // };
 
-    const runMigration = async () => {
-        setLoading(true);
-        toast.info("Inyectando tus Postres Reales...");
-
-        try {
-            // 1. TUS POSTRES EXACTOS
-            const items = [
-                // Los de a $70
-                { id: "item_fresas_crema", name: "Fresas con crema", category: "postres", price: 70, disabledIn: [], branchPrices: {} },
-                { id: "item_duraznos_crema", name: "Duraznos con crema", category: "postres", price: 70, disabledIn: [], branchPrices: {} },
-                { id: "item_frutos_rojos_crema", name: "Frutos rojos con crema", category: "postres", price: 70, disabledIn: [], branchPrices: {} },
-                { id: "item_uvas_verdes_crema", name: "Uvas verdes con crema", category: "postres", price: 70, disabledIn: [], branchPrices: {} },
-                
-                // Los postres caseros
-                { id: "item_flan_vainilla", name: "Flan de vainilla", category: "postres", price: 30, disabledIn: [], branchPrices: {} },
-                { id: "item_arroz_leche", name: "Arroz con leche", category: "postres", price: 30, disabledIn: [], branchPrices: {} },
-                { id: "item_pay_limon", name: "Pay de limón", category: "postres", price: 35, disabledIn: [], branchPrices: {} },
-                { id: "item_flan_napolitano", name: "Flan napolitano", category: "postres", price: 35, disabledIn: [], branchPrices: {} }
-            ];
-
-            // 2. LA CARPETA DE POSTRES
-            const grupoPostres = { 
-                id: "postres", 
-                name: "Postres", 
-                level: 1, 
-                parent: "root", 
-                items_ref: [
-                    "item_fresas_crema", "item_duraznos_crema", "item_frutos_rojos_crema", "item_uvas_verdes_crema",
-                    "item_flan_vainilla", "item_arroz_leche", "item_pay_limon", "item_flan_napolitano"
-                ] 
-            };
-
-            // Ejecución
-            for (const item of items) await setDoc(doc(db, "menu_items", item.id), item);
-            await setDoc(doc(db, "menu_groups", grupoPostres.id), grupoPostres);
-
-            toast.success("¡Postres reales inyectados con éxito! 🍓🍮");
-        } catch (e) {
-            console.error(e);
-            toast.error("Ocurrió un error en la migración.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
     // const runMigration = async () => {
     //     setLoading(true);
-    //     toast.info("Inyectando Reglas de Precio y vinculando...");
+    //     toast.info("Inyectando tus Postres Reales...");
 
     //     try {
-    //         // 1. LAS REGLAS MATEMÁTICAS (Ahora sí van a la base)
-    //         const priceRules = [
-    //             { 
-    //                 id: "rule_crepa_dulce", 
-    //                 name: "Regla Crepa Dulce", 
-    //                 basePrices: [
-    //                     { count: 1, price: 60 }, { count: 2, price: 70 }, 
-    //                     { count: 3, price: 75 }, { count: 4, price: 85 }, 
-    //                     { count: 5, price: 95 }, { count: 6, price: 105 }
-    //                 ] 
-    //             },
-    //             { 
-    //                 id: "rule_crepa_salada", 
-    //                 name: "Regla Crepa Salada", 
-    //                 basePrices: [
-    //                     { count: 1, price: 60 }, { count: 2, price: 70 }, 
-    //                     { count: 3, price: 80 }, { count: 4, price: 90 }, 
-    //                     { count: 5, price: 100 }, { count: 6, price: 110 }
-    //                 ] 
-    //             },
-    //             { 
-    //                 id: "rule_waffles_hc", 
-    //                 name: "Regla Waffles/HotCakes", 
-    //                 basePrices: [
-    //                     { count: 1, price: 60 }, { count: 2, price: 65 }, 
-    //                     { count: 3, price: 70 }, { count: 4, price: 75 }, 
-    //                     { count: 5, price: 80 }, { count: 6, price: 85 }
-    //                 ] 
-    //             }
+    //         // 1. TUS POSTRES EXACTOS
+    //         const items = [
+    //             // Los de a $70
+    //             { id: "item_fresas_crema", name: "Fresas con crema", category: "postres", price: 70, disabledIn: [], branchPrices: {} },
+    //             { id: "item_duraznos_crema", name: "Duraznos con crema", category: "postres", price: 70, disabledIn: [], branchPrices: {} },
+    //             { id: "item_frutos_rojos_crema", name: "Frutos rojos con crema", category: "postres", price: 70, disabledIn: [], branchPrices: {} },
+    //             { id: "item_uvas_verdes_crema", name: "Uvas verdes con crema", category: "postres", price: 70, disabledIn: [], branchPrices: {} },
+                
+    //             // Los postres caseros
+    //             { id: "item_flan_vainilla", name: "Flan de vainilla", category: "postres", price: 30, disabledIn: [], branchPrices: {} },
+    //             { id: "item_arroz_leche", name: "Arroz con leche", category: "postres", price: 30, disabledIn: [], branchPrices: {} },
+    //             { id: "item_pay_limon", name: "Pay de limón", category: "postres", price: 35, disabledIn: [], branchPrices: {} },
+    //             { id: "item_flan_napolitano", name: "Flan napolitano", category: "postres", price: 35, disabledIn: [], branchPrices: {} }
     //         ];
 
-    //         // 2. VINCULAMOS LOS BOTONES CON ESTAS REGLAS
-    //         // (Aseguramos que los IDs coincidan exactamente con lo que el modal busca)
-    //         const groups = [
-    //             {
-    //                 id: "armar_crepa_dulce", 
-    //                 name: "Armar Crepa Dulce 🛠️", 
-    //                 level: 2, 
-    //                 parent: "crepas_dulces",
-    //                 rules_ref: "rule_crepa_dulce", 
-    //                 base_group: "crepa_dulce_base", 
-    //                 extra_groups: ["crepa_dulce_extra"], 
-    //                 topping_groups: ["crepa_dulce_topping"]
-    //             },
-    //             {
-    //                 id: "armar_crepa_salada", 
-    //                 name: "Armar Crepa Salada 🛠️", 
-    //                 level: 2, 
-    //                 parent: "crepas_saladas",
-    //                 rules_ref: "rule_crepa_salada", 
-    //                 base_group: "crepa_salada_base", 
-    //                 extra_groups: ["crepa_salada_extra"], 
-    //                 topping_groups: ["crepa_salada_topping"]
-    //             },
-    //             {
-    //                 id: "waffles",
-    //                 name: "Waffles",
-    //                 level: 1,
-    //                 parent: "root",
-    //                 rules_ref: "rule_waffles_hc",
-    //                 base_group: "crepa_dulce_base",
-    //                 extra_groups: ["crepa_dulce_extra"],
-    //                 topping_groups: ["crepa_dulce_topping"]
-    //             }
-    //         ];
+    //         // 2. LA CARPETA DE POSTRES
+    //         const grupoPostres = { 
+    //             id: "postres", 
+    //             name: "Postres", 
+    //             level: 1, 
+    //             parent: "root", 
+    //             items_ref: [
+    //                 "item_fresas_crema", "item_duraznos_crema", "item_frutos_rojos_crema", "item_uvas_verdes_crema",
+    //                 "item_flan_vainilla", "item_arroz_leche", "item_pay_limon", "item_flan_napolitano"
+    //             ] 
+    //         };
 
-    //         // Subimos las reglas
-    //         for (const rule of priceRules) {
-    //             await setDoc(doc(db, "price_rules", rule.id), rule);
-    //         }
+    //         // Ejecución
+    //         for (const item of items) await setDoc(doc(db, "menu_items", item.id), item);
+    //         await setDoc(doc(db, "menu_groups", grupoPostres.id), grupoPostres);
 
-    //         // Actualizamos los grupos para que apunten a estas reglas
-    //         for (const grp of groups) {
-    //             await setDoc(doc(db, "menu_groups", grp.id), grp, { merge: true });
-    //         }
-
-    //         toast.success("¡Reglas de precio inyectadas y vinculadas! 🎉");
+    //         toast.success("¡Postres reales inyectados con éxito! 🍓🍮");
     //     } catch (e) {
     //         console.error(e);
-    //         toast.error("Error al inyectar reglas.");
+    //         toast.error("Ocurrió un error en la migración.");
     //     } finally {
     //         setLoading(false);
     //     }
     // };
+
+    const runMigration = async () => {
+        setLoading(true);
+        toast.info("Inyectando Reglas de Precio y vinculando...");
+
+        try {
+            // 1. LAS REGLAS MATEMÁTICAS (Ahora sí van a la base)
+            const priceRules = [
+                { 
+                    id: "rule_crepa_dulce", 
+                    name: "Regla Crepa Dulce", 
+                    basePrices: [
+                        { count: 1, price: 60 }, { count: 2, price: 70 }, 
+                        { count: 3, price: 75 }, { count: 4, price: 85 }, 
+                        { count: 5, price: 95 }, { count: 6, price: 105 }
+                    ] 
+                },
+                { 
+                    id: "rule_crepa_salada", 
+                    name: "Regla Crepa Salada", 
+                    basePrices: [
+                        { count: 1, price: 60 }, { count: 2, price: 70 }, 
+                        { count: 3, price: 80 }, { count: 4, price: 90 }, 
+                        { count: 5, price: 100 }, { count: 6, price: 110 }
+                    ] 
+                },
+                { 
+                    id: "rule_waffles_hc", 
+                    name: "Regla Waffles/HotCakes", 
+                    basePrices: [
+                        { count: 1, price: 60 }, { count: 2, price: 65 }, 
+                        { count: 3, price: 70 }, { count: 4, price: 75 }, 
+                        { count: 5, price: 80 }, { count: 6, price: 85 }
+                    ] 
+                }
+            ];
+
+            // 2. VINCULAMOS LOS BOTONES CON ESTAS REGLAS
+            // (Aseguramos que los IDs coincidan exactamente con lo que el modal busca)
+            const groups = [
+                {
+                    id: "armar_crepa_dulce", 
+                    name: "Armar Crepa Dulce 🛠️", 
+                    level: 2, 
+                    parent: "crepas_dulces",
+                    rules_ref: "rule_crepa_dulce", 
+                    base_group: "crepa_dulce_base", 
+                    extra_groups: ["crepa_dulce_extra"], 
+                    topping_groups: ["crepa_dulce_topping"]
+                },
+                {
+                    id: "armar_crepa_salada", 
+                    name: "Armar Crepa Salada 🛠️", 
+                    level: 2, 
+                    parent: "crepas_saladas",
+                    rules_ref: "rule_crepa_salada", 
+                    base_group: "crepa_salada_base", 
+                    extra_groups: ["crepa_salada_extra"], 
+                    topping_groups: ["crepa_salada_topping"]
+                },
+                {
+                    id: "waffles",
+                    name: "Waffles",
+                    level: 1,
+                    parent: "root",
+                    rules_ref: "rule_waffles_hc",
+                    base_group: "crepa_dulce_base",
+                    extra_groups: ["crepa_dulce_extra"],
+                    topping_groups: ["crepa_dulce_topping"]
+                }
+            ];
+
+            // Subimos las reglas
+            for (const rule of priceRules) {
+                await setDoc(doc(db, "price_rules", rule.id), rule);
+            }
+
+            // Actualizamos los grupos para que apunten a estas reglas
+            for (const grp of groups) {
+                await setDoc(doc(db, "menu_groups", grp.id), grp, { merge: true });
+            }
+
+            toast.success("¡Reglas de precio inyectadas y vinculadas! 🎉");
+        } catch (e) {
+            console.error(e);
+            toast.error("Error al inyectar reglas.");
+        } finally {
+            setLoading(false);
+        }
+    };
     return (
         <div className="p-10 border-2 border-dashed border-info bg-info/10 rounded-xl max-w-xl mx-auto mt-10 text-center">
             <h2 className="text-2xl font-black text-info mb-4">Paso 1: Estructura Aplanada</h2>
