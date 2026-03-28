@@ -66,19 +66,19 @@ export const ICON_WEBPS: Record<string, string> = {
     'item_malteada_sencilla': new URL('../assets/icons/BebidasFrias/Malteada_Sencilla.webp', import.meta.url).href,
     'item_malteada_especial': new URL('../assets/icons/BebidasFrias/Malteada_Especial.webp', import.meta.url).href,
     'item_soda_italiana': new URL('../assets/icons/BebidasFrias/Soda_Italiana.webp', import.meta.url).href,
+    'item_esquimo': new URL('../assets/icons/BebidasFrias/esquimo.webp', import.meta.url).href,
     //--------------------------------------------//
 
     //------Configuración de iconos de postres------//
-    'item_gelatina_rompope': new URL('../assets/icons/Gelatina_Rompope.webp', import.meta.url).href,
-    'item_pay_limon': new URL('../assets/icons/Pay_Limon.webp', import.meta.url).href,
-    'item_gelatina_mosaico': new URL('../assets/icons/Gelatina_Mosaico.webp', import.meta.url).href,
-    'item_arroz_leche': new URL('../assets/icons/Arroz_Leche.webp', import.meta.url).href,
-    'item_flan_napolitano': new URL('../assets/icons/Flan_Napolitano.webp', import.meta.url).href,
-    'item_flan_vainilla': new URL('../assets/icons/Flan_Vainilla.webp', import.meta.url).href,
-    'item_uvas_verdes_crema': new URL('../assets/icons/Uvas_Verdes_Crema.webp', import.meta.url).href,
-    'item_frutos_rojos_crema': new URL('../assets/icons/Frutos_Rojos_Crema.webp', import.meta.url).href,
-    'item_duraznos_crema': new URL('../assets/icons/Duraznos_Crema.webp', import.meta.url).href,
-
+    'item_pay_limon': new URL('../assets/icons/Postre/pay_limon.webp', import.meta.url).href,
+    'item_arroz_leche': new URL('../assets/icons/Postre/arroz_leche.webp', import.meta.url).href,
+    'item_flan_napolitano': new URL('../assets/icons/Postre/flan_napolitano.webp', import.meta.url).href,
+    'item_flan_vainilla': new URL('../assets/icons/Postre/flan_vainilla.webp', import.meta.url).href,
+    'item_uvas_verdes_crema': new URL('../assets/icons/Postre/postre_uvas_crema.webp', import.meta.url).href,
+    'item_frutos_rojos_crema': new URL('../assets/icons/Postre/postre_frutos_rojos.webp', import.meta.url).href,
+    'item_duraznos_crema': new URL('../assets/icons/Postre/postre_durazno.webp', import.meta.url).href,
+    'item_fresas_crema': new URL('../assets/icons/Postre/postre_fresas_crema.webp', import.meta.url).href,
+    'item_tapioca': new URL('../assets/icons/Postre/postre_tapioca.webp', import.meta.url).href,
     //--------------------------------------------//
 
 
@@ -110,17 +110,6 @@ function isGroup(item: MenuItem | MenuGroup): item is MenuGroup {
 export function getIconForItem(item: MenuItem | MenuGroup): React.ReactNode {
 
     const id = item.id.toLowerCase();
-    const category = 'category' in item ? item.category.toLowerCase() : '';
-    const name = item.name.toLowerCase();
-
-    // 1. POSTRES ESPECÍFICOS
-    if (id.includes('item_fresa_crema') || name.includes('fresas con crema')) return <KawaiiIcon iconKey="fresa_crema" />;
-
-    if (id === 'item_gelatina_rompope' || id === 'item_pay_limon' || id === 'item_gelatina_mosaico' ||
-        id === 'item_arroz_leche' || id === 'item_flan_napolitano' || id === 'item_flan_vainilla' ||
-        id === 'item_uvas_verdes_crema' || id === 'item_frutos_rojos_crema' || id === 'item_duraznos_crema') {
-        return <KawaiiIcon iconKey="dessert" />;
-    }
 
     // Crepas Dulces
     if (id === 'item_frutos_rojos') return <KawaiiIcon iconKey="item_frutos_rojos" />;
@@ -172,8 +161,18 @@ export function getIconForItem(item: MenuItem | MenuGroup): React.ReactNode {
     if (id === 'item_malt_esp') return <KawaiiIcon iconKey="item_malteada_especial" />;
     if (id === 'item_soda') return <KawaiiIcon iconKey="item_soda_italiana" />;
     if (id === 'item_bubble_tea') return <KawaiiIcon iconKey="item_bubble_tea" />;
+    if (id === 'item_esquimo') return <KawaiiIcon iconKey="item_esquimo" />;
 
     // 4. OTROS POSTRES
+    if (id === 'item_pay_limon') return <KawaiiIcon iconKey="item_pay_limon" />;
+    if (id === 'item_arroz_leche') return <KawaiiIcon iconKey="item_arroz_leche" />;
+    if (id === 'item_flan_napolitano') return <KawaiiIcon iconKey="item_flan_napolitano" />;
+    if (id === 'item_flan_vainilla') return <KawaiiIcon iconKey="item_flan_vainilla" />;
+    if (id === 'item_uvas_verdes_crema') return <KawaiiIcon iconKey="item_uvas_verdes_crema" />;
+    if (id === 'item_frutos_rojos_crema') return <KawaiiIcon iconKey="item_frutos_rojos_crema" />;
+    if (id === 'item_duraznos_crema') return <KawaiiIcon iconKey="item_duraznos_crema" />;
+    if (id === 'item_fresas_crema') return <KawaiiIcon iconKey="item_fresas_crema" />;
+    if (id === 'item_tapioca') return <KawaiiIcon iconKey="item_tapioca" />;
     // Mapeos por categoría o grupo
     if (id === 'hotcakes') return <KawaiiIcon iconKey="item_hotcakes" />;
     if (id === 'waffles') return <KawaiiIcon iconKey="item_waffles" />;

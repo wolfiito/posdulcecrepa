@@ -7,7 +7,8 @@ import { useAuthStore } from './store/useAuthStore';
 import { MainLayout } from './components/MainLayout';
 import { ProtectedRoute } from './components/ProtectedRoute'; // <--- IMPORTAR
 import { DatabaseSeeder } from './components/admin/DatabaseSeeder';
-import { RestoreBackup } from './components/admin/RestoreBackup';
+// import { RestoreBackup } from './components/admin/RestoreBackup';
+// import { BackupDatabase } from './components/admin/BackupDatabase';
 // Páginas
 import { LoginScreen } from './components/LoginScreen';
 import { PosPage } from './pages/PosPage';
@@ -19,7 +20,6 @@ import { UsersScreen } from './components/UsersScreen';
 import { AdminMenuScreen } from './components/AdminMenuScreen';
 import type { UserRole } from './types/user';
 import { BranchesManager } from './components/admin/BranchesManager';
-import { BackupDatabase } from './components/admin/BackupDatabase';
 import { InventoryByBranchScreen } from './components/admin/InventoryByBranchScreen';
 import ImagePreloader from './components/ImagePreloader';
 
@@ -86,9 +86,9 @@ function App() {
             <ProtectedRoute allowedRoles={ADMIN_ONLY}>
                <AdminMenuScreen />
                <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                   <BackupDatabase />
+                   {/* <BackupDatabase /> */}
                    <DatabaseSeeder />
-                   <RestoreBackup />
+                   {/* <RestoreBackup /> */}
                </div>
             </ProtectedRoute>
           } />
