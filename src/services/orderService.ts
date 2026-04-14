@@ -85,7 +85,7 @@ export const orderService = {
 
             if (snap.exists()) {
                 const data = snap.data();
-                const isTracked = data.trackStock !== false;
+                const isTracked = data.trackStock === true;
                 
                 if (isTracked) {
                     const currentStock = Number(data.currentStock) || 0;

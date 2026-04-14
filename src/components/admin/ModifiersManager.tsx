@@ -1,6 +1,6 @@
 // src/components/admin/ModifiersManager.tsx
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { toast } from 'sonner';
 import type { Modifier, ModifierGroup } from '../../types/menu';
@@ -47,7 +47,23 @@ export const ModifiersManager: React.FC = () => {
         setIsSaving(true);
         try {
             const idToSave = editingMod.id || `mod_${Date.now()}`;
+            // 1. Guardar en el catálogo global
             await setDoc(doc(db, 'modifiers', idToSave), { ...editingMod, id: idToSave });
+
+            // 2. Propagar trackStock a todas las sucursales (solo docs que ya existan)
+            const newTrackStock = editingMod.trackStock ?? false;
+            const syncBatch = writeBatch(db);
+            let hasSyncUpdates = false;
+            for (const branch of branches) {
+                const invRef = doc(db, 'branches', branch.id, 'inventory', idToSave);
+                const invSnap = await getDoc(invRef);
+                if (invSnap.exists()) {
+                    syncBatch.update(invRef, { trackStock: newTrackStock });
+                    hasSyncUpdates = true;
+                }
+            }
+            if (hasSyncUpdates) await syncBatch.commit();
+
             toast.success("Ingrediente guardado");
             setEditingMod(null);
             fetchData();
