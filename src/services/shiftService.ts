@@ -93,9 +93,17 @@ export const shiftService = {
           orders.push({ id: doc.id, ...data });
 
           if (data.payment.transactions && Array.isArray(data.payment.transactions)) {
+              // El cambio siempre proviene del efectivo; lo descontamos del cash neto.
+              const changeGiven = Number(data.payment.change) || 0;
+              let cashChangeApplied = false;
               data.payment.transactions.forEach((tx: any) => {
                   const amount = Number(tx.amount) || 0;
-                  if (tx.method === 'cash') cashTotal += amount;
+                  if (tx.method === 'cash') {
+                      // Solo descontar el cambio una vez (en la primera tx de efectivo)
+                      const netCash = cashChangeApplied ? amount : amount - changeGiven;
+                      cashTotal += netCash;
+                      cashChangeApplied = true;
+                  }
                   if (tx.method === 'card') cardTotal += amount;
                   if (tx.method === 'transfer') transferTotal += amount;
               });
