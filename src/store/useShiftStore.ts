@@ -5,7 +5,6 @@ import {
     collection, 
     query, 
     where, 
-    orderBy, 
     limit, 
     onSnapshot, 
     Timestamp 
@@ -32,23 +31,27 @@ export const useShiftStore = create<ShiftState>((set, get) => ({
 
   // 1. ESCUCHA EN TIEMPO REAL (La clave de la solución)
   startListeningToShift: () => {
-      // Evitar dobles suscripciones
-      if (get().unsubscribeShift) return;
-
       const { activeBranchId, currentUser } = useAuthStore.getState();
       if (!activeBranchId || !currentUser) return;
+
+      // Si ya hay una escucha, checamos si es la misma o hay que cambiarla
+      // Para simplificar, la cerramos y abrimos una nueva si se llama de nuevo
+      const currentUnsubscribe = get().unsubscribeShift;
+      if (currentUnsubscribe) {
+          currentUnsubscribe();
+      }
 
       set({ isLoading: true });
 
       // Query para buscar MI caja abierta (Filtramos por userId para aislamiento)
+      // ELIMINAMOS orderBy para no requerir índice compuesto y evitar errores en dispositivos nuevos
       const q = query(
         collection(db, 'shifts'),
         where('branchId', '==', activeBranchId), 
         where('userId', '==', currentUser.id),
         where('isOpen', '==', true),
-        orderBy('openedAt', 'desc'),
         limit(1)
-    );
+      );
 
       // onSnapshot se ejecuta cada vez que cambia algo en la BD
       const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -60,10 +63,8 @@ export const useShiftStore = create<ShiftState>((set, get) => ({
                   openedAt: docData.openedAt instanceof Timestamp ? docData.openedAt.toDate() : docData.openedAt
               } as Shift;
               
-              console.log("🟢 CAJA DETECTADA ABIERTA:", safeShift.id);
               set({ currentShift: safeShift, isLoading: false });
           } else {
-              console.log("🔴 CAJA CERRADA O INEXISTENTE");
               set({ currentShift: null, isLoading: false });
           }
       }, (error) => {

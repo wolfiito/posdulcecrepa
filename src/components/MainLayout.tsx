@@ -27,11 +27,11 @@ export const MainLayout: React.FC = () => {
 
   const { startListeningInventory } = useInventoryStore();
   useEffect(() => {
-    if (currentUser) {
+    if (currentUser && activeBranchId) {
         startListeningToShift();
     }
     return () => stopListeningToShift();
-  }, [currentUser, startListeningToShift, stopListeningToShift]);
+  }, [currentUser, activeBranchId, startListeningToShift, stopListeningToShift]);
   useEffect(() => {
     if (currentInventoryBranch) {
         console.log("Descargando inventario de la sucursal:", currentInventoryBranch); // <-- Para que lo veas con F12
