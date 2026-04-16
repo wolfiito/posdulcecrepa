@@ -29,11 +29,11 @@ export const MovementsScreen: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false); // Control del Modal
 
     const { currentShift } = useShiftStore();
-    const { activeBranchId, currentUser } = useAuthStore();
+    const { activeBranchId } = useAuthStore();
 
     const loadData = () => {
         setLoading(true);
-        movementService.getDailyMovements(activeBranchId || undefined)
+        movementService.getDailyMovements(activeBranchId || undefined, currentShift?.id)
             .then(data => {
                 // Ordenar: más recientes primero
                 const sorted = data.filter(m => m.type === 'OUT').sort((a,b) => {
@@ -43,11 +43,14 @@ export const MovementsScreen: React.FC = () => {
                 });
                 setMovements(sorted);
             })
-            .catch(() => toast.error("Error al cargar movimientos"))
+            .catch((err) => {
+                console.error("Error loading movements:", err);
+                toast.error("Error al cargar movimientos");
+            })
             .finally(() => setLoading(false));
     };
 
-    useEffect(() => { loadData(); }, []);
+    useEffect(() => { loadData(); }, [currentShift, activeBranchId]);
 
     const handleDelete = (id: string) => {
         toast("¿Eliminar este registro?", {

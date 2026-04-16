@@ -109,6 +109,7 @@ export const MenuScreen: React.FC = () => {
                 
                 addItem({
                     id: Date.now().toString(),
+                    productId: menuItem.id,
                     baseName: menuItem.name,
                     finalPrice: branchPrice,
                     finalCost: menuItem.cost,

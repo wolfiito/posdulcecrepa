@@ -2,7 +2,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import Modal from 'react-modal';
 import type { MenuGroup, Modifier, TicketItem, PriceRule } from '../types/menu';
-import { MODIFIER_GROUPS, EXCLUSIVE_GROUPS, EXCLUSIVE_BASE_GROUPS } from '../constants/menuConstants';
+import { MODIFIER_GROUPS, EXCLUSIVE_GROUPS } from '../constants/menuConstants';
 import { calculateCustomItemPrice } from '../utils/pricing';
 import { useInventoryStore } from '../store/useInventoryStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -128,6 +128,8 @@ const { price: currentPrice, cost: currentCost, ruleDescription: currentRule, is
     return Array.from(selectedModifiers.values()).some(mod => currentStepInfo.groups.includes(mod.group));
   }, [currentStepInfo, selectedModifiers]);
 
+  const [quantity, setQuantity] = useState(1);
+
   const handleModifierChange = (modifier: Modifier) => {
     const isExclusive = EXCLUSIVE_GROUPS.includes(modifier.group);
     setSelectedModifiers(prev => {
@@ -145,10 +147,12 @@ const { price: currentPrice, cost: currentCost, ruleDescription: currentRule, is
     if (!group || !isValid) return;
     onAddItem({
       id: Date.now().toString(),
+      productId: group.id,
       baseName: group.name.split('(')[0].trim(), 
       finalPrice: currentPrice,
       finalCost: currentCost,
       type: 'CUSTOM',
+      quantity: quantity,
       details: {
         baseRuleId: group.rules_ref,
         basePriceRule: currentRule,
@@ -156,6 +160,12 @@ const { price: currentPrice, cost: currentCost, ruleDescription: currentRule, is
       }
     });
   };
+
+  useEffect(() => {
+    if (isOpen) {
+      setQuantity(1);
+    }
+  }, [isOpen]);
 
   // Lógica de límite visual (no afecta precio, solo deshabilita botones)
   const selectedBaseCount = useMemo(() => {
@@ -187,7 +197,7 @@ const { price: currentPrice, cost: currentCost, ruleDescription: currentRule, is
         </div>
         {/* Precio */}
         <div className={`badge badge-lg font-bold transition-colors duration-300 ${isValid ? 'badge-success text-success-content' : 'badge-ghost opacity-50'}`}>
-          {currentRule} &rarr; ${currentPrice.toFixed(2)}
+          {currentRule} &rarr; ${(currentPrice * quantity).toFixed(2)}
         </div>
       </div>
       
@@ -233,19 +243,44 @@ const { price: currentPrice, cost: currentCost, ruleDescription: currentRule, is
       </div>
       
       {/* Footer */}
-      <div className="p-4 border-t border-base-200 bg-base-100 flex gap-3">
-        <button onClick={step === 0 ? onClose : () => setStep(s => s - 1)} className="btn btn-ghost text-base-content/70">
-            {step === 0 ? 'Cancelar' : 'Atrás'}
-        </button>
-        {isLastStep ? (
-            <button onClick={handleAddToTicket} disabled={!isValid} className="btn btn-primary flex-1 shadow-lg shadow-primary/20">
-                Agregar ${currentPrice.toFixed(2)}
-            </button>
-        ) : (
-            <button onClick={() => setStep(s => s + 1)} disabled={!isStepValid} className="btn btn-secondary flex-1">
-                Siguiente
-            </button>
+      <div className="p-4 border-t border-base-200 bg-base-100 flex flex-col gap-4">
+        {/* Selector de Cantidad */}
+        {isLastStep && isValid && (
+            <div className="flex items-center justify-center gap-6 py-2 animate-fade-in">
+                <span className="text-xs font-bold uppercase opacity-50">Cantidad</span>
+                <div className="flex items-center gap-4">
+                    <button 
+                        onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                        className="btn btn-circle btn-sm btn-outline btn-primary"
+                        disabled={quantity <= 1}
+                    >
+                        －
+                    </button>
+                    <span className="text-2xl font-black font-mono w-8 text-center">{quantity}</span>
+                    <button 
+                        onClick={() => setQuantity(q => q + 1)}
+                        className="btn btn-circle btn-sm btn-outline btn-primary"
+                    >
+                        ＋
+                    </button>
+                </div>
+            </div>
         )}
+
+        <div className="flex gap-3">
+            <button onClick={step === 0 ? onClose : () => setStep(s => s - 1)} className="btn btn-ghost text-base-content/70">
+                {step === 0 ? 'Cancelar' : 'Atrás'}
+            </button>
+            {isLastStep ? (
+                <button onClick={handleAddToTicket} disabled={!isValid} className="btn btn-primary flex-1 shadow-lg shadow-primary/20">
+                    Agregar ${(currentPrice * quantity).toFixed(2)}
+                </button>
+            ) : (
+                <button onClick={() => setStep(s => s + 1)} disabled={!isStepValid} className="btn btn-secondary flex-1">
+                    Siguiente
+                </button>
+            )}
+        </div>
       </div>
     </Modal>
   );

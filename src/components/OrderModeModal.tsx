@@ -19,8 +19,6 @@ interface OrderModeModalProps {
 export const OrderModeModal: React.FC<OrderModeModalProps> = ({ isOpen, onClose, onConfirm }) => {
   const { activeBranchId } = useAuthStore();
   
-  const [mode, setMode] = useState<OrderMode | null>(null);
-  const [tableNumber, setTableNumber] = useState<string>('');
   const [customerName, setCustomerName] = useState('');
   
   // Estado para la cantidad de mesas dinámica
@@ -43,15 +41,12 @@ export const OrderModeModal: React.FC<OrderModeModalProps> = ({ isOpen, onClose,
       
       // Resetear formulario al abrir
       if (isOpen) {
-          setMode(null);
-          setTableNumber('');
           setCustomerName('');
       }
   }, [isOpen, activeBranchId]);
 
   const handleTableSelect = (num: number) => {
     const tableName = `Mesa ${num}`;
-    setTableNumber(tableName);
     onConfirm(tableName as OrderMode, '');
   };
 
@@ -139,7 +134,7 @@ export const OrderModeModal: React.FC<OrderModeModalProps> = ({ isOpen, onClose,
                             disabled={!customerName.trim()}
                             className="btn btn-secondary btn-lg w-full shadow-lg"
                         >
-                            Confirmar Pedido ➝
+                            Enviar a Cocina ➝
                         </button>
                     </div>
                 </div>

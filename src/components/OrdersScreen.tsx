@@ -240,13 +240,15 @@ export const OrdersScreen: React.FC = () => {
                   
                   // Consolidación por Producto + Detalles (IGNORAMOS id ya que es único por línea)
                   const consolidatedItems = allRawItems.reduce((acc, current) => {
-                      // Signature: productId/baseName + price + details stringified
+                      const finalPriceStr = Number(current.finalPrice || 0).toFixed(2);
                       const detailsSig = current.details ? JSON.stringify(current.details) : "";
-                      const sig = (current.productId || current.baseName) + current.finalPrice + detailsSig;
+                      // Signature: productId/baseName + price + details stringified
+                      const sig = `${current.productId || current.baseName}|${finalPriceStr}|${detailsSig}`;
                       
                       const existingIndex = acc.findIndex(i => {
+                          const iPriceStr = Number(i.finalPrice || 0).toFixed(2);
                           const iDetailsSig = i.details ? JSON.stringify(i.details) : "";
-                          const iSig = (i.productId || i.baseName) + i.finalPrice + iDetailsSig;
+                          const iSig = `${i.productId || i.baseName}|${iPriceStr}|${iDetailsSig}`;
                           return iSig === sig;
                       });
 

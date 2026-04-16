@@ -54,9 +54,9 @@ export const TicketItemCard: React.FC<Props> = ({ item, onRemove }) => {
         style={{ touchAction: "none" }}
       >
         <div className="flex justify-between items-start gap-3">
-            {/* Cantidad (Por ahora 1x, preparado para futuro) */}
+            {/* Cantidad */}
             <div className="flex items-center justify-center bg-base-200 w-8 h-8 rounded-lg text-xs font-bold shrink-0 text-base-content/70">
-                1x
+                {item.quantity || 1}x
             </div>
 
             {/* Detalles */}
@@ -84,7 +84,7 @@ export const TicketItemCard: React.FC<Props> = ({ item, onRemove }) => {
 
             {/* Precio */}
             <div className="font-black text-base text-base-content shrink-0">
-                ${item.finalPrice.toFixed(2)}
+                ${(item.finalPrice * (item.quantity || 1)).toFixed(2)}
             </div>
         </div>
       </motion.div>

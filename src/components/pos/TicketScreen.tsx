@@ -11,7 +11,8 @@ export const TicketScreen: React.FC = () => {
 
     // 2. 👇 Lógica para el título: Si hay nombre (Mesa 1), úsalo. Si no, "Nueva Orden".
     // El "Alejandro" desaparecerá porque aquí no llamamos a currentUser.
-    const displayTitle = customerName || 'Nueva Orden';
+    const isMesa = orderMode?.startsWith('Mesa ');
+    const displayTitle = customerName || (isMesa ? orderMode : 'Nueva Orden');
     
     // Subtítulo dinámico (Ej: "Para Llevar" o "Comedor")
     const displaySubtitle = orderMode === 'Para Llevar' ? 'Pedido Para Llevar' : 'Consumo en Local';

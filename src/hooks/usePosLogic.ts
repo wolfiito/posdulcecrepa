@@ -16,7 +16,6 @@ export const usePosLogic = () => {
   const { currentShift } = useShiftStore(); 
   
   const { 
-    items,
     clearTicket, 
     orderMode, 
     customerName, 
@@ -36,7 +35,6 @@ export const usePosLogic = () => {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isModeModalOpen, setIsModeModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isLoading, setIsLoading] = useState(false); 
 
   useEffect(() => {
     const unsubscribe = startListening();
@@ -73,11 +71,10 @@ export const usePosLogic = () => {
       const currentClientName = overrideName || useTicketStore.getState().customerName;
       
       const cashierName = currentUser?.name || 'Cajero';
-      const total = currentItems.reduce((sum, item) => sum + item.finalPrice, 0);
+      const total = useTicketStore.getState().getTotal();
 
-      const isTakeOut = currentMode === 'Para Llevar';
-      const shouldPrint = currentUser?.role !== 'MESERO' && isTakeOut;
-      const activeShiftId = (shouldPrint && currentShift) ? currentShift.id : undefined;
+      const shouldPrint = false; // DESACTIVADO: Solo se imprime al cobrar en la pantalla de órdenes
+      const activeShiftId = undefined;
 
       try {
           setIsPaymentModalOpen(false); 
@@ -97,11 +94,7 @@ export const usePosLogic = () => {
           clearTicket();
           setView('menu');
 
-          if (shouldPrint) {
-              toast.success(`¡Orden cobrada e impresa! 🖨️`);
-          } else {
-              toast.success(`¡Enviado a cocina: ${currentClientName}! 👨‍🍳`);
-          }
+          toast.success(`¡Enviado a cocina: ${currentClientName}! 👨‍🍳`);
 
       } catch (error: any) {
           console.error(error);
@@ -121,20 +114,7 @@ export const usePosLogic = () => {
       setCustomerName(finalName);
       setIsModeModalOpen(false);
 
-      const isMesero = currentUser?.role === 'MESERO';
-      const isTakeOut = selectedMode === 'Para Llevar';
-
-      if (isTakeOut && !isMesero) {
-          if (!currentShift) {
-              toast.error("CAJA CERRADA: Abre turno para cobrar.");
-              openShiftModal(); 
-              return;
-          }
-
-          setTimeout(() => setIsPaymentModalOpen(true), 100); 
-      } else {
-          handleFinalizeOrder(undefined, selectedMode, finalName); 
-      }
+      handleFinalizeOrder(undefined, selectedMode as OrderMode, finalName); 
   }, [currentUser, currentShift, openShiftModal, setOrderMode, setCustomerName, handleFinalizeOrder, activeBranchId]);
 
   const handleMainBtnClick = useCallback(() => {

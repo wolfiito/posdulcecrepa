@@ -14,11 +14,23 @@ import {
 import type { Movement, MovementType, MovementCategory } from '../types/movement';
 
 export const movementService = {
-  // 1. Obtener movimientos del día por sucursal
-  async getDailyMovements(branchId?: string): Promise<Movement[]> {
+  // 1. Obtener movimientos (Hoy o por Turno específico)
+  async getDailyMovements(branchId?: string, shiftId?: string): Promise<Movement[]> {
       const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
 
+      // Si tenemos shiftId, es mejor filtrar por él directamente (más eficiente e index-ready)
+      if (shiftId) {
+        const qShift = query(
+            collection(db, 'movements'),
+            where('shiftId', '==', shiftId),
+            orderBy('createdAt', 'desc')
+        );
+        const snap = await getDocs(qShift);
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as Movement));
+      }
+
+      // De lo contrario, buscamos los del día en la sucursal
       let q = query(
           collection(db, 'movements'),
           where('createdAt', '>=', startOfDay),

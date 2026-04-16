@@ -125,6 +125,24 @@ export const excelExportService = {
     addSummaryRow('    Transferencia', data.transferTotal);
     summarySheet.addRow([]); 
     addSummaryRow('(-) GASTOS OPERATIVOS', data.totalExpenses, true, false, 'DC2626');
+    
+    // --- NUEVO: Desglose de Gastos por Categoría ---
+    if (data.expenses && data.expenses.length > 0) {
+        const expenseGroups: Record<string, number> = {};
+        data.expenses.forEach(exp => {
+            const cat = exp.category || 'Otros';
+            expenseGroups[cat] = (expenseGroups[cat] || 0) + exp.amount;
+        });
+
+        summarySheet.addRow([]);
+        const expenseHeaderRow = summarySheet.addRow(['    DETALLE DE GASTOS POR CATEGORÍA', '']);
+        expenseHeaderRow.getCell(1).font = { italic: true, bold: true, size: 10, color: { argb: 'FF64748B' } };
+        
+        Object.entries(expenseGroups).forEach(([cat, amount]) => {
+            addSummaryRow(`      • ${cat}`, amount, false, false, '64748B');
+        });
+    }
+
     summarySheet.addRow([]); 
     addSummaryRow('(=) UTILIDAD NETA', data.netBalance, false, true);
 
