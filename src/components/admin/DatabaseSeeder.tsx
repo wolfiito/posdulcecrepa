@@ -230,9 +230,9 @@ async function seedWafflesHotcakes() {
         { id: "mod_ext_kitkat", name: "Kitkat", price: 30, group: "crepa_dulce_extra", branchPrices: { "ZH1qzEPpDlDgWu8168th": 30, "wa9igpvRpHkYpT7RPqgu": 35 }, trackStock: true, disabledIn: [] },
         { id: "mod_ext_hersheys_blanco", name: "Hershey's blanco", price: 10, group: "crepa_dulce_extra", branchPrices: { "ZH1qzEPpDlDgWu8168th": 10, "wa9igpvRpHkYpT7RPqgu": 15 }, trackStock: true, disabledIn: [] },
         { id: "mod_ext_mini_conejo_turin", name: "Mini conejo", price: 10, group: "crepa_dulce_extra", branchPrices: { "ZH1qzEPpDlDgWu8168th": 10, "wa9igpvRpHkYpT7RPqgu": 15 }, trackStock: true, disabledIn: [] },
-        { id: "mod_ext_helado", name: "Bola de helado", price: 10, group: "crepa_dulce_extra", branchPrices: { "ZH1qzEPpDlDgWu8168th": 10, "wa9igpvRpHkYpT7RPqgu": 15 }, trackStock: true, disabledIn: [] },
-        { id: "mod_ext_baileys", name: "Baileys", price: 30, group: "crepa_dulce_extra", branchPrices: { "ZH1qzEPpDlDgWu8168th": 30, "wa9igpvRpHkYpT7RPqgu": 35 }, trackStock: true, disabledIn: [] },
-        { id: "mod_ext_kahlua", name: "Kahlua", price: 30, group: "crepa_dulce_extra", branchPrices: { "ZH1qzEPpDlDgWu8168th": 30, "wa9igpvRpHkYpT7RPqgu": 35 }, trackStock: true, disabledIn: [] },
+        { id: "mod_ext_helado", name: "Bola de helado", price: 10, group: "crepa_dulce_extra", branchPrices: { "ZH1qzEPpDlDgWu8168th": 10, "wa9igpvRpHkYpT7RPqgu": 15 }, trackStock: false, disabledIn: [] },
+        { id: "mod_ext_baileys", name: "Baileys", price: 30, group: "crepa_dulce_extra", branchPrices: { "ZH1qzEPpDlDgWu8168th": 30, "wa9igpvRpHkYpT7RPqgu": 35 }, trackStock: false, disabledIn: [] },
+        { id: "mod_ext_kahlua", name: "Kahlua", price: 30, group: "crepa_dulce_extra", branchPrices: { "ZH1qzEPpDlDgWu8168th": 30, "wa9igpvRpHkYpT7RPqgu": 35 }, trackStock: false, disabledIn: [] },
 
         { id: "top_lechera", name: "Lechera", price: 0, group: "crepa_dulce_topping", trackStock: false, disabledIn: [] },
         { id: "top_chispas", name: "Chispas de colores", price: 0, group: "crepa_dulce_topping", trackStock: false, disabledIn: [] },
