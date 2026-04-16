@@ -35,15 +35,16 @@ export const useShiftStore = create<ShiftState>((set, get) => ({
       // Evitar dobles suscripciones
       if (get().unsubscribeShift) return;
 
-      const { activeBranchId } = useAuthStore.getState();
-      if (!activeBranchId) return;
+      const { activeBranchId, currentUser } = useAuthStore.getState();
+      if (!activeBranchId || !currentUser) return;
 
       set({ isLoading: true });
 
-      // Query para buscar MI caja abierta
+      // Query para buscar MI caja abierta (Filtramos por userId para aislamiento)
       const q = query(
         collection(db, 'shifts'),
         where('branchId', '==', activeBranchId), 
+        where('userId', '==', currentUser.id),
         where('isOpen', '==', true),
         orderBy('openedAt', 'desc'),
         limit(1)

@@ -33,17 +33,28 @@ export interface Shift {
 }
 
 export const shiftService = {
-  // 1. Obtener turno (Igual)
-  async getCurrentShift(branchId: string): Promise<Shift | null> {
+  // 1. Obtener turno (Ahora opcionalmente por usuario)
+  async getCurrentShift(branchId: string, userId?: string): Promise<Shift | null> {
     if (!branchId) return null;
 
-    const q = query(
+    let q = query(
       collection(db, 'shifts'),
       where('branchId', '==', branchId),
       where('isOpen', '==', true),
       orderBy('openedAt', 'desc'),
       limit(1)
     );
+
+    if (userId) {
+      q = query(
+        collection(db, 'shifts'),
+        where('branchId', '==', branchId),
+        where('userId', '==', userId),
+        where('isOpen', '==', true),
+        orderBy('openedAt', 'desc'),
+        limit(1)
+      );
+    }
 
     const snapshot = await getDocs(q);
     if (snapshot.empty) return null;
@@ -52,7 +63,7 @@ export const shiftService = {
     return { id: snapshot.docs[0].id, ...data } as Shift;
   },
 
-  // 2. Abrir turno (Igual)
+  // 2. Abrir turno
   async openShift(
     initialFund: number, 
     userId: string, 
@@ -60,8 +71,8 @@ export const shiftService = {
     branchId: string
     ) : Promise<string> {
 
-    const current = await this.getCurrentShift(branchId);
-    if (current) throw new Error(`⛔ Ya hay un turno abierto en esta sucursal (abierto por ${current.openedBy}). Cierralo primero.`);
+    const current = await this.getCurrentShift(branchId, userId);
+    if (current) throw new Error(`⛔ Ya tienes un turno abierto. Cierralo primero.`);
     
     const docRef = await addDoc(collection(db, 'shifts'), {
       branchId,

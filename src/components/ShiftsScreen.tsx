@@ -123,9 +123,15 @@ export const ShiftsScreen: React.FC = () => {
                         <Numpad onNumber={handleNumber} onBackspace={handleBackspace} />
                     </div>
 
+                    {currentUser?.role !== 'CAJERO' && (
+                        <div className="alert alert-warning mb-4 rounded-xl shadow-sm py-3">
+                            <span className="text-xs font-bold">⚠️ Solo usuarios con Rol de Cajero pueden abrir caja.</span>
+                        </div>
+                    )}
+
                     <button 
                         onClick={() => requestAction('OPEN')} 
-                        disabled={!inputAmount}
+                        disabled={!inputAmount || currentUser?.role !== 'CAJERO'}
                         className="btn btn-primary btn-block btn-lg rounded-2xl shadow-lg mt-4"
                     >
                         Confirmar Apertura
