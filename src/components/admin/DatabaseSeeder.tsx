@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { logger } from '../../services/loggerService';
 // import { GroupsManager } from './GroupsManager';
 
 async function seedRoot() {
@@ -418,7 +419,7 @@ export const DatabaseSeeder: React.FC = () => {
             await fn();
             toast.success(`${label} — ¡listo!`);
         } catch (e) {
-            console.error(e);
+            logger.error(`Falló la inyección en DatabaseSeeder: ${label}`, e, { context: 'DatabaseSeeder.runSection' });
             toast.error(`Error en: ${label}`);
         } finally {
             setLoading(null);
@@ -435,7 +436,7 @@ export const DatabaseSeeder: React.FC = () => {
             }
             toast.success("¡Todo el menú inyectado con éxito!");
         } catch (e) {
-            console.error(e);
+            logger.error("Error durante la inyección completa de DatabaseSeeder.", e, { context: 'DatabaseSeeder.runAll' });
             toast.error("Error durante la inyección completa.");
         } finally {
             setLoading(null);

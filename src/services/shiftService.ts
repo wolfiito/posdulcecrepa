@@ -1,6 +1,7 @@
 // src/services/shiftService.ts
 import { db, collection, addDoc, updateDoc, getDocs, query, where, orderBy, limit, serverTimestamp, doc, Timestamp } from '../firebase';
 import type { DailyReportData } from '../types/report';
+import { logger } from './loggerService';
 
 // --- DEFINIMOS LOS TIPOS PARA EVITAR ERRORES ---
 export interface ShiftMetrics extends DailyReportData {
@@ -71,18 +72,29 @@ export const shiftService = {
     branchId: string
     ) : Promise<string> {
 
-    const current = await this.getCurrentShift(branchId, userId);
-    if (current) throw new Error(`⛔ Ya tienes un turno abierto. Cierralo primero.`);
-    
-    const docRef = await addDoc(collection(db, 'shifts'), {
-      branchId,
-      userId, 
-      isOpen: true,
-      openedBy: userName,
-      openedAt: serverTimestamp(),
-      initialFund: initialFund
-    });
-    return docRef.id;
+    try {
+      const current = await this.getCurrentShift(branchId, userId);
+      if (current) throw new Error(`Ya tienes un turno abierto. Cierralo primero.`);
+      
+      const docRef = await addDoc(collection(db, 'shifts'), {
+        branchId,
+        userId, 
+        isOpen: true,
+        openedBy: userName,
+        openedAt: serverTimestamp(),
+        initialFund: initialFund
+      });
+
+      logger.info(`Caja abierta por ${userName} con fondo inicial de $${initialFund}`, { 
+        context: 'shiftService.openShift',
+        metadata: { branchId, userId }
+      });
+
+      return docRef.id;
+    } catch (error) {
+      logger.error('Error al abrir turno', error, { context: 'shiftService.openShift' });
+      throw error;
+    }
   },
 
   async getShiftMetrics(shift: Shift): Promise<ShiftMetrics> {
@@ -190,17 +202,27 @@ export const shiftService = {
 
   // 4. Cerrar turno (Igual)
   async closeShift(shiftId: string, finalCount: number, metrics: ShiftMetrics) {
-    const shiftRef = doc(db, 'shifts', shiftId);
-    const difference = finalCount - metrics.expectedCash;
+    try {
+      const shiftRef = doc(db, 'shifts', shiftId);
+      const difference = finalCount - metrics.expectedCash;
 
-    await updateDoc(shiftRef, {
-      isOpen: false,
-      closedAt: serverTimestamp(),
-      finalCount,
-      totalSalesCash: metrics.cashTotal,
-      totalExpenses: metrics.totalExpenses,
-      expectedCash: metrics.expectedCash,
-      difference
-    });
+      await updateDoc(shiftRef, {
+        isOpen: false,
+        closedAt: serverTimestamp(),
+        finalCount,
+        totalSalesCash: metrics.cashTotal,
+        totalExpenses: metrics.totalExpenses,
+        expectedCash: metrics.expectedCash,
+        difference
+      });
+
+      logger.info(`Caja cerrada. Dinero final: $${finalCount}. Diferencia: $${difference}`, {
+        context: 'shiftService.closeShift',
+        metadata: { shiftId, expectedCash: metrics.expectedCash, finalCount, difference }
+      });
+    } catch (error) {
+      logger.error('Error al cerrar turno', error, { context: 'shiftService.closeShift' });
+      throw error;
+    }
   }
 };

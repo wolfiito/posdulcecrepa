@@ -40,6 +40,9 @@ export const useAuthStore = create<AuthState>()(
             error: null
           });
         } catch (err: any) {
+            import('../services/loggerService').then(({ logger }) => {
+              logger.error('Error durante el inicio de sesión', err, { context: 'useAuthStore.loginWithCredentials' });
+            });
             set({ 
               error: err.message || 'Credenciales incorrectas', 
               isLoading: false 

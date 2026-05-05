@@ -4,9 +4,26 @@ import { BrowserRouter } from 'react-router-dom'
 import './index.css' // Solo mantenemos los estilos globales de Tailwind
 import App from './App.tsx'
 import { registerSW } from 'virtual:pwa-register'
+import ErrorBoundary from './components/ErrorBoundary'
+import { logger } from './services/loggerService'
 
 // Registro automático del Service Worker para actualizaciones inmediatas
 registerSW({ immediate: true })
+
+// Integración de Logs Globales
+window.onerror = function (message, source, lineno, colno, error) {
+  logger.error(`Error global: ${message}`, error || new Error(message as string), {
+    context: 'window.onerror',
+    metadata: { source, lineno, colno }
+  });
+  return false;
+};
+
+window.addEventListener('unhandledrejection', (event) => {
+  logger.error('Promesa no controlada (unhandled rejection)', event.reason, {
+    context: 'window.unhandledrejection',
+  });
+});
 
 // Asegurarnos de que el elemento root existe antes de renderizar
 const rootElement = document.getElementById('root');
@@ -14,10 +31,11 @@ const rootElement = document.getElementById('root');
 if (rootElement) {
   createRoot(rootElement).render( 
     <StrictMode>
-      {/* Envolver App con BrowserRouter */}
-      <BrowserRouter> 
-        <App />
-      </BrowserRouter>
+      <ErrorBoundary>
+        <BrowserRouter> 
+          <App />
+        </BrowserRouter>
+      </ErrorBoundary>
     </StrictMode>,
   )
 } else {

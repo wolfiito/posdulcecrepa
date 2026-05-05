@@ -1,6 +1,7 @@
 // src/services/inventoryService.ts
 import { db, doc, collection, getDocs, setDoc, writeBatch } from '../firebase';
 import type { Modifier } from '../types/menu';
+import { logger } from './loggerService';
 
 export interface BranchInventoryItem {
   id: string; // El mismo ID que el modificador global
@@ -37,15 +38,25 @@ export const inventoryService = {
 
   // 2. Actualizar el stock de un ítem específico en una sucursal
   async updateStock(branchId: string, modifierId: string, newStock: number, modifierName: string) {
-    const ref = doc(db, 'branches', branchId, 'inventory', modifierId);
-    
-    // Usamos setDoc con merge para crear el documento si es la primera vez que se asigna stock
-    await setDoc(ref, {
-        currentStock: newStock,
-        name: modifierName, 
-        trackStock: true, // NUEVO: Evita que sea ignorado en el ticket
-        lastUpdated: new Date()
-    }, { merge: true });
+    try {
+      const ref = doc(db, 'branches', branchId, 'inventory', modifierId);
+      
+      // Usamos setDoc con merge para crear el documento si es la primera vez que se asigna stock
+      await setDoc(ref, {
+          currentStock: newStock,
+          name: modifierName, 
+          trackStock: true, // NUEVO: Evita que sea ignorado en el ticket
+          lastUpdated: new Date()
+      }, { merge: true });
+
+      logger.info(`Stock ajustado a manualmente: ${modifierName} -> ${newStock}`, {
+        context: 'inventoryService.updateStock',
+        metadata: { branchId, modifierId, newStock }
+      });
+    } catch (error) {
+       logger.error(`Error al actualizar stock de ${modifierName}`, error, { context: 'inventoryService.updateStock' });
+       throw error;
+    }
   },
 
   // 3. Inicializar inventario masivo (Para cuando abres una sucursal nueva)

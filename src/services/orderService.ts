@@ -1,6 +1,7 @@
 // src/services/orderService.ts
 import { db, collection, serverTimestamp, runTransaction, doc, writeBatch, increment } from '../firebase';
 import { printService } from './printService';
+import { logger } from './loggerService';
 import type { TicketItem } from '../types/menu';
 import type { PaymentDetails, OrderMode, KitchenStatus } from '../types/order';
 import type { DocumentReference } from 'firebase/firestore'; 
@@ -148,7 +149,7 @@ export const orderService = {
     return finalOrderNumber;
 
     } catch (error) {
-      console.error("Error crítico al crear orden:", error);
+      logger.error("Error crítico al crear orden", error, { context: 'orderService.createOrder' });
       throw error;
     }
   },
@@ -213,7 +214,7 @@ export const orderService = {
         await batch.commit();
         return true;
     } catch (error) {
-        console.error("Error al cancelar orden:", error);
+        logger.error("Error al cancelar orden", error, { context: 'orderService.cancelOrder' });
         throw error;
     }
   },
@@ -255,7 +256,7 @@ export const orderService = {
         await batch.commit();
         return true;
     } catch (error) {
-        console.error("Error al eliminar item de orden:", error);
+        logger.error("Error al eliminar item de orden", error, { context: 'orderService.removeItemFromOrder' });
         throw error;
     }
   }
