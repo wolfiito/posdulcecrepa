@@ -62,10 +62,22 @@ export const calculateCustomItemPrice = (
       ruleDescription = 'Elija ingredientes base';
     }
     if (priceRule) {
-        const matchedRule = [...priceRule.basePrices]
-            .sort((a, b) => b.count - a.count)
-            .find(r => baseIngredientCount >= r.count);
-        basePrice = matchedRule?.price || 0;
+        const sortedRules = [...priceRule.basePrices].sort((a, b) => b.count - a.count);
+        const maxRule = sortedRules[0];
+
+        if (maxRule && baseIngredientCount > maxRule.count) {
+            // HÍBRIDO: Usamos el tope de la lista y sumamos el incremento dinámico
+            const extraIngredients = baseIngredientCount - maxRule.count;
+            const increment = priceRule.incrementPerIngredient ?? 5;
+            basePrice = maxRule.price + (extraIngredients * increment);
+        } else if (maxRule) {
+            // TRADICIONAL: Buscamos en la lista (exact o más cercano por debajo)
+            const matchedRule = sortedRules.find(r => baseIngredientCount >= r.count);
+            basePrice = matchedRule?.price || 0;
+        } else if (priceRule.initialPrice !== undefined && priceRule.incrementPerIngredient !== undefined) {
+            // LINEAL PURO: (Si basePrices está vacío)
+            basePrice = priceRule.initialPrice + (Math.max(0, baseIngredientCount - 1) * priceRule.incrementPerIngredient);
+        }
     }
   }
   else {

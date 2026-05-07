@@ -22,7 +22,7 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
   const [step, setStep] = useState(0);
   const [selectedModifiers, setSelectedModifiers] = useState<Map<string, Modifier>>(new Map());
 
-  const maxIngredients = useMemo(() => group?.id.includes('hotcakes') ? 3 : 5, [group]);
+  const maxIngredients = 99; // Límite removido (seteado en 99 por seguridad de UI)
 
   useEffect(() => {
     if (isOpen) {
@@ -79,6 +79,8 @@ const branchAdjustedPriceRule = useMemo(() => {
   if (!priceRule) return undefined;
   return {
       ...priceRule,
+      initialPrice: priceRule.branchInitialPrices?.[activeBranchId || ''] ?? priceRule.initialPrice,
+      incrementPerIngredient: priceRule.branchIncrements?.[activeBranchId || ''] ?? priceRule.incrementPerIngredient,
       basePrices: priceRule.basePrices.map(bp => ({
           ...bp, // Mantenemos el conteo (ej. 1 ing, 2 ing)
           // Si la sucursal tiene un precio especial para este escalón, lo usamos. Si no, usamos el base.

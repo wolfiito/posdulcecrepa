@@ -87,7 +87,7 @@ function App() {
                <AdminMenuScreen />
                <div className="flex flex-col sm:flex-row gap-4 mb-6">
                    {/* <BackupDatabase /> */}
-                   <DatabaseSeeder />
+                   {(currentUser?.username == '2310' || currentUser?.id == '2310') && <DatabaseSeeder />}
                    {/* <RestoreBackup /> */}
                </div>
             </ProtectedRoute>
