@@ -1890,8 +1890,7 @@ async function seedPostres() {
             price: 70,
             disabledIn: [],
             branchPrices: { "wa9igpvRpHkYpT7RPqgu": 75 },
-            extra_groups: ["crepa_dulce_extra"],
-            topping_groups: ["crepa_dulce_topping"],
+            modifierGroups: ["crepa_dulce_extra", "crepa_dulce_topping"],
             trackStock: false,
         },
         {
@@ -1901,8 +1900,7 @@ async function seedPostres() {
             price: 70,
             disabledIn: [],
             branchPrices: { "wa9igpvRpHkYpT7RPqgu": 75 },
-            extra_groups: ["crepa_dulce_extra"],
-            topping_groups: ["crepa_dulce_topping"],
+            modifierGroups: ["crepa_dulce_extra", "crepa_dulce_topping"],
             trackStock: false,
         },
         {
@@ -1912,8 +1910,7 @@ async function seedPostres() {
             price: 70,
             disabledIn: [],
             branchPrices: { "wa9igpvRpHkYpT7RPqgu": 75 },
-            extra_groups: ["crepa_dulce_extra"],
-            topping_groups: ["crepa_dulce_topping"],
+            modifierGroups: ["crepa_dulce_extra", "crepa_dulce_topping"],
             trackStock: false,
         },
         {
@@ -1923,8 +1920,7 @@ async function seedPostres() {
             price: 70,
             disabledIn: [],
             branchPrices: { "wa9igpvRpHkYpT7RPqgu": 75 },
-            extra_groups: ["crepa_dulce_extra"],
-            topping_groups: ["crepa_dulce_topping"],
+            modifierGroups: ["crepa_dulce_extra", "crepa_dulce_topping"],
             trackStock: false,
         },
         {
