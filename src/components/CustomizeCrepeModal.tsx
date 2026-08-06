@@ -122,7 +122,7 @@ const { price: currentPrice, cost: currentCost, ruleDescription: currentRule, is
   
   // ¡AQUÍ ESTÁ EL TRUCO! Le mandamos la regla matemática ya ajustada por sucursal
   return calculateCustomItemPrice(group, modsList, branchAdjustedPriceRule, activeBranchId);
-}, [group, selectedModifiers, branchAdjustedPriceRule]);
+}, [group, selectedModifiers, branchAdjustedPriceRule, activeBranchId]);
 
   // Validaciones de UI
   const isStepValid = useMemo(() => {
