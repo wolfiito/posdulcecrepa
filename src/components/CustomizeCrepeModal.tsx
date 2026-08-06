@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect } from 'react';
 import Modal from 'react-modal';
 import type { MenuGroup, Modifier, TicketItem, PriceRule } from '../types/menu';
 import { MODIFIER_GROUPS, EXCLUSIVE_GROUPS } from '../constants/menuConstants';
-import { calculateCustomItemPrice } from '../utils/pricing';
+import { calculateCustomItemPrice, getBranchPrice } from '../utils/pricing';
 import { useInventoryStore } from '../store/useInventoryStore';
 import { useAuthStore } from '../store/useAuthStore';
 
@@ -121,7 +121,7 @@ const { price: currentPrice, cost: currentCost, ruleDescription: currentRule, is
   const modsList = Array.from(selectedModifiers.values());
   
   // ¡AQUÍ ESTÁ EL TRUCO! Le mandamos la regla matemática ya ajustada por sucursal
-  return calculateCustomItemPrice(group, modsList, branchAdjustedPriceRule);
+  return calculateCustomItemPrice(group, modsList, branchAdjustedPriceRule, activeBranchId);
 }, [group, selectedModifiers, branchAdjustedPriceRule]);
 
   // Validaciones de UI
@@ -218,6 +218,7 @@ const { price: currentPrice, cost: currentCost, ruleDescription: currentRule, is
                   }
 
                   const isSelected = selectedModifiers.has(mod.id);
+                  const modifierPrice = getBranchPrice(mod.price, mod.branchPrices, activeBranchId);
                   const isCrepeOrPostreBase = mod.group === MODIFIER_GROUPS.CREPA_DULCE_BASE || mod.group === MODIFIER_GROUPS.CREPA_SALADA_BASE;
                   const shouldBeDisabled = isCrepeOrPostreBase && isCrepeLimitReached && !isSelected;
 
@@ -233,9 +234,9 @@ const { price: currentPrice, cost: currentCost, ruleDescription: currentRule, is
                           `}
                       >
                           <span className="text-sm font-semibold">{mod.name}</span>
-                          {mod.price > 0 && (
+                          {modifierPrice > 0 && (
                               <span className={`text-xs font-normal mt-1 ${isSelected ? 'text-primary-content/90' : 'text-base-content/60'}`}>
-                                  +${mod.price.toFixed(2)}
+                                  +${modifierPrice.toFixed(2)}
                               </span>
                           )}
                       </button>
