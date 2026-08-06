@@ -4,9 +4,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { logger } from '../../services/loggerService';
 import { useAuthStore } from '../../store/useAuthStore';
-// import { GroupsManager } from './GroupsManager';
 
-// #region Grupos Principales
 async function seedRoot() {
     const groups = [
         {
@@ -68,9 +66,7 @@ async function seedRoot() {
     ];
     for (const g of groups) await setDoc(doc(db, "menu_groups", g.id), g);
 }
-// #endregion
 
-// #region Bebidas Calientes
 async function seedBebidasCalientes() {
 
     const modifierGroups = [
@@ -411,9 +407,7 @@ async function seedBebidasCalientes() {
     for (const item of items) await setDoc(doc(db, "menu_items", item.id), item);
     await setDoc(doc(db, "menu_groups", grupo.id), grupo);
 }
-// #endregion
 
-// #region Bebidas Frias
 async function seedBebidasFrias() {
     const modifierGroups = [
         { id: "soda_sabor", name: "Sabor de Soda" },
@@ -983,10 +977,8 @@ async function seedBebidasFrias() {
     for (const item of items) await setDoc(doc(db, "menu_items", item.id), item);
     await setDoc(doc(db, "menu_groups", grupo.id), grupo);
 }
-// #endregion
 
 
-// #region Waffles y Hotcakes
 async function seedWafflesHotcakes() {
     const modifierGroups = [
         { id: "crepa_dulce_base", name: "Ingredientes Base" },
@@ -1367,9 +1359,7 @@ async function seedWafflesHotcakes() {
     for (const mod of modifiers) await setDoc(doc(db, "modifiers", mod.id), mod);
     for (const grp of groups) await setDoc(doc(db, "menu_groups", grp.id), grp);
 }
-// #endregion
 
-// #region Crepas
 async function seedCrepas() {
     const modifierGroups = [
         { id: "crepa_salada_base", name: "Ingredientes Base" },
@@ -1878,9 +1868,7 @@ async function seedCrepas() {
     for (const item of items) await setDoc(doc(db, "menu_items", item.id), item);
     for (const grp of groups) await setDoc(doc(db, "menu_groups", grp.id), grp);
 }
-// #endregion
 
-// #region Postres
 async function seedPostres() {
     const items = [
         {
@@ -1979,12 +1967,8 @@ async function seedPostres() {
     for (const item of items) await setDoc(doc(db, "menu_items", item.id), item);
     await setDoc(doc(db, "menu_groups", grupo.id), grupo);
 }
-// #endregion
 
-// #region Reglas de Precios
 async function seedPriceRules() {
-    // branchPrices: { [sucursalId]: precio } — sobrescribe el precio base para esa sucursal.
-    // El motor en CustomizeCrepeModal ya lee bp.branchPrices?.[activeBranchId] ?? bp.price
     const priceRules = [
         {
             id: "rule_crepa_dulce",
@@ -2025,9 +2009,7 @@ async function seedPriceRules() {
     ];
     for (const rule of priceRules) await setDoc(doc(db, "price_rules", rule.id), rule);
 }
-// #endregion
 
-// #region Estructura Raíz
 const SECTIONS = [
     { key: "root", label: "Estructura Raíz (8 categorías)", fn: seedRoot },
     { key: "bebidas_calientes", label: "Bebidas Calientes", fn: seedBebidasCalientes },
@@ -2037,9 +2019,7 @@ const SECTIONS = [
     { key: "postres", label: "Postres", fn: seedPostres },
     { key: "price_rules", label: "Reglas de Precio", fn: seedPriceRules },
 ];
-// #endregion
 
-// #region Componente
 export const DatabaseSeeder: React.FC = () => {
     const { currentUser } = useAuthStore();
     const [loading, setLoading] = useState<string | null>(null);
@@ -2086,7 +2066,7 @@ export const DatabaseSeeder: React.FC = () => {
                 Inyecta cada sección por separado, o presiona <strong>Todo de un jalón</strong> para correr todas en secuencia.
             </p>
 
-            {/* Botón "todo de un jalón" */}
+
             <button
                 onClick={runAll}
                 disabled={loading !== null}
@@ -2097,7 +2077,7 @@ export const DatabaseSeeder: React.FC = () => {
 
             <div className="divider text-xs opacity-50">o sección por sección</div>
 
-            {/* Botones individuales */}
+
             <div className="flex flex-col gap-3 mt-4">
                 {SECTIONS.map((s) => (
                     <button
@@ -2113,4 +2093,3 @@ export const DatabaseSeeder: React.FC = () => {
         </div>
     );
 };
-// #endregion
