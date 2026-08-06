@@ -35,6 +35,7 @@ export interface FixedPriceItem {
     name: string;
     price: number;
     cost?: number;
+    branchPrices?: Record<string, number>;
     group: string; 
     trackStock?: boolean;
     currentStock?: number;
