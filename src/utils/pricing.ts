@@ -9,10 +9,17 @@ interface PriceResult {
   isValid: boolean;
 }
 
+export const getBranchPrice = (
+  price: number,
+  branchPrices: Record<string, number> | undefined,
+  branchId?: string | null
+): number => branchId ? branchPrices?.[branchId] ?? price : price;
+
 export const calculateCustomItemPrice = (
   group: MenuGroup,
   selectedModifiers: Modifier[],
-  priceRule?: PriceRule
+  priceRule?: PriceRule,
+  branchId?: string | null
 ): PriceResult => {
 
   if (!group) return { price: 0, cost: 0, ruleDescription: 'Error', isValid: false };
@@ -24,7 +31,7 @@ export const calculateCustomItemPrice = (
 
   selectedModifiers.forEach(mod => {
     if (mod.group === group.base_group) baseIngredientCount++;
-    if (mod.price > 0) extraPrice += mod.price;
+    extraPrice += getBranchPrice(mod.price, mod.branchPrices, branchId);
 
     if (mod.cost && mod.cost > 0) {
         totalCost += mod.cost;
