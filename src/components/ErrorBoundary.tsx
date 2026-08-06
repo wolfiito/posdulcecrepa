@@ -17,12 +17,10 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   static getDerivedStateFromError(error: Error): State {
-    // Actualiza el estado para que el siguiente renderizado muestre la IU de repuesto.
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // También puedes registrar el error en un servicio de reporte de errores
     logger.error('React component crashed', error, {
       context: 'ErrorBoundary',
       metadata: { componentStack: errorInfo.componentStack }
