@@ -1,16 +1,14 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
-import './index.css' // Solo mantenemos los estilos globales de Tailwind
+import './index.css'
 import App from './App.tsx'
 import { registerSW } from 'virtual:pwa-register'
 import ErrorBoundary from './components/ErrorBoundary'
 import { logger } from './services/loggerService'
 
-// Registro automático del Service Worker para actualizaciones inmediatas
 registerSW({ immediate: true })
 
-// Integración de Logs Globales
 window.onerror = function (message, source, lineno, colno, error) {
   logger.error(`Error global: ${message}`, error || new Error(message as string), {
     context: 'window.onerror',
@@ -25,7 +23,6 @@ window.addEventListener('unhandledrejection', (event) => {
   });
 });
 
-// Asegurarnos de que el elemento root existe antes de renderizar
 const rootElement = document.getElementById('root');
 
 if (rootElement) {
