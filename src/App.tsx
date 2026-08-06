@@ -1,15 +1,10 @@
-// src/App.tsx
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { useAuthStore } from './store/useAuthStore';
 
-// Layout y Componente de Seguridad
 import { MainLayout } from './components/MainLayout';
-import { ProtectedRoute } from './components/ProtectedRoute'; // <--- IMPORTAR
+import { ProtectedRoute } from './components/ProtectedRoute';
 import { DatabaseSeeder } from './components/admin/DatabaseSeeder';
-// import { RestoreBackup } from './components/admin/RestoreBackup';
-// import { BackupDatabase } from './components/admin/BackupDatabase';
-// Páginas
 import { LoginScreen } from './components/LoginScreen';
 import { PosPage } from './pages/PosPage';
 import { OrdersScreen } from './components/OrdersScreen';
@@ -35,7 +30,6 @@ function App() {
       );
   }
 
-  // Definimos roles comunes para reutilizar
   const STAFF_ROLES: UserRole[] = ['CAJERO', 'GERENTE', 'ADMIN'];
   const ADMIN_ONLY: UserRole[] = ['ADMIN'];
 
@@ -47,10 +41,10 @@ function App() {
       <Routes>
         <Route element={<MainLayout />}>
 
-          {/* ACCESO TOTAL: Todos (incluido Mesero) pueden ver el POS */}
+
           <Route path="/" element={<PosPage />} />
 
-          {/* ACCESO STAFF: Mesero NO puede entrar aquí */}
+
           <Route path="/orders" element={
             <ProtectedRoute allowedRoles={STAFF_ROLES}>
               <OrdersScreen />
@@ -69,7 +63,7 @@ function App() {
             </ProtectedRoute>
           } />
 
-          {/* ACCESO ADMIN: Solo el dueño entra aquí */}
+
           <Route path="/reports" element={
             <ProtectedRoute allowedRoles={ADMIN_ONLY}>
                <ReportsScreen />
@@ -86,9 +80,9 @@ function App() {
             <ProtectedRoute allowedRoles={ADMIN_ONLY}>
                <AdminMenuScreen />
                <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                   {/* <BackupDatabase /> */}
+
                    {(currentUser?.username == '2310' || currentUser?.id == '2310') && <DatabaseSeeder />}
-                   {/* <RestoreBackup /> */}
+
                </div>
             </ProtectedRoute>
           } />
