@@ -1,4 +1,3 @@
-// src/components/CustomizeCrepeModal.tsx (Limpio)
 import { useState, useMemo, useEffect } from 'react';
 import Modal from 'react-modal';
 import type { MenuGroup, Modifier, TicketItem, PriceRule } from '../types/menu';
@@ -22,7 +21,7 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
   const [step, setStep] = useState(0);
   const [selectedModifiers, setSelectedModifiers] = useState<Map<string, Modifier>>(new Map());
 
-  const maxIngredients = 99; // Límite removido (seteado en 99 por seguridad de UI)
+  const maxIngredients = 99;
 
   useEffect(() => {
     if (isOpen) {
@@ -37,7 +36,6 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
   }, [group, allPriceRules]);
 
 
-  // --- Lógica de Pasos (Wizard) ---
   const steps = useMemo(() => {
     if (!group) return [];
     const baseGroups = group.base_group ? [group.base_group] : [];
@@ -72,7 +70,6 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
 
   const currentStepInfo = steps[step];
   const isLastStep = step === steps.length - 1;
-// 1. Extraemos el inventario
 const { stockData } = useInventoryStore();
 const { activeBranchId } = useAuthStore();
 const branchAdjustedPriceRule = useMemo(() => {
@@ -82,20 +79,17 @@ const branchAdjustedPriceRule = useMemo(() => {
       initialPrice: priceRule.branchInitialPrices?.[activeBranchId || ''] ?? priceRule.initialPrice,
       incrementPerIngredient: priceRule.branchIncrements?.[activeBranchId || ''] ?? priceRule.incrementPerIngredient,
       basePrices: priceRule.basePrices.map(bp => ({
-          ...bp, // Mantenemos el conteo (ej. 1 ing, 2 ing)
-          // Si la sucursal tiene un precio especial para este escalón, lo usamos. Si no, usamos el base.
+          ...bp,
           price: bp.branchPrices?.[activeBranchId || ''] ?? bp.price 
       }))
   };
 }, [priceRule, activeBranchId]);
-// 2. Filtramos los ingredientes
 const modifiersForCurrentStep = useMemo(() => {
   if (!currentStepInfo) return [];
   
   return allModifiers
       .filter(mod => currentStepInfo.groups.includes(mod.group))
       .filter(mod => {
-          // NUEVO: Si el ingrediente está prohibido en esta sucursal, lo ocultamos
           if (activeBranchId && mod.disabledIn?.includes(activeBranchId)) {
               return false;
           }
@@ -104,27 +98,19 @@ const modifiersForCurrentStep = useMemo(() => {
           const isTracked = mod.trackStock === true || inv?.trackStock === true;
           const realStock = Number(inv?.currentStock) || 0; 
           
-          // (Mantenemos tu chismoso Turín intacto 🐰)
-          if (mod.name.toLowerCase().includes('turin') || mod.name.toLowerCase().includes('turín')) {
-              console.log(`🐰 CHISMOSO TURÍN:`, { mod, isTracked, realStock });
-          }
-          
           if (isTracked && realStock <= 0) {
               return false; 
           }
           return true; 
       });
 }, [currentStepInfo, allModifiers, stockData, activeBranchId]);
-// --- USO DE LA NUEVA UTILIDAD DE PRECIOS ---
 const { price: currentPrice, cost: currentCost, ruleDescription: currentRule, isValid } = useMemo(() => {
   if (!group) return { price: 0, cost: 0, ruleDescription: '', isValid: false };
   const modsList = Array.from(selectedModifiers.values());
   
-  // ¡AQUÍ ESTÁ EL TRUCO! Le mandamos la regla matemática ya ajustada por sucursal
   return calculateCustomItemPrice(group, modsList, branchAdjustedPriceRule);
 }, [group, selectedModifiers, branchAdjustedPriceRule]);
 
-  // Validaciones de UI
   const isStepValid = useMemo(() => {
     if (!currentStepInfo || !currentStepInfo.isRequired) return true;
     return Array.from(selectedModifiers.values()).some(mod => currentStepInfo.groups.includes(mod.group));
@@ -169,7 +155,6 @@ const { price: currentPrice, cost: currentCost, ruleDescription: currentRule, is
     }
   }, [isOpen]);
 
-  // Lógica de límite visual (no afecta precio, solo deshabilita botones)
   const selectedBaseCount = useMemo(() => {
     let count = 0;
     if (group?.base_group === MODIFIER_GROUPS.CREPA_DULCE_BASE || group?.base_group === MODIFIER_GROUPS.CREPA_SALADA_BASE) {
@@ -188,22 +173,22 @@ const { price: currentPrice, cost: currentCost, ruleDescription: currentRule, is
       className="bg-base-100 w-full max-w-lg max-h-[90dvh] rounded-box shadow-2xl flex flex-col overflow-hidden outline-none animate-pop-in border border-base-200"
       overlayClassName="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
     >
-      {/* Header */}
+
       <div className="p-5 border-b border-base-200 bg-base-100 text-center relative">
         <h2 className="text-xl font-bold text-base-content">{group.name}</h2>
-        {/* Steps */}
+
         <div className="flex gap-1 justify-center my-3 h-1.5 w-full max-w-xs mx-auto">
             {steps.map((s, index) => (
                 <div key={s.name} className={`flex-1 rounded-full transition-colors duration-300 ${index <= step ? 'bg-primary' : 'bg-base-300'}`} />
             ))}
         </div>
-        {/* Precio */}
+
         <div className={`badge badge-lg font-bold transition-colors duration-300 ${isValid ? 'badge-success text-success-content' : 'badge-ghost opacity-50'}`}>
           {currentRule} &rarr; ${(currentPrice * quantity).toFixed(2)}
         </div>
       </div>
       
-      {/* Contenido */}
+
       <div className="flex-1 overflow-y-auto p-4 bg-base-200/50">
           <h4 className="text-sm font-bold uppercase tracking-wide opacity-70 mb-3 flex justify-between">
             {currentStepInfo.name}
@@ -211,7 +196,6 @@ const { price: currentPrice, cost: currentCost, ruleDescription: currentRule, is
           </h4>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {modifiersForCurrentStep.map(mod => {
-                  // SEGURIDAD EXTRA: Si por alguna razón llegó aquí con stock 0 y trackeo activo, lo saltamos
                   const inv = stockData[mod.id];
                   if ((mod.trackStock || inv?.trackStock) && (inv?.currentStock ?? 0) <= 0) {
                       return null; 
@@ -244,9 +228,9 @@ const { price: currentPrice, cost: currentCost, ruleDescription: currentRule, is
           </div>
       </div>
       
-      {/* Footer */}
+
       <div className="p-4 border-t border-base-200 bg-base-100 flex flex-col gap-4">
-        {/* Selector de Cantidad */}
+
         {isLastStep && isValid && (
             <div className="flex items-center justify-center gap-6 py-2 animate-fade-in">
                 <span className="text-xs font-bold uppercase opacity-50">Cantidad</span>
