@@ -1,4 +1,3 @@
-// src/firebase.ts
 import { initializeApp } from "firebase/app";
 import { 
   collection, 
@@ -11,7 +10,6 @@ import {
   initializeFirestore, 
   persistentLocalCache, 
   persistentMultipleTabManager,
-  // Importamos los TIPOS que necesitamos
   type Transaction, 
   type DocumentData,
   type QueryDocumentSnapshot,
@@ -27,12 +25,10 @@ import {
   FieldValue,
   writeBatch,
   increment
-      // Podrías sumar todo e imprimir un comprobante final aquí.
 } from "firebase/firestore";
 
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 
-// Tu configuración (No cambies tus claves)
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -42,10 +38,8 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Inicializa Firebase
 const app = initializeApp(firebaseConfig);
 
-// Esto permite que la app funcione sin internet y cargue instantáneamente.
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager()
@@ -70,15 +64,13 @@ export {
   orderBy,
   Timestamp,
   limit,
-  updateDoc,   // <--- NUEVO
+  updateDoc,
   deleteDoc,
   setDoc,
   onSnapshot,
   FieldValue,
   writeBatch,
   increment
-      // Podrías sumar todo e imprimir un comprobante final aquí.
 };
 
-// Exporta los TIPOS que usaremos
 export type { Transaction, DocumentData, QueryDocumentSnapshot };
