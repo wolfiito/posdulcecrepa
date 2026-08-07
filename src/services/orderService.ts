@@ -35,7 +35,7 @@ export const orderService = {
     customerName: string,
     shouldPrint: boolean,
     payment?: PaymentDetails,
-    shiftId: string
+    shiftId?: string
   ): Promise<number> {
 
     const initialStatus = payment ? 'paid' : 'pending';
@@ -47,6 +47,10 @@ export const orderService = {
     const finalCustomerName = (isMesa && !customerName) ? mode : (customerName || 'Cliente Anónimo');
 
     try {
+      if (payment && !shiftId) {
+        throw new Error('Se requiere un turno abierto para registrar un pago.');
+      }
+
       await runTransaction(db, async (transaction) => {
         const counterRef = doc(db,"branches", branchId, "counters", "orders");
 
@@ -120,7 +124,7 @@ export const orderService = {
         };
 
         if (cleanPayment) firebaseOrderData.payment = cleanPayment;
-        firebaseOrderData.shiftId = shiftId;
+        if (shiftId) firebaseOrderData.shiftId = shiftId;
         
         const newOrderRef = doc(collection(db, "orders")); 
         transaction.set(newOrderRef, firebaseOrderData);
