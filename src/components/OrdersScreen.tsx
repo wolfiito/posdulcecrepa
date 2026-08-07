@@ -160,12 +160,16 @@ export const OrdersScreen: React.FC = () => {
 
   const confirmPayment = async (paymentDetails: any) => {
     if (!selectedGroup) return;
+    if (!currentShift?.isOpen) {
+        toast.error("⛔ CAJA CERRADA: Abre turno para cobrar.");
+        openShiftModal();
+        return;
+    }
     try {
         setIsPayModalOpen(false);
         const orderIds = selectedGroup.orders.map(o => o.id as string);
-        const activeShiftId = currentShift?.isOpen ? currentShift.id : undefined;
 
-        await orderService.payOrders(orderIds, paymentDetails, activeShiftId);
+        await orderService.payOrders(orderIds, paymentDetails, currentShift.id);
 
         const allItems = selectedGroup.orders.flatMap(o => o.items);
         
