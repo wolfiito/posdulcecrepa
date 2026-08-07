@@ -65,6 +65,11 @@ export const usePosLogic = () => {
           return;
       }
 
+      if (!currentShift?.isOpen) {
+        toast.error("⛔ CAJA CERRADA: abre un turno antes de crear una orden.");
+        return;
+      }
+
       setIsProcessing(true);
 
       const currentMode = overrideMode || useTicketStore.getState().orderMode;
@@ -74,7 +79,7 @@ export const usePosLogic = () => {
       const total = useTicketStore.getState().getTotal();
 
       const shouldPrint = false; // DESACTIVADO: Solo se imprime al cobrar en la pantalla de órdenes
-      const activeShiftId = undefined;
+      const activeShiftId = currentShift.id;
 
       try {
           setIsPaymentModalOpen(false); 
