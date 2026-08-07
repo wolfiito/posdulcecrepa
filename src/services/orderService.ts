@@ -35,7 +35,7 @@ export const orderService = {
     customerName: string,
     shouldPrint: boolean,
     payment?: PaymentDetails,
-    shiftId?: string
+    shiftId: string
   ): Promise<number> {
 
     const initialStatus = payment ? 'paid' : 'pending';
@@ -120,7 +120,7 @@ export const orderService = {
         };
 
         if (cleanPayment) firebaseOrderData.payment = cleanPayment;
-        if (shiftId) firebaseOrderData.shiftId = shiftId;
+        firebaseOrderData.shiftId = shiftId;
         
         const newOrderRef = doc(collection(db, "orders")); 
         transaction.set(newOrderRef, firebaseOrderData);
@@ -154,7 +154,7 @@ export const orderService = {
     }
   },
 
-  async payOrders(orderIds: string[], payment: PaymentDetails, shiftId?: string) {
+  async payOrders(orderIds: string[], payment: PaymentDetails, shiftId: string) {
       const batch = writeBatch(db);
 
       orderIds.forEach(id => {
@@ -165,9 +165,7 @@ export const orderService = {
             payment: payment,
             paidAt: serverTimestamp(), 
         };
-        if (shiftId) {
-            updateData.shiftId = shiftId; 
-        }
+        updateData.shiftId = shiftId;
 
         batch.update(ref, updateData);
       });
