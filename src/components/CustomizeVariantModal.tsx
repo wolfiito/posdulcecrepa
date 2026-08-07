@@ -2,7 +2,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import Modal from 'react-modal';
 import type { VariantPriceItem, FixedPriceItem, Modifier, TicketItem, MenuItem } from '../types/menu'; 
-import { EXCLUSIVE_GROUPS } from '../constants/menuConstants'; // Usamos tu lista maestra de exclusividad
+import { EXCLUSIVE_GROUPS } from '../constants/menuConstants';
+import { getBranchPrice } from '../utils/pricing';
 import { useInventoryStore } from '../store/useInventoryStore';
 import { useAuthStore } from '../store/useAuthStore';
 
@@ -16,7 +17,7 @@ interface Props {
   onAddItem: (item: TicketItem) => void;
 }
 
-const initialVariant = { name: '', price: 0, cost: 0 };
+const initialVariant: VariantPriceItem['variants'][number] = { name: '', price: 0, cost: 0 };
 
 function isVariantPrice(item: MenuItem): item is VariantPriceItem {
   return 'variants' in item;
@@ -36,10 +37,6 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
     const { stockData } = useInventoryStore();
     const { activeBranchId } = useAuthStore();
 
-    const getPrice = (obj: any) => {
-        if (!obj) return 0;
-        return obj.branchPrices?.[activeBranchId || ''] ?? obj.price ?? 0;
-    };
 
     useEffect(() => {
         if (isOpen && item) {
@@ -51,10 +48,15 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
 
     // --- CÁLCULO DE PRECIOS ---
     const { price: currentPrice, cost: currentCost } = useMemo(() => {
-        const variantPrice = isVariantPrice(item) ? selectedVariant.price : item.price;
+        const variantPrice = isVariantPrice(item)
+            ? getBranchPrice(selectedVariant.price, selectedVariant.branchPrices, activeBranchId)
+            : getBranchPrice(item.price, item.branchPrices, activeBranchId);
         const baseCost = isVariantPrice(item) ? (selectedVariant.cost || 0) : (item.cost || 0);
         
-        const extraPrice = Array.from(selectedModifiers.values()).reduce((sum, mod) => sum + mod.price, 0);
+        const extraPrice = Array.from(selectedModifiers.values()).reduce(
+            (sum, mod) => sum + getBranchPrice(mod.price, mod.branchPrices, activeBranchId),
+            0
+        );
         const extraCost = Array.from(selectedModifiers.values()).reduce((sum, mod) => sum + (mod.cost || 0), 0);
         
         return { 
@@ -218,7 +220,7 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
                     {/* TAMAÑOS */}
                     {currentStep.type === 'variant_selector' && (currentStep.options as any[]).map(variant => {
                         const isSelected = selectedVariant.name === variant.name;
-                        const vPrice = getPrice(variant); // <--- LEE EL PRECIO DE SUCURSAL
+                        const vPrice = getBranchPrice(variant.price, variant.branchPrices, activeBranchId);
                         return (
                             <button
                                 key={variant.name}
@@ -239,6 +241,7 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
                     {/* MODIFICADORES */}
                     {currentStep.type === 'modifier_selector' && (currentStep.options as Modifier[]).map(mod => {
                         const isSelected = selectedModifiers.has(mod.id);
+                        const modifierPrice = getBranchPrice(mod.price, mod.branchPrices, activeBranchId);
                         return (
                             <button
                                 key={mod.id}
@@ -249,9 +252,9 @@ export function CustomizeVariantModal({ isOpen, onClose, item, allModifiers, onA
                                 `}
                             >
                                 <span className="text-sm font-semibold">{mod.name}</span> 
-                                {mod.price > 0 && (
+                                {modifierPrice > 0 && (
                                     <span className={`text-xs font-normal mt-1 ${isSelected ? 'text-primary-content/90' : 'text-base-content/60'}`}>
-                                        +${mod.price.toFixed(2)}
+                                        +${modifierPrice.toFixed(2)}
                                     </span>
                                 )}
                             </button>
