@@ -1,6 +1,5 @@
 // src/services/branchService.ts
 import { db, collection, getDocs, addDoc, updateDoc, doc, serverTimestamp } from '../firebase';
-import { inventoryService } from './inventoryService';
 import type { Branch } from '../types/branch';
 import { getDoc } from 'firebase/firestore';
 
@@ -20,8 +19,6 @@ export const branchService = {
         isActive: true,
         createdAt: serverTimestamp()
       });
-
-      await inventoryService.initializeBranchInventory(docRef.id);
 
       return docRef.id;
     } catch (error) {

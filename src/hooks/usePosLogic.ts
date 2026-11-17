@@ -6,6 +6,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useShiftStore } from '../store/useShiftStore';
 import { useUIStore } from '../store/useUIStore';
 import { useMenuStore } from '../store/useMenuStore';
+import { getItemSupplyUsage } from '../utils/inventory';
 import { orderService } from '../services/orderService';
 import type { OrderMode, PaymentDetails } from '../types/order';
 import type { TicketItem } from '../types/menu';
@@ -79,9 +80,13 @@ export const usePosLogic = () => {
       try {
           setIsPaymentModalOpen(false); 
           
+          // Cada artículo guarda los insumos que gasta, para descontarlos y poder regresarlos al cancelar
+          const menu = useMenuStore.getState();
+          const itemsWithUsage = currentItems.map(item => ({ ...item, supplyUsage: getItemSupplyUsage(item, menu) }));
+
           await orderService.createOrder(
             activeBranchId,
-            currentItems, 
+            itemsWithUsage, 
             total, 
             currentMode, 
             cashierName,
@@ -94,7 +99,7 @@ export const usePosLogic = () => {
           clearTicket();
           setView('menu');
 
-          toast.success(`¡Enviado a cocina: ${currentClientName}! 👨‍🍳`);
+          toast.success(`¡Enviado a cocina: ${currentClientName}!`);
 
       } catch (error: any) {
           console.error(error);

@@ -33,6 +33,8 @@ export interface Order {
   kitchenStatus: KitchenStatus; 
   
   orderNumber: number;
+  // Solo al imprimir varias órdenes cobradas juntas (no se guarda en Firestore)
+  mergedOrderNumbers?: number[];
   customerName?: string;
   
   createdAt: Timestamp | FieldValue | Date; 

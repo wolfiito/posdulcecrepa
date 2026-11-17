@@ -4,6 +4,7 @@ import Modal from 'react-modal';
 import { useAuthStore } from '../store/useAuthStore';
 import { branchService } from '../services/branchService'; // Importamos servicio
 import { toast } from 'sonner';
+import { X, UtensilsCrossed, ShoppingBag, ArrowRight } from 'lucide-react';
 
 // Tipos
 import type { OrderMode } from '../types/order';
@@ -68,7 +69,7 @@ export const OrderModeModal: React.FC<OrderModeModalProps> = ({ isOpen, onClose,
         {/* HEADER */}
         <div className="p-4 border-b border-base-200 flex justify-between items-center bg-base-200/50">
             <h2 className="text-xl font-black">Selecciona Modalidad</h2>
-            <button onClick={onClose} className="btn btn-circle btn-sm btn-ghost">✕</button>
+            <button onClick={onClose} className="btn btn-circle btn-sm btn-ghost"><X size={16} /></button>
         </div>
 
         {/* CONTENIDO (Dos Columnas) */}
@@ -78,7 +79,7 @@ export const OrderModeModal: React.FC<OrderModeModalProps> = ({ isOpen, onClose,
                 {/* COLUMNA IZQUIERDA: COMER AQUÍ (MESAS DINÁMICAS) */}
                 <div className="flex flex-col h-full">
                     <div className="flex items-center gap-2 mb-4 text-primary">
-                         <span className="text-2xl">🍽️</span>
+                         <UtensilsCrossed size={24} className="shrink-0" />
                          <h3 className="text-lg font-bold uppercase tracking-wider">Comer Aquí</h3>
                     </div>
                     
@@ -111,7 +112,7 @@ export const OrderModeModal: React.FC<OrderModeModalProps> = ({ isOpen, onClose,
                 {/* COLUMNA DERECHA: PARA LLEVAR (Igual que antes) */}
                 <div className="flex flex-col h-full">
                     <div className="flex items-center gap-2 mb-4 text-secondary">
-                         <span className="text-2xl">🥡</span>
+                         <ShoppingBag size={24} className="shrink-0" />
                          <h3 className="text-lg font-bold uppercase tracking-wider">Para Llevar</h3>
                     </div>
 
@@ -134,7 +135,7 @@ export const OrderModeModal: React.FC<OrderModeModalProps> = ({ isOpen, onClose,
                             disabled={!customerName.trim()}
                             className="btn btn-secondary btn-lg w-full shadow-lg"
                         >
-                            Enviar a Cocina ➝
+                            Enviar a Cocina <ArrowRight size={20} className="shrink-0" />
                         </button>
                     </div>
                 </div>

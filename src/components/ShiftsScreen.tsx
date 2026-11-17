@@ -8,6 +8,7 @@ import { PinPadModal } from './PinPadModal'; // <--- CAMBIO: Usamos el Modal Pre
 import { ZReportTemplate } from './ZReportTemplate';
 import { Timestamp } from '../firebase';
 import { toast } from 'sonner';
+import { LockOpen, TriangleAlert, Banknote, CreditCard, Landmark, Calculator, CircleDollarSign, Flag } from 'lucide-react';
 
 export const ShiftsScreen: React.FC = () => {
   const { currentShift, isLoading, openShift, closeShift } = useShiftStore();
@@ -103,7 +104,7 @@ export const ShiftsScreen: React.FC = () => {
             <div className="card w-full max-w-sm bg-base-100 shadow-xl border border-base-200">
                 <div className="card-body items-center text-center p-6">
                     <div className="w-20 h-20 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-4 shadow-inner">
-                        <span className="text-4xl">🔓</span>
+                        <LockOpen size={36} />
                     </div>
                     <h1 className="text-2xl font-black text-base-content">Abrir Caja</h1>
                     <p className="text-sm font-medium opacity-60 mb-6">Hola, {currentUser?.name}</p>
@@ -125,7 +126,7 @@ export const ShiftsScreen: React.FC = () => {
 
                     {currentUser?.role !== 'CAJERO' && (
                         <div className="alert alert-warning mb-4 rounded-xl shadow-sm py-3">
-                            <span className="text-xs font-bold">⚠️ Solo usuarios con Rol de Cajero pueden abrir caja.</span>
+                            <span className="text-xs font-bold flex items-center gap-2"><TriangleAlert size={14} className="shrink-0" /> Solo usuarios con Rol de Cajero pueden abrir caja.</span>
                         </div>
                     )}
 
@@ -170,15 +171,15 @@ export const ShiftsScreen: React.FC = () => {
                     <h3 className="text-xs font-bold text-base-content/40 uppercase tracking-wider">Ventas por Método</h3>
                     
                     <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2"><span className="text-lg">💵</span> <span className="font-bold text-sm">Efectivo</span></div>
+                        <div className="flex items-center gap-2"><Banknote size={18} className="shrink-0" /> <span className="font-bold text-sm">Efectivo</span></div>
                         <span className="font-mono font-bold">${closingSummary.cashTotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center text-info">
-                        <div className="flex items-center gap-2"><span className="text-lg">💳</span> <span className="font-bold text-sm">Tarjeta</span></div>
+                        <div className="flex items-center gap-2"><CreditCard size={18} className="shrink-0" /> <span className="font-bold text-sm">Tarjeta</span></div>
                         <span className="font-mono font-bold">${closingSummary.cardTotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center text-warning">
-                        <div className="flex items-center gap-2"><span className="text-lg">🏦</span> <span className="font-bold text-sm">Transf.</span></div>
+                        <div className="flex items-center gap-2"><Landmark size={18} className="shrink-0" /> <span className="font-bold text-sm">Transf.</span></div>
                         <span className="font-mono font-bold">${closingSummary.transferTotal.toFixed(2)}</span>
                     </div>
                     
@@ -191,7 +192,7 @@ export const ShiftsScreen: React.FC = () => {
 
                 {/* TARJETA 2: Cálculo de Caja */}
                 <div className="bg-base-100 p-5 rounded-3xl border border-base-200 shadow-sm space-y-3 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-3 opacity-10 text-6xl">🧮</div>
+                    <div className="absolute top-0 right-0 p-3 opacity-10"><Calculator size={60} /></div>
                     <h3 className="text-xs font-bold text-base-content/40 uppercase tracking-wider">Arqueo de Caja</h3>
                     
                     <div className="flex justify-between text-sm">
@@ -285,7 +286,7 @@ export const ShiftsScreen: React.FC = () => {
             {/* Tarjeta Informativa */}
             <div className="stats shadow-lg bg-base-100 border border-base-200 overflow-visible">
                 <div className="stat relative overflow-hidden">
-                    <div className="absolute -right-4 -top-4 opacity-5 text-9xl text-primary rotate-12">💰</div>
+                    <div className="absolute -right-4 -top-4 opacity-5 text-primary rotate-12"><CircleDollarSign size={128} /></div>
                     <div className="stat-title font-bold uppercase tracking-wider opacity-60">Fondo Inicial</div>
                     <div className="stat-value text-primary font-black text-5xl tracking-tight">
                         ${currentShift.initialFund.toFixed(2)}
@@ -301,7 +302,7 @@ export const ShiftsScreen: React.FC = () => {
                 <div className="card-body items-center justify-center text-center relative overflow-hidden">
                     <div className="absolute inset-0 bg-error/5 group-hover:bg-error/10 transition-colors"></div>
                     <div className="w-16 h-16 bg-error/20 text-error rounded-2xl flex items-center justify-center text-3xl mb-3 group-hover:scale-110 transition-transform">
-                        🏁
+                        <Flag size={30} />
                     </div>
                     <h2 className="card-title text-error">Cerrar Turno</h2>
                     <p className="text-sm opacity-60 max-w-xs">

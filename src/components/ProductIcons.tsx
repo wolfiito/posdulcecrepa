@@ -1,5 +1,6 @@
 // src/components/ProductIcons.tsx
 import React from 'react';
+import { UtensilsCrossed } from 'lucide-react';
 import type { MenuItem, MenuGroup } from '../types/menu';
 
 export const ICON_WEBPS: Record<string, string> = {
@@ -99,7 +100,7 @@ const KawaiiIcon: React.FC<{ iconKey?: string }> = ({ iconKey }) => {
         );
     }
 
-    return <span className="text-4xl text-gray-400">🍽️</span>;
+    return <UtensilsCrossed size={36} className="text-gray-400" />;
 };
 
 
@@ -184,5 +185,5 @@ export function getIconForItem(item: MenuItem | MenuGroup): React.ReactNode {
     if (id === 'bebidas_calientes') return <KawaiiIcon iconKey="item_bebidas_calientes" />;
     if (id === 'item_bebidas') return <KawaiiIcon iconKey="item_bebidas" />;
     // DEFAULT
-    return isGroup(item) ? null : <span className="text-4xl text-gray-400">🍽️</span>;
+    return isGroup(item) ? null : <UtensilsCrossed size={36} className="text-gray-400" />;
 }

@@ -8,6 +8,7 @@ import {
   IconMenu, IconPOS, IconBox, IconWallet, IconChart, 
   IconUsers, IconSun, IconMoon, IconLogout, IconBack 
 } from './Icons';
+import { Bell, Building, Package, Layers } from 'lucide-react';
 import { AdminBranchSelector } from './admin/AdminBranchSelector'; // <-- Importado
 import { useInventoryStore } from '../store/useInventoryStore';
 
@@ -109,7 +110,7 @@ export const MainLayout: React.FC = () => {
           <li><Link to="/" className={getLinkClass('/')}><IconPOS /> Punto de Venta</Link></li>
           
           {['CAJERO', 'GERENTE', 'ADMIN'].includes(currentUser?.role || '') && (
-            <li><Link to="/orders" className={getLinkClass('/orders')}><span className="text-xl">🔔</span> Órdenes Pendientes</Link></li>
+            <li><Link to="/orders" className={getLinkClass('/orders')}><Bell size={20} className="shrink-0" /> Órdenes Pendientes</Link></li>
           )}
 
           <div className="divider my-1"></div>
@@ -128,11 +129,11 @@ export const MainLayout: React.FC = () => {
                 <li><Link to="/reports" className={getLinkClass('/reports')}><IconChart /> Reportes</Link></li>
                 
                 {/* --- ENLACES DE ADMIN --- */}
-                <li><Link to="/branches" className={getLinkClass('/branches')}><span className="text-xl">🏢</span> Sucursales</Link></li>
-                <li><Link to="/inventory-branch" className={getLinkClass('/inventory-branch')}><span className="text-xl">📦</span> Inventario Global</Link></li>
+                <li><Link to="/branches" className={getLinkClass('/branches')}><Building size={20} className="shrink-0" /> Sucursales</Link></li>
+                <li><Link to="/inventory-branch" className={getLinkClass('/inventory-branch')}><Package size={20} className="shrink-0" /> Inventario</Link></li>
                 
                 <li><Link to="/users" className={getLinkClass('/users')}><IconUsers /> Usuarios</Link></li>
-                <li><Link to="/admin-menu" className={getLinkClass('/admin-menu')}><span className="text-xl">🛠️</span> Editor de Menú</Link></li>
+                <li><Link to="/admin-menu" className={getLinkClass('/admin-menu')}><Layers size={20} className="shrink-0" /> Editor de Menú</Link></li>
             </>
           )}
 

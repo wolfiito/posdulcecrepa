@@ -170,7 +170,7 @@ export const shiftService = {
             productMap.set(name, {
                 name,
                 quantity: existing.quantity + qty,
-                total: existing.total + price
+                total: existing.total + price * qty
             });
         });
     });

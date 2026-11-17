@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import Modal from 'react-modal';
 import { toast } from 'sonner';
+import { Users, Building, Pencil, Trash, UserPlus, EllipsisVertical } from 'lucide-react';
 
 // Servicios y Componentes
 import { userService } from '../services/userService';
@@ -95,7 +96,7 @@ export const UsersScreen: React.FC = () => {
         <div className="animate-fade-in max-w-6xl mx-auto pb-24 px-4">
             <div className="flex items-center gap-3 mb-8 mt-4">
                 <h2 className="text-3xl font-black text-base-content flex items-center gap-2">
-                    👥 Equipo Local
+                    <Users size={28} className="shrink-0" /> Equipo Local
                     <span className="badge badge-neutral badge-lg text-white font-bold">{users.length}</span>
                 </h2>
                 {!activeBranchId && <span className="text-error font-bold">(Selecciona una sucursal primero)</span>}
@@ -125,8 +126,8 @@ export const UsersScreen: React.FC = () => {
                                                 {style.icon} {style.label}
                                             </span>
                                             {/* Badge de Sucursal */}
-                                            <span className="badge badge-sm badge-ghost text-xs">
-                                                🏢 {branchName}
+                                            <span className="badge badge-sm badge-ghost text-xs gap-1">
+                                                <Building size={12} className="shrink-0" /> {branchName}
                                             </span>
                                         </div>
                                         <p className="text-xs opacity-50 font-mono bg-base-200 inline-block px-1 rounded">ID: {user.username}</p>
@@ -134,11 +135,11 @@ export const UsersScreen: React.FC = () => {
 
                                     <div className="dropdown dropdown-end">
                                         <div tabIndex={0} role="button" className="btn btn-circle btn-ghost btn-sm bg-base-200/50">
-                                            ⋮
+                                            <EllipsisVertical size={16} />
                                         </div>
                                         <ul tabIndex={0} className="dropdown-content z-[1] menu p-2 shadow-xl bg-base-100 rounded-box w-40 border border-base-200">
-                                            <li><button onClick={() => handleEdit(user)}>✏️ Editar</button></li>
-                                            <li><button onClick={() => requestDelete(user.id)} className="text-error">🗑️ Eliminar</button></li>
+                                            <li><button onClick={() => handleEdit(user)}><Pencil size={14} className="shrink-0" /> Editar</button></li>
+                                            <li><button onClick={() => requestDelete(user.id)} className="text-error"><Trash size={14} className="shrink-0" /> Eliminar</button></li>
                                         </ul>
                                     </div>
                                 </div>
@@ -251,7 +252,9 @@ const UserFormModal: React.FC<FormProps> = ({ isOpen, onClose, userToEdit, onSuc
         >
             <div className="p-6">
                 <h3 className="text-xl font-black mb-6 flex items-center gap-2">
-                    {userToEdit ? '✏️ Editar Usuario' : '👤 Nuevo Usuario'}
+                    {userToEdit
+                        ? <><Pencil size={20} className="shrink-0" /> Editar Usuario</>
+                        : <><UserPlus size={20} className="shrink-0" /> Nuevo Usuario</>}
                 </h3>
                 
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -283,7 +286,7 @@ const UserFormModal: React.FC<FormProps> = ({ isOpen, onClose, userToEdit, onSuc
                             <option value="" disabled>Selecciona una sucursal</option>
                             {branches.map(branch => (
                                 <option key={branch.id} value={branch.id}>
-                                    🏢 {branch.name}
+                                    {branch.name}
                                 </option>
                             ))}
                         </select>

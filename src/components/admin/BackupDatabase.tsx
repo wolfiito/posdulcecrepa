@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { toast } from 'sonner';
+import { Save } from 'lucide-react';
 
 export const BackupDatabase: React.FC = () => {
     const [loading, setLoading] = useState(false);
@@ -43,7 +44,7 @@ export const BackupDatabase: React.FC = () => {
 
     return (
         <div className="p-6 border border-base-300 bg-base-200 rounded-xl max-w-sm">
-            <h3 className="text-lg font-bold mb-2">💾 Respaldo de Seguridad</h3>
+            <h3 className="text-lg font-bold mb-2 flex items-center gap-2"><Save size={18} className="shrink-0" /> Respaldo de Seguridad</h3>
             <p className="text-sm opacity-70 mb-4">Descarga una copia exacta de tu menú actual antes de hacer cambios.</p>
             <button onClick={handleBackup} disabled={loading} className="btn btn-neutral w-full">
                 {loading ? <span className="loading loading-spinner"></span> : "Descargar Respaldo JSON"}

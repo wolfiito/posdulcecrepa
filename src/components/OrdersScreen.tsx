@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { db, collection, query, where, orderBy, onSnapshot, Timestamp, doc, getDoc } from '../firebase';
 import { OrderTicketItem } from './OrderTicketItem';
-import { orderService } from '../services/orderService';
+import { orderService, type ReturnMode } from '../services/orderService';
+import { ReturnInventoryModal, type PendingReturn } from './ReturnInventoryModal';
 import { PaymentModal } from './PaymentModal';
 import { toast } from 'sonner';
 import type { Order } from '../types/order';
@@ -12,6 +13,7 @@ import { useShiftStore } from '../store/useShiftStore';
 import { useUIStore } from '../store/useUIStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { printService } from '../services/printService';
+import { Receipt, Brush, ShoppingBag, UtensilsCrossed, Clock, CircleCheck, Pencil, Trash } from 'lucide-react';
 
 interface GroupedOrder {
   id: string;
@@ -31,11 +33,17 @@ export const OrdersScreen: React.FC = () => {
   const [selectedGroup, setSelectedGroup] = useState<GroupedOrder | null>(null);
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [pendingReturn, setPendingReturn] = useState<PendingReturn | null>(null);
 
   // Seguridad
   const { currentShift } = useShiftStore();
   const { openShiftModal } = useUIStore();
-  const { activeBranchId } = useAuthStore();
+  const { activeBranchId, currentUser } = useAuthStore();
+
+  // Datos de sucursal listos para el encabezado del ticket
+  useEffect(() => {
+    printService.preloadBranch(activeBranchId);
+  }, [activeBranchId]);
 
   useEffect(() => {
     // Escuchar órdenes pendientes
@@ -99,7 +107,7 @@ export const OrdersScreen: React.FC = () => {
 
   const handlePayGroup = (group: GroupedOrder) => {
       if (!currentShift) {
-          toast.error("⛔ CAJA CERRADA: Abre turno para cobrar.");
+          toast.error("CAJA CERRADA: Abre turno para cobrar.");
           openShiftModal();
           return;
       }
@@ -107,7 +115,16 @@ export const OrdersScreen: React.FC = () => {
       setIsPayModalOpen(true);
   };
 
+  // Pregunta si ya se preparó antes de quitar una unidad
   const handleRemoveItem = async (itemToRemove: TicketItem, orderId: string) => {
+    setPendingReturn({
+        title: `Quitar 1 ${itemToRemove.baseName}`,
+        items: [{ ...itemToRemove, quantity: 1 }],
+        run: mode => removeItem(itemToRemove, orderId, mode)
+    });
+  };
+
+  const removeItem = async (itemToRemove: TicketItem, orderId: string, mode: ReturnMode) => {
     try {
         const orderRef = doc(db, "orders", orderId);
         const orderSnapshot = await getDoc(orderRef);
@@ -127,35 +144,50 @@ export const OrdersScreen: React.FC = () => {
         }
 
         const remainingItems = [...currentItems];
-        remainingItems.splice(itemIndex, 1);
-        
-        const newTotal = remainingItems.reduce((acc, i) => acc + (i.finalPrice || 0), 0);
+        const currentQty = remainingItems[itemIndex].quantity || 1;
+        if (currentQty > 1) {
+            // Si la línea trae varias unidades, solo restamos una
+            remainingItems[itemIndex] = { ...remainingItems[itemIndex], quantity: currentQty - 1 };
+        } else {
+            remainingItems.splice(itemIndex, 1);
+        }
+
+        const newTotal = remainingItems.reduce((acc, i) => acc + (i.finalPrice || 0) * (i.quantity || 1), 0);
         
         // IMPORTANTE: Al eliminar desde la UI (swipe), eliminamos de a 1 unidad.
-        // Creamos una copia del item con quantity = 1 para que el servicio restaure solo eso.
-        const itemWithSingleQty = { ...itemToRemove, quantity: 1 };
+        // Usamos el artículo guardado en la orden (trae su supplyUsage) con quantity = 1.
+        const itemWithSingleQty = { ...currentItems[itemIndex], quantity: 1 };
         
-        await orderService.removeItemFromOrder(activeBranchId!, orderId, itemWithSingleQty, remainingItems, newTotal);
-        toast.success("Producto eliminado e inventario restaurado");
+        await orderService.removeItemFromOrder(activeBranchId!, orderId, itemWithSingleQty, remainingItems, newTotal, {
+            user: currentUser?.name, mode, orderNumber: orderData.orderNumber
+        });
+        toast.success(mode === 'waste' ? "Producto eliminado; insumos registrados como merma" : "Producto eliminado");
     } catch (error) {
         console.error(error);
         toast.error("Error al eliminar producto");
     }
   };
 
-  const handleDeleteGroup = async (group: GroupedOrder) => {
+  const handleDeleteGroup = (group: GroupedOrder) => {
     if (!activeBranchId) return;
-    if (!window.confirm(`¿Estás seguro de que quieres eliminar TODAS las órdenes de ${group.customerName}?`)) return;
-    
-    try {
-        for (const order of group.orders) {
-            await orderService.cancelOrder(activeBranchId, order.id!, order.items);
+    const branchId = activeBranchId;
+    setPendingReturn({
+        title: `Eliminar la cuenta de ${group.customerName}`,
+        items: group.orders.flatMap(o => o.items),
+        run: async (mode) => {
+            try {
+                for (const order of group.orders) {
+                    await orderService.cancelOrder(branchId, order.id!, order.items, {
+                        user: currentUser?.name, mode, orderNumber: order.orderNumber
+                    });
+                }
+                toast.success(`Cuenta de ${group.customerName} eliminada`);
+            } catch (error) {
+                console.error(error);
+                toast.error("Error al eliminar la cuenta");
+            }
         }
-        toast.success(`Cuenta de ${group.customerName} eliminada`);
-    } catch (error) {
-        console.error(error);
-        toast.error("Error al eliminar la cuenta");
-    }
+    });
   };
 
   const confirmPayment = async (paymentDetails: any) => {
@@ -175,11 +207,13 @@ export const OrdersScreen: React.FC = () => {
             mode: selectedGroup.mode,
             status: 'paid', 
             kitchenStatus: 'delivered',
-            orderNumber: selectedGroup.orders[0].orderNumber, 
+            orderNumber: selectedGroup.orders[0].orderNumber,
+            mergedOrderNumbers: selectedGroup.orders.map(o => o.orderNumber),
             customerName: selectedGroup.customerName,
             createdAt: new Date(), 
             payment: paymentDetails,
-            cashier: "Cajero"
+            cashier: currentUser?.name || "Cajero",
+            branchId: selectedGroup.orders[0].branchId || activeBranchId
         };
         
         printService.printReceipt(consolidatedOrder as any);
@@ -209,7 +243,7 @@ export const OrdersScreen: React.FC = () => {
       
       <div className="flex items-center gap-3 mb-8 mt-4">
         <h2 className="text-3xl font-black text-base-content flex items-center gap-2">
-            🧾 Comandas Activas
+            <Receipt size={30} className="shrink-0" /> Comandas Activas
             {activeBranchId && groupedOrders.length > 0 && (
                  <span className="badge badge-primary badge-lg text-white font-bold">{groupedOrders.length}</span>
             )}
@@ -220,7 +254,7 @@ export const OrdersScreen: React.FC = () => {
           <div className="flex justify-center py-20"><span className="loading loading-spinner loading-lg text-primary"></span></div>
       ) : groupedOrders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 opacity-40">
-              <div className="text-6xl mb-4">🧹</div>
+              <Brush size={60} className="mb-4" />
               <h3 className="text-xl font-bold">Todo limpio</h3>
               <p>No hay cuentas abiertas por cobrar.</p>
           </div>
@@ -278,11 +312,11 @@ export const OrdersScreen: React.FC = () => {
                             <div className="flex justify-between items-start mb-1">
                                 <h3 className="font-black text-lg leading-tight line-clamp-1">{group.customerName}</h3>
                                 <span className={`badge ${badgeColor} badge-sm font-bold text-white shadow-sm shrink-0`}>
-                                    {group.mode === 'Para Llevar' ? '🥡 Llevar' : '🍽️ Mesa'}
+                                    <span className="flex items-center gap-1">{group.mode === 'Para Llevar' ? <><ShoppingBag size={12} className="shrink-0" /> Llevar</> : <><UtensilsCrossed size={12} className="shrink-0" /> Mesa</>}</span>
                                 </span>
                             </div>
                             <div className="flex items-center gap-1 text-xs font-medium text-gray-400">
-                                <span>🕒 Abierto hace: {timeAgo}</span>
+                                <Clock size={12} className="shrink-0" /><span>Abierto hace: {timeAgo}</span>
                             </div>
                         </div>
 
@@ -334,14 +368,14 @@ export const OrdersScreen: React.FC = () => {
                                         className={`btn btn-outline border-none text-[10px] font-bold h-10 min-h-0 ${editingGroupId === groupId ? 'btn-success bg-green-50' : 'bg-gray-50'}`}
                                         title="Activar edición de productos"
                                     >
-                                        {editingGroupId === groupId ? '✅ LISTO' : '✏️ EDITAR'}
+                                        {editingGroupId === groupId ? <><CircleCheck size={14} className="shrink-0" /> LISTO</> : <><Pencil size={14} className="shrink-0" /> EDITAR</>}
                                     </button>
                                     <button 
                                         onClick={() => handleDeleteGroup(group)}
                                         className="btn btn-outline btn-error border-none bg-red-50 hover:bg-red-100 text-[10px] font-bold h-10 min-h-0"
                                         title="Eliminar toda la comanda"
                                     >
-                                        🗑️ ELIMINAR
+                                        <Trash size={14} className="shrink-0" /> ELIMINAR
                                     </button>
                                 </div>
                                 <button 
@@ -370,6 +404,7 @@ export const OrdersScreen: React.FC = () => {
           items={selectedGroup?.orders.flatMap(o => o.items) || []}
           onConfirm={confirmPayment} 
       />
+      <ReturnInventoryModal pending={pendingReturn} onClose={() => setPendingReturn(null)} />
     </div>
   );
 };

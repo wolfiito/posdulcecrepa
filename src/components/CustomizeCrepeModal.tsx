@@ -2,10 +2,12 @@
 import { useState, useMemo, useEffect } from 'react';
 import Modal from 'react-modal';
 import type { MenuGroup, Modifier, TicketItem, PriceRule } from '../types/menu';
-import { MODIFIER_GROUPS, EXCLUSIVE_GROUPS } from '../constants/menuConstants';
-import { calculateCustomItemPrice, getBranchPrice } from '../utils/pricing';
+import { MODIFIER_GROUPS, isExclusiveGroup } from '../constants/menuConstants';
+import { calculateCustomItemPrice, getBranchPrice, getBranchAdjustedRule } from '../utils/pricing';
 import { useInventoryStore } from '../store/useInventoryStore';
+import { isRecipeBlocked } from '../utils/inventory';
 import { useAuthStore } from '../store/useAuthStore';
+import { useMenuStore } from '../store/useMenuStore';
 
 Modal.setAppElement('#root');
 
@@ -21,6 +23,7 @@ interface Props {
 export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allPriceRules, onAddItem }: Props) {
   const [step, setStep] = useState(0);
   const [selectedModifiers, setSelectedModifiers] = useState<Map<string, Modifier>>(new Map());
+  const { modifierGroups } = useMenuStore();
 
   const maxIngredients = 99; // Límite removido (seteado en 99 por seguridad de UI)
 
@@ -47,7 +50,7 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
 
     if (baseGroups.length > 0) {
         allSteps.push({ 
-            name: (group.id.includes('frappe') || group.id.includes('malteada')) ? 'Seleccione Sabor' : 'Ingredientes Base',
+            name: isExclusiveGroup(baseGroups[0], modifierGroups) ? 'Seleccione Sabor' : 'Ingredientes Base',
             groups: baseGroups,
             isRequired: true
         });
@@ -60,34 +63,17 @@ export function CustomizeCrepeModal({ isOpen, onClose, group, allModifiers, allP
         });
     }
     if (toppingGroups.length > 0) {
-        if (group.id.includes('dulces') || group.id.includes('postre')) {
-             allSteps.push({ name: 'Salsas (1 Gratis)', groups: [MODIFIER_GROUPS.CREPA_TOPPING_SALSA], isRequired: false });
-             allSteps.push({ name: 'Topping Seco (1 Gratis)', groups: [MODIFIER_GROUPS.CREPA_TOPPING_SECO], isRequired: false });
-        } else {
-            allSteps.push({ name: 'Toppings', groups: toppingGroups, isRequired: false });
-        }
+        allSteps.push({ name: 'Toppings', groups: toppingGroups, isRequired: false });
     }
     return allSteps.filter(s => s.groups.length > 0);
-  }, [group]);
+  }, [group, modifierGroups]);
 
   const currentStepInfo = steps[step];
   const isLastStep = step === steps.length - 1;
 // 1. Extraemos el inventario
 const { stockData } = useInventoryStore();
 const { activeBranchId } = useAuthStore();
-const branchAdjustedPriceRule = useMemo(() => {
-  if (!priceRule) return undefined;
-  return {
-      ...priceRule,
-      initialPrice: priceRule.branchInitialPrices?.[activeBranchId || ''] ?? priceRule.initialPrice,
-      incrementPerIngredient: priceRule.branchIncrements?.[activeBranchId || ''] ?? priceRule.incrementPerIngredient,
-      basePrices: priceRule.basePrices.map(bp => ({
-          ...bp, // Mantenemos el conteo (ej. 1 ing, 2 ing)
-          // Si la sucursal tiene un precio especial para este escalón, lo usamos. Si no, usamos el base.
-          price: bp.branchPrices?.[activeBranchId || ''] ?? bp.price 
-      }))
-  };
-}, [priceRule, activeBranchId]);
+const branchAdjustedPriceRule = useMemo(() => getBranchAdjustedRule(priceRule, activeBranchId), [priceRule, activeBranchId]);
 // 2. Filtramos los ingredientes
 const modifiersForCurrentStep = useMemo(() => {
   if (!currentStepInfo) return [];
@@ -100,19 +86,8 @@ const modifiersForCurrentStep = useMemo(() => {
               return false;
           }
 
-          const inv = stockData[mod.id];
-          const isTracked = mod.trackStock === true || inv?.trackStock === true;
-          const realStock = Number(inv?.currentStock) || 0; 
-          
-          // (Mantenemos tu chismoso Turín intacto 🐰)
-          if (mod.name.toLowerCase().includes('turin') || mod.name.toLowerCase().includes('turín')) {
-              console.log(`🐰 CHISMOSO TURÍN:`, { mod, isTracked, realStock });
-          }
-          
-          if (isTracked && realStock <= 0) {
-              return false; 
-          }
-          return true; 
+          // Oculta lo que usa un insumo marcado como agotado en la sucursal
+          return !isRecipeBlocked(mod.recipe, stockData);
       });
 }, [currentStepInfo, allModifiers, stockData, activeBranchId]);
 // --- USO DE LA NUEVA UTILIDAD DE PRECIOS ---
@@ -133,7 +108,7 @@ const { price: currentPrice, cost: currentCost, ruleDescription: currentRule, is
   const [quantity, setQuantity] = useState(1);
 
   const handleModifierChange = (modifier: Modifier) => {
-    const isExclusive = EXCLUSIVE_GROUPS.includes(modifier.group);
+    const isExclusive = isExclusiveGroup(modifier.group, modifierGroups);
     setSelectedModifiers(prev => {
         const newMap = new Map(prev);
         if (isExclusive) { 
@@ -211,12 +186,6 @@ const { price: currentPrice, cost: currentCost, ruleDescription: currentRule, is
           </h4>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {modifiersForCurrentStep.map(mod => {
-                  // SEGURIDAD EXTRA: Si por alguna razón llegó aquí con stock 0 y trackeo activo, lo saltamos
-                  const inv = stockData[mod.id];
-                  if ((mod.trackStock || inv?.trackStock) && (inv?.currentStock ?? 0) <= 0) {
-                      return null; 
-                  }
-
                   const isSelected = selectedModifiers.has(mod.id);
                   const modifierPrice = getBranchPrice(mod.price, mod.branchPrices, activeBranchId);
                   const isCrepeOrPostreBase = mod.group === MODIFIER_GROUPS.CREPA_DULCE_BASE || mod.group === MODIFIER_GROUPS.CREPA_SALADA_BASE;

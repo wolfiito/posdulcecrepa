@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import type { PaymentMethod, PaymentDetails, PaymentTransaction } from '../types/order';
 import type { TicketItem } from '../types/menu';
 import { toast } from 'sonner';
+import { Banknote, CreditCard, Landmark } from 'lucide-react';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -138,7 +139,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                                             </span>
                                         )}
                                     </span>
-                                    <span className="font-mono font-bold">${item.finalPrice.toFixed(2)}</span>
+                                    <span className="font-mono font-bold">${(item.finalPrice * (item.quantity || 1)).toFixed(2)}</span>
                                 </div>
                             ));
                         })()}
@@ -167,9 +168,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <div className="space-y-4 animate-fade-in pb-2">
                     <div className="grid grid-cols-3 gap-2">
                         {[
-                            { id: 'cash', label: 'Efectivo', icon: '💵' },
-                            { id: 'card', label: 'Tarjeta', icon: '💳' },
-                            { id: 'transfer', label: 'Transf.', icon: '🏦' },
+                            { id: 'cash', label: 'Efectivo', icon: Banknote },
+                            { id: 'card', label: 'Tarjeta', icon: CreditCard },
+                            { id: 'transfer', label: 'Transf.', icon: Landmark },
                         ].map((m) => (
                             <button 
                                 key={m.id}
@@ -182,7 +183,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                                     }
                                 `}
                             >
-                                <span className="text-xl">{m.icon}</span>
+                                <m.icon size={20} className="shrink-0" />
                                 <span className="text-[10px] font-bold">{m.label}</span>
                             </button>
                         ))}
@@ -217,13 +218,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             {isMixedMode && (
                 <div className="space-y-2 animate-fade-in pb-2">
                     {[
-                        { label: 'Efectivo', val: cashAmount, set: setCashAmount, icon: '💵' },
-                        { label: 'Tarjeta', val: cardAmount, set: setCardAmount, icon: '💳' },
-                        { label: 'Transf.', val: transferAmount, set: setTransferAmount, icon: '🏦' },
+                        { label: 'Efectivo', val: cashAmount, set: setCashAmount, icon: Banknote },
+                        { label: 'Tarjeta', val: cardAmount, set: setCardAmount, icon: CreditCard },
+                        { label: 'Transf.', val: transferAmount, set: setTransferAmount, icon: Landmark },
                     ].map((field) => (
                         <div key={field.label} className="flex items-center gap-2">
                             <div className="w-20 flex items-center gap-1.5 font-bold text-base-content/70 shrink-0">
-                                <span>{field.icon}</span> <span className="text-xs">{field.label}</span>
+                                <field.icon size={16} className="shrink-0" /> <span className="text-xs">{field.label}</span>
                             </div>
                             
                             <input 

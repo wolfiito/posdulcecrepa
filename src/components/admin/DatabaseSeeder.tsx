@@ -4,6 +4,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { logger } from '../../services/loggerService';
 import { useAuthStore } from '../../store/useAuthStore';
+import { seedInventory } from './seedInventory';
 // import { GroupsManager } from './GroupsManager';
 
 // #region Grupos Principales
@@ -15,58 +16,19 @@ async function seedRoot() {
             level: 0,
             children: ["crepas_dulces", "crepas_saladas", "bebidas_calientes", "bebidas_frias", "hotcakes", "waffles", "mini_hotcakes", "postres"]
         },
-        {
-            id: "crepas_dulces",
-            name: "Crepas Dulces",
-            level: 1,
-            parent: "root",
-            children: []
-        },
-        {
-            id: "crepas_saladas",
-            name: "Crepas Saladas",
-            level: 1,
-            parent: "root",
-            children: []
-        },
-        {
-            id: "bebidas_calientes",
-            name: "Bebidas Calientes",
-            level: 1,
-            parent: "root",
-            items_ref: []
-        },
-        {
-            id: "bebidas_frias",
-            name: "Bebidas Frías",
-            level: 1,
-            parent: "root",
-            items_ref: []
-        },
-        {
-            id: "hotcakes",
-            name: "Hot Cakes",
-            level: 1,
-            parent: "root",
-            items_ref: []
-        },
-        {
-            id: "waffles",
-            name: "Waffles",
-            level: 1,
-            parent: "root",
-            items_ref: []
-        },
-        {
-            id: "mini_hotcakes",
-            name: "Mini Hot Cakes",
-            level: 1,
-            parent: "root",
-            items_ref: []
-        },
-        { id: "postres", name: "Postres Fijos", level: 1, parent: "root", items_ref: [] },
+        // Solo la estructura (nombre, nivel, padre). Los productos, reglas de precio y
+        // grupos de ingredientes los define cada sección; por eso aquí no van items_ref
+        // ni rules_ref, y se escribe con merge para no borrar lo que ya cargaron.
+        { id: "crepas_dulces",     name: "Crepas Dulces",     level: 1, parent: "root" },
+        { id: "crepas_saladas",    name: "Crepas Saladas",    level: 1, parent: "root" },
+        { id: "bebidas_calientes", name: "Bebidas Calientes", level: 1, parent: "root" },
+        { id: "bebidas_frias",     name: "Bebidas Frías",     level: 1, parent: "root" },
+        { id: "hotcakes",          name: "Hot Cakes",         level: 1, parent: "root" },
+        { id: "waffles",           name: "Waffles",           level: 1, parent: "root" },
+        { id: "mini_hotcakes",     name: "Mini Hot Cakes",    level: 1, parent: "root" },
+        { id: "postres",           name: "Postres Fijos",     level: 1, parent: "root" },
     ];
-    for (const g of groups) await setDoc(doc(db, "menu_groups", g.id), g);
+    for (const g of groups) await setDoc(doc(db, "menu_groups", g.id), g, { merge: true });
 }
 // #endregion
 
@@ -2009,9 +1971,9 @@ async function seedPriceRules() {
         {
             id: "rule_waffles_hc",
             name: "Regla Waffles/HotCakes",
-            initialPrice: 35,
+            initialPrice: 60,
             incrementPerIngredient: 5,
-            branchInitialPrices: { "wa9igpvRpHkYpT7RPqgu": 40 },
+            branchInitialPrices: { "wa9igpvRpHkYpT7RPqgu": 65 },
             basePrices: []
         },
         {
@@ -2036,6 +1998,8 @@ const SECTIONS = [
     { key: "crepas", label: "Crepas Dulces & Saladas", fn: seedCrepas },
     { key: "postres", label: "Postres", fn: seedPostres },
     { key: "price_rules", label: "Reglas de Precio", fn: seedPriceRules },
+    // Va al final: asigna recetas a lo que crearon las secciones anteriores
+    { key: "inventario", label: "Inventario (gramajes estimados)", fn: seedInventory },
 ];
 // #endregion
 

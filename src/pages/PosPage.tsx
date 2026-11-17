@@ -1,6 +1,7 @@
 // src/pages/PosPage.tsx
 import React from 'react'
 import Modal from 'react-modal';
+import { X } from 'lucide-react';
 
 // Hooks y Stores
 import { usePosLogic } from '../hooks/usePosLogic';
@@ -113,7 +114,7 @@ export const PosPage: React.FC = () => {
         overlayClassName="fixed inset-0 bg-black/70 backdrop-blur-sm z-50"
       >
           <div className="flex justify-end mb-2">
-              <button onClick={closeModals} className="btn btn-sm btn-circle btn-ghost">✕</button>
+              <button onClick={closeModals} className="btn btn-sm btn-circle btn-ghost"><X size={16} /></button>
           </div>
           <ShiftsScreen />
       </Modal>

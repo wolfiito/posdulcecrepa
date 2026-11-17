@@ -1,10 +1,11 @@
 // src/utils/bluetoothPrintBuilder.ts
 import { Timestamp } from '../firebase';
 import type { Order } from '../types/order';
+import type { TicketItem } from '../types/menu';
+import { getBranchPrice } from './pricing';
 
 // CONFIGURACIÓN DE ANCHO (58mm suele ser 32 caracteres con fuente normal)
 const MAX_CHARS = 32;
-const CARD_FEE_PERCENT = 0.035;
 /**
  * Ayuda a crear una línea con texto a la izquierda y a la derecha
  * Ejemplo: "Crepa Dulce ........... $55.00"
@@ -15,7 +16,7 @@ const formatLine = (leftText: string, rightText: string): string => {
     const spaces = " ".repeat(spaceNeeded);
     return `${leftText}${spaces}${rightText}`;
   };
-  
+
   const getFormattedDate = (order: Order) => {
     try {
         let d: Date;
@@ -36,195 +37,228 @@ const formatLine = (leftText: string, rightText: string): string => {
             date: d.toLocaleDateString('es-MX'),
             time: d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
         };
-    } catch (e) { 
-        return { date: "--/--/--", time: "--:--" }; 
+    } catch (e) {
+        return { date: "--/--/--", time: "--:--" };
     }
 };
 
 // ==========================================
-// 1. CONSTRUCTOR PARA IPHONE (JSON Thermer)
+// 1. DISEÑO DEL TICKET (compartido por Thermer y Android)
 // ==========================================
-export const buildReceiptJSON = (order: Order) => {
+
+export interface ReceiptBranchInfo {
+    name: string;
+    address?: string;
+}
+
+// Renglón del ticket, independiente del formato de salida (JSON o <tags>)
+interface ReceiptLine {
+    content: string;
+    bold: 0 | 1;
+    align: 0 | 1 | 2;   // 0 Izq, 1 Centro, 2 Der
+    format: 0 | 1 | 2;  // 0 Normal, 1 Doble Alto, 2 Doble Ancho y Alto
+}
+
+const LOGO_PATH = '/logo-dulcecrepa-mono.png';
+const DIVIDER = "-".repeat(MAX_CHARS);
+const DOUBLE_DIVIDER = "=".repeat(MAX_CHARS);
+
+// Columnas de la tabla de productos: CANT (5) + DESCRIPCION (17) + IMPORTE (10) = 32
+const QTY_WIDTH = 5;
+const AMOUNT_WIDTH = 10;
+const DESC_WIDTH = MAX_CHARS - QTY_WIDTH - AMOUNT_WIDTH;
+
+const money = (value: number) => `$${value.toFixed(2)}`;
+
+const itemRow = (qty: string, desc: string, amount: string) =>
+    qty.padEnd(QTY_WIDTH) + desc.padEnd(DESC_WIDTH) + amount.padStart(AMOUNT_WIDTH);
+
+/**
+ * Parte un texto en renglones de máximo `width` caracteres sin cortar palabras
+ * (solo corta una palabra si por sí sola no cabe en el renglón).
+ */
+const wrapText = (text: string, width: number): string[] => {
+    const lines: string[] = [];
+    let current = '';
+
+    text.split(/\s+/).filter(Boolean).forEach(word => {
+        while (word.length > width) {
+            if (current) { lines.push(current); current = ''; }
+            lines.push(word.slice(0, width));
+            word = word.slice(width);
+        }
+        if (!current) current = word;
+        else if (`${current} ${word}`.length <= width) current = `${current} ${word}`;
+        else { lines.push(current); current = word; }
+    });
+
+    if (current) lines.push(current);
+    return lines.length > 0 ? lines : [''];
+};
+
+/**
+ * Junta en un solo renglón los productos idénticos (mismo producto, variante,
+ * precio y extras). Pasa al cobrar varias órdenes de un mismo cliente.
+ */
+const consolidateItems = (items: TicketItem[]): TicketItem[] => {
+    const grouped = new Map<string, TicketItem>();
+
+    items.forEach(item => {
+        const modsSig = (item.details?.selectedModifiers || []).map(m => m.id).sort().join(',');
+        const sig = [
+            item.productId || item.baseName,
+            item.details?.variantName || '',
+            item.finalPrice.toFixed(2),
+            modsSig
+        ].join('|');
+
+        const existing = grouped.get(sig);
+        if (existing) {
+            existing.quantity = (existing.quantity || 1) + (item.quantity || 1);
+        } else {
+            grouped.set(sig, { ...item, quantity: item.quantity || 1 });
+        }
+    });
+
+    return Array.from(grouped.values());
+};
+
+const PAYMENT_LABELS: Record<string, string> = {
+    cash: 'Efectivo',
+    card: 'Tarjeta',
+    transfer: 'Transferencia'
+};
+
+const buildReceiptLines = (order: Order, branch?: ReceiptBranchInfo): ReceiptLine[] => {
+    const lines: ReceiptLine[] = [];
+    const add = (content: string, opts: Partial<Omit<ReceiptLine, 'content'>> = {}) =>
+        lines.push({ content, bold: 0, align: 0, format: 0, ...opts });
+    const center = (content: string, opts: Partial<Omit<ReceiptLine, 'content'>> = {}) =>
+        add(content, { align: 1, ...opts });
+
+    // --- 1. ENCABEZADO DE SUCURSAL ---
+    if (branch?.name) center(branch.name, { bold: 1 });
+    if (branch?.address) wrapText(branch.address, MAX_CHARS).forEach(l => center(l));
+    add(DIVIDER);
+
+    // --- 2. DATOS DE LA ORDEN ---
+    const { date, time } = getFormattedDate(order);
+    const formatFolio = (n: number) => `#${String(n ?? 0).padStart(4, '0')}`;
+    const folios = order.mergedOrderNumbers && order.mergedOrderNumbers.length > 1
+        ? order.mergedOrderNumbers
+        : [order.orderNumber];
+
+    if (folios.length === 1) {
+        add(formatLine(`Folio: ${formatFolio(folios[0])}`, order.mode || ''), { bold: 1 });
+    } else {
+        // Cuenta con varias órdenes: todos los folios, ajustados al ancho
+        add(order.mode || '', { bold: 1 });
+        wrapText(`Folios: ${folios.map(formatFolio).join(', ')}`, MAX_CHARS).forEach(l => add(l, { bold: 1 }));
+    }
+    add(formatLine(`Fecha: ${date}`, time));
+    if (order.customerName) add(`Cliente: ${order.customerName}`);
+    add(`Atendió: ${order.cashier || 'Cajero General'}`);
+    add(DOUBLE_DIVIDER);
+
+    // --- 3. PRODUCTOS ---
+    add(itemRow('CANT', 'DESCRIPCION', 'IMPORTE'), { bold: 1 });
+    add(DIVIDER);
+
+    const items = consolidateItems(order.items);
+    items.forEach(item => {
+        const qty = item.quantity || 1;
+        const variant = item.details?.variantName ? ` (${item.details.variantName})` : '';
+        const [firstLine, ...restLines] = wrapText(`${item.baseName}${variant}`, DESC_WIDTH);
+
+        add(itemRow(String(qty), firstLine, money(item.finalPrice * qty)), { bold: 1 });
+        restLines.forEach(l => add(itemRow('', l, '')));
+
+        // Extras con el precio que se cobró en la sucursal de la orden
+        item.details?.selectedModifiers?.forEach(mod => {
+            const modPrice = getBranchPrice(mod.price, mod.branchPrices, order.branchId);
+            const modText = modPrice > 0 ? `+ ${mod.name} ${money(modPrice)}` : `+ ${mod.name}`;
+            wrapText(modText, MAX_CHARS - QTY_WIDTH).forEach(l => add(' '.repeat(QTY_WIDTH) + l));
+        });
+
+        // Precio unitario cuando hay más de una pieza
+        if (qty > 1) add(' '.repeat(QTY_WIDTH) + `${qty} x ${money(item.finalPrice)}`);
+    });
+
+    add(DIVIDER);
+
+    // --- 4. TOTALES ---
+    const totalUnits = items.reduce((sum, item) => sum + (item.quantity || 1), 0);
+    add(formatLine('Artículos:', String(totalUnits)));
+    add(formatLine('TOTAL:', money(order.total)), { bold: 1, format: 1 });
+    add(DIVIDER);
+
+    // --- 5. FORMA DE PAGO ---
+    const payment = order.payment;
+    if (!payment) {
+        center('PENDIENTE DE PAGO', { bold: 1 });
+    } else if (payment.method === 'mixed') {
+        center('PAGO COMBINADO', { bold: 1 });
+        payment.transactions?.forEach(tx => {
+            add(formatLine(`${PAYMENT_LABELS[tx.method] || 'Otro'}:`, money(tx.amount)));
+        });
+        if (payment.change > 0) add(formatLine('Cambio:', money(payment.change)), { bold: 1 });
+    } else if (payment.method === 'cash') {
+        // totalPaid = lo que entregó el cliente (ej. billete de $500)
+        const received = payment.totalPaid || payment.amountPaid || order.total;
+        add(formatLine('Efectivo:', money(received)));
+        add(formatLine('Cambio:', money(payment.change || 0)), { bold: 1 });
+    } else {
+        add(formatLine(`${PAYMENT_LABELS[payment.method] || 'Otro'}:`, money(order.total)));
+    }
+
+    // --- 6. PIE ---
+    add('');
+    center('¡Gracias por su visita!', { bold: 1 });
+    center('Este no es un comprobante fiscal');
+
+    // Espacios finales para corte
+    add('');
+    add('');
+    add('');
+
+    return lines;
+};
+
+// --- Salida para IPHONE / PC (JSON Thermer) ---
+export const buildReceiptJSON = (order: Order, branch?: ReceiptBranchInfo) => {
     const data: Record<string, any> = {};
     let index = 0;
-    
+
     // --- CORRECCIÓN CRÍTICA AQUÍ ---
     // Usamos padStart(3, '0') para que sea "001", "002", "010".
     // Esto evita que la App ordene "10" antes que "2".
     const add = (item: any) => {
-      const key = index.toString().padStart(3, '0'); 
+      const key = index.toString().padStart(3, '0');
       data[key] = item;
       index++;
     };
-  
-    const { date, time } = getFormattedDate(order);
-    const cashierName = order.cashier || 'Cajero General';
-    // --- 1. ENCABEZADO ---
-    // Format 2 = Doble Ancho y Alto (Gigante)
-    add({ type: 0, content: "DULCE CREPA", bold: 1, align: 1, format: 2 }); 
-    add({ type: 0, content: "Sucursal: Centro", bold: 0, align: 0, format: 0 });
-    add({ type: 0, content: `Fecha: ${date}`, bold: 0, align: 0, format: 0 });
-    add({ type: 0, content: `Hora: ${time}`, bolde: 0, align: 0, format: 0 });
-    add({ type: 0, content: `Atendió: ${cashierName}`, bold: 0, align: 0, format: 0 });
-    add({ type: 0, content: "--------------------------------", bold: 1, align: 1, format: 0 });
-    add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
-    // --- 2. PRODUCTOS ---
-    order.items.forEach(item => {
-      const variant = item.details?.variantName ? `(${item.details.variantName})` : '';
-      const nameFull = `${item.baseName} ${variant}`;
-      const priceStr = `$${item.finalPrice.toFixed(2)}`;
-  
-      // Nombre y Precio en la misma línea (Negritas)
-      add({ 
-          type: 0, 
-          content: formatLine(nameFull, priceStr), 
-          bold: 1, 
-          align: 0, 
-          format: 0 
-      });  
-      // Extras (Con signo + en negrita)
-      if (item.details?.selectedModifiers) {
-        
-         item.details.selectedModifiers.forEach(mod => {
-            const modName = ` + ${mod.name}`;
-            const modPrice = mod.price > 0 ? `$${mod.price.toFixed(2)}` : '$0.00';
-             // Format 0 (Normal) para que se lea bien, Bold activado
-             add({ 
-                type: 0, 
-                content: formatLine(modName, modPrice), 
-                bold: 1, 
-                align: 0, 
-                format: 0 }); 
-         });
-      }
-      add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
+
+    // Type 1 = Imagen. Thermer la descarga desde la URL pública (requiere internet al imprimir)
+    add({ type: 1, path: `${window.location.origin}${LOGO_PATH}`, align: 1 });
+
+    buildReceiptLines(order, branch).forEach(line => {
+        // Thermer necesita "\n" para imprimir un renglón vacío
+        add({ type: 0, ...line, content: line.content || "\n" });
     });
-    
-    add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
-    add({ type: 0, content: "--------------------------------", bold: 1, align: 1, format: 0 });
 
-  // --- 3. TOTALES Y PAGOS (LÓGICA MEJORADA) ---
-  
-  // A. PAGO CON TARJETA
-  if (order.payment?.method === 'card') {
-    add({ type: 0, content: formatLine("Subtotal:", `$${order.total.toFixed(2)}`), bold: 0, align: 2, format: 0 });
-    add({ type: 0, content: formatLine("TOTAL:", `$${order.total.toFixed(2)}`), bold: 1, align: 2, format: 1 });
-    add({ type: 0, content: "[PAGO CON TARJETA]", bold: 1, align: 1, format: 0 });
-
-  // B. PAGO EN EFECTIVO
-  } else if (order.payment?.method === 'cash') {
-    add({ type: 0, content: formatLine("TOTAL:", `$${order.total.toFixed(2)}`), bold: 1, align: 2, format: 1 });
-    const paid = order.payment.amountPaid || order.total;
-    const change = order.payment.change || 0;
-    add({ type: 0, content: formatLine("Su Pago:", `$${paid.toFixed(2)}`), bold: 0, align: 2, format: 0 });
-    add({ type: 0, content: formatLine("Cambio:", `$${change.toFixed(2)}`), bold: 1, align: 2, format: 0 });
-    add({ type: 0, content: "[PAGO EN EFECTIVO]", bold: 1, align: 1, format: 0 });
-
-  // C. TRANSFERENCIA
-  } else if (order.payment?.method === 'transfer') {
-    add({ type: 0, content: formatLine("TOTAL:", `$${order.total.toFixed(2)}`), bold: 1, align: 2, format: 1 });
-    add({ type: 0, content: "[TRANSFERENCIA]", bold: 1, align: 1, format: 0 });
-
-  // D. 👇 NUEVO: PAGO COMBINADO (MIXTO) 👇
-  } else if (order.payment?.method === 'mixed') {
-    add({ type: 0, content: formatLine("TOTAL:", `$${order.total.toFixed(2)}`), bold: 1, align: 2, format: 1 });
-    add({ type: 0, content: "--------------------------------", bold: 0, align: 1, format: 0 });
-    
-    // Recorremos las transacciones guardadas en order.payment.transactions
-    if (order.payment.transactions && order.payment.transactions.length > 0) {
-        order.payment.transactions.forEach(tx => {
-            // Traducimos el método a español para el ticket
-            let methodLabel = "Otro";
-            if (tx.method === 'cash') methodLabel = "Efectivo";
-            if (tx.method === 'card') methodLabel = "Tarjeta";
-            if (tx.method === 'transfer') methodLabel = "Transf.";
-
-            add({ 
-                type: 0, 
-                content: formatLine(methodLabel, `$${tx.amount.toFixed(2)}`), 
-                bold: 0, 
-                align: 0, 
-                format: 0 
-            });
-        });
-    }
-    
-    if (order.payment.change && order.payment.change > 0) {
-         add({ type: 0, content: formatLine("Cambio:", `$${order.payment.change.toFixed(2)}`), bold: 1, align: 2, format: 0 });
-    }
-
-    add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
-    add({ type: 0, content: "[PAGO COMBINADO]", bold: 1, align: 1, format: 0 });
-
-  // E. OTROS (Pendiente)
-  } else {
-      add({ type: 0, content: formatLine("TOTAL:", `$${order.total.toFixed(2)}`), bold: 1, align: 2, format: 1 });
-      const statusText = order.status === 'paid' ? 'PAGADO' : 'PENDIENTE DE PAGO';
-      add({ type: 0, content: statusText, bold: 1, align: 1, format: 0 });
-}
-
-// Espacios finales para corte
-add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
-add({ type: 0, content: "\n", bold: 0, align: 0, format: 0 });
-
-return JSON.stringify(data);
+    return JSON.stringify(data);
 };
 
-
-// ==========================================
-// 2. CONSTRUCTOR STRING (Para Android Share)
-// ==========================================
-export const buildReceiptString = (order: Order) => {
-  let str = "";
-  const { date, time } = getFormattedDate(order);
-  const cashierName = order.cashier || 'Cajero General';
-
+// --- Salida para ANDROID (texto con <tags> para compartir) ---
+export const buildReceiptString = (order: Order, branch?: ReceiptBranchInfo) => {
   // Tags: <BAF> -> B:Bold(0/1), A:Align(0L,1C,2R), F:Font(0N,1DH,2DHW,3DW)
-  str += "<112>DULCE CREPA\n"; 
-  str += "<010>Sucursal: Centro\n";
-  str += `<000>Fecha: ${date}\n`;
-  str += `<000>Hora: ${time}\n`;
-  str += `<000>Atendió: ${cashierName}\n`;
-  str += "<110>--------------------------------\n";
+  // El modo texto no imprime imágenes, así que el nombre va como encabezado
+  let str = "<112>DULCE CREPA\n";
 
-  order.items.forEach(item => {
-    const variant = item.details?.variantName ? `(${item.details.variantName})` : '';
-    str += `<100>${formatLine(`${item.baseName} ${variant}`, `$${item.finalPrice.toFixed(2)}`)}\n`;
-    if (item.details?.selectedModifiers) {
-        item.details.selectedModifiers.forEach(mod => {
-            str += `<100>  + ${mod.name}\n`;
-        });
-    }
+  buildReceiptLines(order, branch).forEach(line => {
+      str += `<${line.bold}${line.align}${line.format}>${line.content}\n`;
   });
 
-  str += "<110>--------------------------------\n";
-
-  if (order.payment?.method === 'mixed') {
-      str += `<121>Total: $${order.total.toFixed(2)}\n`;
-      str += "<010>--------------------------------\n";
-      if (order.payment.transactions) {
-          order.payment.transactions.forEach(tx => {
-              let mLabel = tx.method === 'cash' ? "Efectivo" : (tx.method === 'card' ? "Tarjeta" : "Transf.");
-              str += `<000>${formatLine(mLabel, `$${tx.amount.toFixed(2)}`)}\n`;
-          });
-      }
-      if (order.payment.change && order.payment.change > 0) {
-          str += `<120>${formatLine("Cambio:", `$${order.payment.change.toFixed(2)}`)}\n`;
-      }
-      str += "\n<110>[PAGO COMBINADO]\n";
-  } else {
-      str += `<121>Total: $${order.total.toFixed(2)}\n`;
-      if (order.payment?.method === 'cash') {
-          const paid = order.payment.amountPaid || order.total;
-          const change = order.payment.change || 0;
-          str += `<020>${formatLine("Su Pago:", `$${paid.toFixed(2)}`)}\n`;
-          str += `<120>${formatLine("Cambio:", `$${change.toFixed(2)}`)}\n`;
-      }
-      const method = order.payment?.method === 'card' ? 'TARJETA' : (order.payment?.method === 'transfer' ? 'TRANSFERENCIA' : 'EFECTIVO');
-      str += `<110>[PAGO ${method}]\n`;
-  }
-
-  str += "<010>\n<010>¡Gracias por su compra!\n\n\n\n";
   return str;
 };
 
@@ -235,8 +269,8 @@ export const buildReceiptString = (order: Order) => {
 const formatReportDate = (val: any) => {
     if (!val) return '--/-- --:--';
     const d = val instanceof Timestamp ? val.toDate() : new Date(val);
-    return d.toLocaleString('es-MX', { 
-        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' 
+    return d.toLocaleString('es-MX', {
+        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
     });
 };
 
@@ -244,7 +278,7 @@ export const buildZReportJSON = (shift: any, metrics: any, finalCount: number) =
     const data: Record<string, any> = {};
     let index = 0;
     const add = (item: any) => {
-      const key = index.toString().padStart(3, '0'); 
+      const key = index.toString().padStart(3, '0');
       data[key] = item;
       index++;
     };
@@ -292,7 +326,7 @@ export const buildZReportString = (shift: any, metrics: any, finalCount: number)
     let str = "";
     const difference = finalCount - metrics.expectedCash;
 
-    str += "<112>CORTE Z\n"; 
+    str += "<112>CORTE Z\n";
     str += "<110>DULCE CREPA\n";
     str += `<000>Cajero: ${shift.openedBy}\n`;
     str += `<000>Apertura: ${formatReportDate(shift.openedAt)}\n`;
