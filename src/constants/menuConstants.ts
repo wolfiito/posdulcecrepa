@@ -1,4 +1,5 @@
 // src/constants/menuConstants.ts
+import type { ModifierGroup } from '../types/menu';
 
 export const MODIFIER_GROUPS = {
     BEBIDA_LECHE: "leche_opciones",
@@ -30,5 +31,17 @@ export const MODIFIER_GROUPS = {
     ...EXCLUSIVE_BASE_GROUPS,
     MODIFIER_GROUPS.BEBIDA_LECHE,
     MODIFIER_GROUPS.CREPA_TOPPING_SALSA,
-    MODIFIER_GROUPS.CREPA_TOPPING_SECO
+    MODIFIER_GROUPS.CREPA_TOPPING_SECO,
+    "tipo_leche",
+    "bubble_estilo"
   ];
+
+  /**
+   * ¿El cliente elige solo una opción de este grupo (y es obligatoria)?
+   * Primero respeta lo configurado en el admin (isExclusive); si el grupo no lo
+   * tiene, usa la lista fija EXCLUSIVE_GROUPS para no cambiar lo que ya existe.
+   */
+  export const isExclusiveGroup = (groupId: string, modifierGroups: ModifierGroup[] = []): boolean => {
+    const configured = modifierGroups.find(g => g.id === groupId)?.isExclusive;
+    return configured ?? EXCLUSIVE_GROUPS.includes(groupId);
+  };

@@ -11,16 +11,17 @@ import { useShiftStore } from '../store/useShiftStore';
 
 // Tipos
 import type { Movement, MovementCategory } from '../types/movement';
+import { ShoppingCart, Lightbulb, HardHat, Wrench, Banknote, FileText, TriangleAlert, Leaf, X, type LucideIcon } from 'lucide-react';
 
 Modal.setAppElement('#root');
 
-const EXPENSE_CATEGORIES: Record<string, { label: string, icon: string, color: string }> = {
-    INSUMO: { label: 'Insumos', icon: '🛒', color: 'bg-blue-100 text-blue-600' },
-    SERVICIO: { label: 'Servicios', icon: '💡', color: 'bg-yellow-100 text-yellow-600' },
-    NOMINA: { label: 'Nómina', icon: '👷', color: 'bg-purple-100 text-purple-600' },
-    MANTENIMIENTO: { label: 'Mantenimiento', icon: '🛠️', color: 'bg-orange-100 text-orange-600' },
-    RETIRO: { label: 'Retiro Caja', icon: '💸', color: 'bg-red-100 text-red-600' },
-    OTRO: { label: 'Otro', icon: '📝', color: 'bg-gray-100 text-gray-600' }
+const EXPENSE_CATEGORIES: Record<string, { label: string, icon: LucideIcon, color: string }> = {
+    INSUMO: { label: 'Insumos', icon: ShoppingCart, color: 'bg-blue-100 text-blue-600' },
+    SERVICIO: { label: 'Servicios', icon: Lightbulb, color: 'bg-yellow-100 text-yellow-600' },
+    NOMINA: { label: 'Nómina', icon: HardHat, color: 'bg-purple-100 text-purple-600' },
+    MANTENIMIENTO: { label: 'Mantenimiento', icon: Wrench, color: 'bg-orange-100 text-orange-600' },
+    RETIRO: { label: 'Retiro Caja', icon: Banknote, color: 'bg-red-100 text-red-600' },
+    OTRO: { label: 'Otro', icon: FileText, color: 'bg-gray-100 text-gray-600' }
 };
 
 export const MovementsScreen: React.FC = () => {
@@ -93,7 +94,7 @@ export const MovementsScreen: React.FC = () => {
             {/* AVISO SIN TURNO */}
             {!currentShift && (
                 <div className="alert alert-warning mb-6 shadow-sm py-2">
-                    <span className="text-xs font-bold">⚠️ No hay turno abierto. No afectará la caja actual.</span>
+                    <span className="text-xs font-bold flex items-center gap-2"><TriangleAlert size={14} className="shrink-0" /> No hay turno abierto. No afectará la caja actual.</span>
                 </div>
             )}
 
@@ -103,7 +104,7 @@ export const MovementsScreen: React.FC = () => {
                     <div className="py-10 text-center"><span className="loading loading-spinner text-primary"></span></div>
                 ) : movements.length === 0 ? (
                     <div className="text-center py-10 opacity-50 bg-base-200 rounded-3xl border-2 border-dashed border-base-300">
-                        <div className="text-4xl mb-2">🍃</div>
+                        <Leaf size={36} className="mx-auto mb-2" />
                         <p className="font-bold">Sin gastos registrados hoy</p>
                     </div>
                 ) : (
@@ -114,7 +115,7 @@ export const MovementsScreen: React.FC = () => {
                                 <div className="card-body p-4 flex-row items-center gap-4">
                                     {/* Icono */}
                                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0 ${style.color}`}>
-                                        {style.icon}
+                                        <style.icon size={24} className="shrink-0" />
                                     </div>
                                     
                                     {/* Info */}
@@ -211,7 +212,7 @@ const NewExpenseModal = ({ isOpen, onClose, onSuccess }: { isOpen: boolean, onCl
             <div className="p-6 bg-base-100">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="text-xl font-black">Nuevo Gasto</h3>
-                    <button onClick={onClose} className="btn btn-sm btn-circle btn-ghost">✕</button>
+                    <button onClick={onClose} className="btn btn-sm btn-circle btn-ghost"><X size={16} /></button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -252,7 +253,7 @@ const NewExpenseModal = ({ isOpen, onClose, onSuccess }: { isOpen: boolean, onCl
                                         }
                                     `}
                                 >
-                                    <span className="text-xl mb-1">{style.icon}</span>
+                                    <style.icon size={20} className="mb-1 shrink-0" />
                                     <span className="text-[10px] font-bold truncate w-full text-center">{style.label}</span>
                                 </button>
                             ))}

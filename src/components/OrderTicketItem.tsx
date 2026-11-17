@@ -25,13 +25,9 @@ export const OrderTicketItem: React.FC<Props> = ({ item, orderId, isEditable, on
     if (!isEditable) return;
     
     if (info.offset.x < dragThreshold) {
-      controls.start({
-        x: "-100%", 
-        opacity: 0,
-        height: 0,
-        marginBottom: 0,
-        transition: { duration: 0.3 } 
-      }).then(() => onRemove(item, orderId));
+      // Regresa a su lugar y pregunta; si se confirma, la orden en vivo lo quita de la lista
+      controls.start({ x: 0, transition: { type: "spring", stiffness: 400, damping: 35 } });
+      onRemove(item, orderId);
     } else {
       controls.start({ x: 0, transition: { type: "spring", stiffness: 400, damping: 35 } });
     }
@@ -67,7 +63,7 @@ export const OrderTicketItem: React.FC<Props> = ({ item, orderId, isEditable, on
                 )}
             </span>
             <span className="font-mono font-bold text-gray-400 text-xs ml-2">
-                ${item.finalPrice.toFixed(2)}
+                ${(item.finalPrice * (item.quantity || 1)).toFixed(2)}
             </span>
         </div>
       </motion.div>

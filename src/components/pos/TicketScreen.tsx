@@ -5,11 +5,11 @@ import { TicketItemCard } from '../TicketItemCard';
 import { IconTicket } from '../Icons';
 
 export const TicketScreen: React.FC = () => {
-    // 1. 👇 Importamos 'customerName' y 'orderMode' del store
+    // 1. Importamos 'customerName' y 'orderMode' del store
     const { items, removeItem, customerName, orderMode } = useTicketStore();
     const { setView } = useUIStore();
 
-    // 2. 👇 Lógica para el título: Si hay nombre (Mesa 1), úsalo. Si no, "Nueva Orden".
+    // 2. Lógica para el título: Si hay nombre (Mesa 1), úsalo. Si no, "Nueva Orden".
     // El "Alejandro" desaparecerá porque aquí no llamamos a currentUser.
     const isMesa = orderMode?.startsWith('Mesa ');
     const displayTitle = customerName || (isMesa ? orderMode : 'Nueva Orden');
@@ -23,7 +23,7 @@ export const TicketScreen: React.FC = () => {
                 <div className={`badge ${orderMode === 'Para Llevar' ? 'badge-secondary' : 'badge-primary'} badge-outline mb-2`}>
                     {displaySubtitle}
                 </div>
-                {/* 3. 👇 Aquí mostramos el nombre real (Mesa) */}
+                {/* 3. Aquí mostramos el nombre real (Mesa) */}
                 <h2 className="text-2xl font-black text-base-content tracking-tight truncate px-4">
                     {displayTitle}
                 </h2>

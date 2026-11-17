@@ -2,13 +2,14 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { db, collection, onSnapshot } from '../firebase';
-import type { MenuGroup, MenuItem, Modifier, PriceRule } from '../types/menu';
+import type { MenuGroup, MenuItem, Modifier, ModifierGroup, PriceRule } from '../types/menu';
 
 interface MenuState {
   groups: MenuGroup[];
   items: MenuItem[];
   modifiers: Modifier[];
   rules: PriceRule[];
+  modifierGroups: ModifierGroup[];
   
   isLoading: boolean;
   error: string | null;
@@ -23,6 +24,7 @@ export const useMenuStore = create<MenuState>()(
       items: [],
       modifiers: [],
       rules: [],
+      modifierGroups: [],
       isLoading: false,
       error: null,
 
@@ -58,6 +60,9 @@ export const useMenuStore = create<MenuState>()(
         (err) => {
             console.error("Error groups:", err);
             set({ error: "Error cargando categorías" });
+            // Damos la sección por terminada para no dejar la app cargando para siempre
+            loadedSections.groups = true;
+            checkLoadingStatus();
         }
     );
 
@@ -72,6 +77,8 @@ export const useMenuStore = create<MenuState>()(
         (err) => {
             console.error("Error items:", err);
             set({ error: "Error cargando productos" });
+            loadedSections.items = true;
+            checkLoadingStatus();
         }
     );
 
@@ -86,6 +93,8 @@ export const useMenuStore = create<MenuState>()(
         (err) => {
             console.error("Error modifiers:", err);
             set({ error: "Error cargando extras" });
+            loadedSections.modifiers = true;
+            checkLoadingStatus();
         }
     );
 
@@ -100,6 +109,20 @@ export const useMenuStore = create<MenuState>()(
         (err) => { 
             console.error("Error rules:", err);
             set({ error: "Error cargando reglas de precio" });
+            loadedSections.rules = true;
+            checkLoadingStatus();
+        }
+    );
+
+    // 5. Escuchar Listas de Opciones (solo para saber cuáles son "elige una").
+    // No bloquea la carga: si falla, isExclusiveGroup usa la lista fija.
+    const unsubModifierGroups = onSnapshot(
+        collection(db, "modifier_groups"),
+        (snap) => {
+            set({ modifierGroups: snap.docs.map(d => ({ id: d.id, ...d.data() } as ModifierGroup)) });
+        },
+        (err) => {
+            console.error("Error modifier groups:", err);
         }
     );
 
@@ -109,6 +132,7 @@ export const useMenuStore = create<MenuState>()(
             unsubItems();
             unsubModifiers();
             unsubRules();
+            unsubModifierGroups();
         };
       }
     }),
@@ -119,7 +143,8 @@ export const useMenuStore = create<MenuState>()(
         groups: state.groups, 
         items: state.items, 
         modifiers: state.modifiers, 
-        rules: state.rules
+        rules: state.rules,
+        modifierGroups: state.modifierGroups
       }),
     }
   )

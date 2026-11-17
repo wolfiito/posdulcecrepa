@@ -1,9 +1,11 @@
 // src/store/useInventoryStore.ts
 import { create } from 'zustand';
 import { db, collection, onSnapshot } from '../firebase';
+import type { SupplyStock } from '../types/inventory';
 
 interface InventoryState {
-  stockData: Record<string, { trackStock?: boolean; currentStock?: number }>;
+  // Existencias de insumos de la sucursal activa, por id de insumo
+  stockData: Record<string, SupplyStock>;
   startListeningInventory: (branchId: string) => () => void;
 }
 
@@ -11,16 +13,15 @@ export const useInventoryStore = create<InventoryState>((set) => ({
   stockData: {},
   startListeningInventory: (branchId: string) => {
     if (!branchId) return () => {};
-    
-    // Escuchamos el inventario específico de esta sucursal
-    const unsub = onSnapshot(collection(db, "branches", branchId, "inventory"), (snap) => {
-       const newStock: Record<string, any> = {};
+
+    const unsub = onSnapshot(collection(db, "branches", branchId, "supplies_stock"), (snap) => {
+       const newStock: Record<string, SupplyStock> = {};
        snap.docs.forEach(doc => {
-           newStock[doc.id] = doc.data(); // Guardamos { trackStock: true, currentStock: 5 }
+           newStock[doc.id] = doc.data() as SupplyStock;
        });
        set({ stockData: newStock });
     });
-    
+
     return unsub;
   }
 }));

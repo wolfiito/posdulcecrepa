@@ -1,20 +1,19 @@
 // src/components/AdminMenuScreen.tsx
 import React, { useState } from 'react';
-import { ModifiersManager } from './admin/ModifiersManager';
 import { ProductsManager } from './admin/ProductsManager';
 import { GroupsManager } from './admin/GroupsManager'; 
-import { ModifierGroupsManager } from './admin/ModifierGroupsManager';
+import { OptionsManager } from './admin/OptionsManager';
 import { PriceRulesManager } from './admin/PriceRulesManager';
+import { CircleDollarSign, Folder, Layers, ListChecks, Utensils } from 'lucide-react';
 
 export const AdminMenuScreen: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'modifiers' | 'items' | 'groups' | 'mod_groups' | 'rules'>('groups');
+  const [activeTab, setActiveTab] = useState<'items' | 'groups' | 'options' | 'rules'>('items');
 
   const tabs = [
-    { id: 'groups', label: '📂 Categorías', color: 'primary' },
-    { id: 'items', label: '🍕 Productos', color: 'primary' },
-    { id: 'mod_groups', label: '📋 Listas', color: 'info' },
-    { id: 'modifiers', label: '🥦 Ingredientes', color: 'secondary' },
-    { id: 'rules', label: '💰 Reglas', color: 'warning' },
+    { id: 'items', label: 'Productos', icon: Utensils, color: 'primary' },
+    { id: 'options', label: 'Opciones', icon: ListChecks, color: 'secondary' },
+    { id: 'groups', label: 'Categorías', icon: Folder, color: 'primary' },
+    { id: 'rules', label: 'Reglas', icon: CircleDollarSign, color: 'warning' },
   ];
 
   return (
@@ -22,7 +21,7 @@ export const AdminMenuScreen: React.FC = () => {
       {/* Header Responsivo */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 mt-4 gap-2">
         <h2 className="text-2xl sm:text-3xl font-black text-primary flex items-center gap-2">
-          <span>🛠️</span> Editor de Menú
+          <Layers size={28} className="shrink-0" /> Editor de Menú
         </h2>
         <span className="badge badge-ghost badge-sm opacity-60">Modo Administrador</span>
       </div>
@@ -34,12 +33,13 @@ export const AdminMenuScreen: React.FC = () => {
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
             className={`
-              flex-none sm:flex-1 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-200 whitespace-nowrap
+              flex-none sm:flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-200 whitespace-nowrap
               ${activeTab === tab.id 
                 ? 'bg-base-100 text-primary shadow-sm scale-[1.02]' 
                 : 'text-base-content/60 hover:bg-base-100/50'}
             `}
           >
+            <tab.icon size={16} className="shrink-0" />
             {tab.label}
           </button>
         ))}
@@ -51,31 +51,9 @@ export const AdminMenuScreen: React.FC = () => {
             {activeTab === 'groups' && <GroupsManager />}
             {activeTab === 'items' && <ProductsManager />}
             
-            {activeTab === 'mod_groups' && (
-                <div className="animate-fade-in">
-                    <div className="alert alert-info shadow-sm mb-6 py-3 text-xs sm:text-sm bg-info/10 border-info/20 text-info-content">
-                        <div className="flex gap-2">
-                            <span>💡</span>
-                            <p>Crea aquí las listas de opciones (ej. <b>"Sabores de Soda"</b>). Luego agrega los sabores en la pestaña "Ingredientes".</p>
-                        </div>
-                    </div>
-                    <ModifierGroupsManager />
-                </div>
-            )}
+            {activeTab === 'options' && <OptionsManager />}
 
-            {activeTab === 'modifiers' && <ModifiersManager />}
-
-            {activeTab === 'rules' && (
-                <div className="animate-fade-in">
-                    <div className="alert alert-warning shadow-sm mb-6 py-3 text-xs sm:text-sm bg-warning/10 border-warning/20 text-warning-content">
-                        <div className="flex gap-2">
-                            <span>💡</span>
-                            <p>Define cómo escala el precio por ingrediente. Estas reglas se asignan a las <b>Categorías</b> armables.</p>
-                        </div>
-                    </div>
-                    <PriceRulesManager />
-                </div>
-            )}
+            {activeTab === 'rules' && <PriceRulesManager />}
         </div>
       </div>
 

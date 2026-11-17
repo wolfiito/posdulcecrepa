@@ -17,7 +17,7 @@ export const RestoreBackup: React.FC = () => {
             return;
         }
 
-        if (!window.confirm("🚨 ATENCIÓN: Esto regresará tu sistema EXACTAMENTE a la versión del archivo que subiste. ¿Continuar?")) return;
+        if (!window.confirm("ATENCIÓN: Esto regresará tu sistema EXACTAMENTE a la versión del archivo que subiste. ¿Continuar?")) return;
 
         setLoading(true);
         toast.info("Leyendo archivo de respaldo y reconstruyendo grupos...");

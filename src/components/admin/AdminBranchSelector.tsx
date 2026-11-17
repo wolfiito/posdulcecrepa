@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { branchService } from '../../services/branchService';
 import type { Branch } from '../../types/branch';
+import { Building, Check, ChevronDown } from 'lucide-react';
 
 export const AdminBranchSelector: React.FC = () => {
     const { currentUser, activeBranchId, setActiveBranch } = useAuthStore();
@@ -49,11 +50,11 @@ export const AdminBranchSelector: React.FC = () => {
         <details ref={dropdownRef} className="dropdown dropdown-end animate-fade-in">
             {/* BOTÓN VISIBLE EN LA BARRA */}
             <summary className="btn btn-sm btn-ghost bg-base-200 border-base-300 shadow-sm flex items-center gap-2 rounded-xl hover:bg-base-300 transition-all m-0">
-                <span className="text-xl leading-none">🏢</span>
+                <Building size={18} className="shrink-0" />
                 <span className="hidden sm:inline font-bold text-base-content/80">
                     {currentBranch?.name || 'Seleccionar...'}
                 </span>
-                <span className="text-[10px] opacity-50 ml-1">▼</span>
+                <ChevronDown size={12} className="shrink-0 opacity-50 ml-1" />
             </summary>
             
             {/* MENÚ FLOTANTE (ESTILIZADO) */}
@@ -79,7 +80,7 @@ export const AdminBranchSelector: React.FC = () => {
                             <span className="truncate">{b.name}</span>
                             {/* Palomita si es la activa */}
                             {activeBranchId === b.id && (
-                                <span className="ml-auto text-primary">✓</span>
+                                <Check size={16} className="shrink-0 ml-auto text-primary" />
                             )}
                         </button>
                     </li>

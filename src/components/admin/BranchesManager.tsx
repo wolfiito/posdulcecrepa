@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { branchService } from '../../services/branchService';
 import type { Branch } from '../../types/branch';
+import { Armchair, Building, MapPin, Pencil } from 'lucide-react';
 
 export const BranchesManager: React.FC = () => {
     const [branches, setBranches] = useState<Branch[]>([]);
@@ -85,7 +86,7 @@ export const BranchesManager: React.FC = () => {
         <div className="animate-fade-in max-w-4xl mx-auto pb-24 px-4">
             <div className="flex items-center justify-between mb-8 mt-4">
                 <h2 className="text-3xl font-black text-base-content flex items-center gap-2">
-                    🏢 Mis Sucursales
+                    <Building size={28} className="shrink-0" /> Mis Sucursales
                 </h2>
                 <button 
                     onClick={() => handleOpenModal()}
@@ -101,20 +102,20 @@ export const BranchesManager: React.FC = () => {
                 <div className="grid gap-4">
                     {branches.map((branch) => (
                         <div key={branch.id} className="card bg-base-100 shadow-sm border border-base-200 flex-row items-center p-4">
-                            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl bg-primary/10 mr-4`}>🏢</div>
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl bg-primary/10 text-primary mr-4`}><Building size={24} className="shrink-0" /></div>
                             <div className="flex-1">
                                 <h3 className="font-bold text-lg flex items-center gap-2">
                                     {branch.name}
                                     {!branch.isActive && <span className="badge badge-error text-white badge-xs">Inactiva</span>}
                                 </h3>
                                 <div className="text-sm opacity-60 flex gap-4">
-                                    <span>📍 {branch.address || 'Sin dirección'}</span>
-                                    <span>🪑 {branch.tableCount || 10} Mesas</span>
+                                    <span className="inline-flex items-center gap-1"><MapPin size={14} className="shrink-0" /> {branch.address || 'Sin dirección'}</span>
+                                    <span className="inline-flex items-center gap-1"><Armchair size={14} className="shrink-0" /> {branch.tableCount || 10} Mesas</span>
                                 </div>
                             </div>
                             
                             <div className="flex items-center gap-2">
-                                <button onClick={() => handleOpenModal(branch)} className="btn btn-sm btn-ghost">✏️ Editar</button>
+                                <button onClick={() => handleOpenModal(branch)} className="btn btn-sm btn-ghost"><Pencil size={14} className="shrink-0" /> Editar</button>
                                 <input 
                                     type="checkbox" 
                                     className="toggle toggle-success toggle-sm" 

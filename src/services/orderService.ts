@@ -1,15 +1,12 @@
 // src/services/orderService.ts
-import { db, collection, serverTimestamp, runTransaction, doc, writeBatch, increment } from '../firebase';
+import { db, collection, serverTimestamp, runTransaction, doc, writeBatch } from '../firebase';
+import type { WriteBatch } from 'firebase/firestore';
 import { printService } from './printService';
 import { logger } from './loggerService';
 import type { TicketItem } from '../types/menu';
 import type { PaymentDetails, OrderMode, KitchenStatus } from '../types/order';
-import type { DocumentReference } from 'firebase/firestore'; 
-
-interface StockUpdate {
-    ref: DocumentReference;
-    newStock: number;
-}
+import { applySupplyUsage, inventoryService, recordPreparedWaste } from './inventoryService';
+import { sumSupplyUsage } from '../utils/inventory';
 
 const cleanUndefined = (obj: any): any => {
     if (Array.isArray(obj)) {
@@ -23,6 +20,27 @@ const cleanUndefined = (obj: any): any => {
         );
     }
     return obj;
+};
+
+// 'restore' = no se preparó, los insumos regresan; 'waste' = ya se preparó, es merma
+export type ReturnMode = 'restore' | 'waste';
+
+export interface ReturnOptions {
+    user?: string;
+    mode?: ReturnMode;
+    orderNumber?: number;
+}
+
+// Órdenes anteriores al inventario por insumo no traen supplyUsage: no mueven nada
+const returnSupplies = async (batch: WriteBatch, branchId: string, usage: Record<string, number>, opts: ReturnOptions) => {
+    if (Object.keys(usage).length === 0) return;
+    const supplyNames = await inventoryService.getSupplyNames();
+    const info = { user: opts.user || 'Sistema', supplyNames, orderNumber: opts.orderNumber };
+    if (opts.mode === 'waste') {
+        recordPreparedWaste(batch, branchId, usage, { ...info, note: 'Devolución de algo ya preparado' });
+    } else {
+        applySupplyUsage(batch, branchId, usage, 1, { ...info, type: 'cancel', note: 'Devolución sin preparar' });
+    }
 };
 
 export const orderService = {
@@ -46,54 +64,15 @@ export const orderService = {
     const isMesa = mode.startsWith('Mesa ');
     const finalCustomerName = (isMesa && !customerName) ? mode : (customerName || 'Cliente Anónimo');
 
+    // Consumo de insumos ya calculado en cada artículo (supplyUsage)
+    const usage = sumSupplyUsage(items);
+    const supplyNames = Object.keys(usage).length > 0 ? await inventoryService.getSupplyNames() : {};
+
     try {
       await runTransaction(db, async (transaction) => {
         const counterRef = doc(db,"branches", branchId, "counters", "orders");
 
-        // --- CÁLCULO DE INVENTARIO ---
-        const modifiersToDeduct = new Map<string, number>();
-        const modIdsToRead = new Set<string>();
-
-        items.forEach(item => {
-            const baseId = item.details?.itemId || item.productId;
-            if (baseId) {
-                const currentQty = modifiersToDeduct.get(baseId) || 0;
-                modifiersToDeduct.set(baseId, currentQty + (item.quantity || 1));
-                modIdsToRead.add(baseId);
-            }
-            if (item.details?.selectedModifiers) {
-                item.details.selectedModifiers.forEach(mod => {
-                    const currentQty = modifiersToDeduct.get(mod.id) || 0;
-                    modifiersToDeduct.set(mod.id, currentQty + (item.quantity || 1));
-                    modIdsToRead.add(mod.id);
-                });
-            }
-        });
-
-        const uniqueModIds = Array.from(modIdsToRead);
-        const invRefs = uniqueModIds.map(id => doc(db, "branches", branchId, "inventory", id));
-
-        const [counterSnap, ...invSnaps] = await Promise.all([
-            transaction.get(counterRef),
-            ...invRefs.map(ref => transaction.get(ref))
-        ]);
-
-        const updates: StockUpdate[] = [];
-        invSnaps.forEach((snap, index) => {
-            const modId = uniqueModIds[index];
-            const qtyToDeduct = modifiersToDeduct.get(modId) || 0;
-            if (snap.exists()) {
-                const data = snap.data();
-                if (data.trackStock === true) {
-                    const currentStock = Number(data.currentStock) || 0;
-                    const newStock = currentStock - qtyToDeduct;
-                    if (newStock < 0) {
-                        throw new Error(`Stock insuficiente: ${data.name || 'Ingrediente'} (Disp: ${currentStock}, Req: ${qtyToDeduct})`);
-                    }
-                    updates.push({ ref: snap.ref, newStock });
-                }
-            }
-        });
+        const counterSnap = await transaction.get(counterRef);
 
         // --- CREAR NUEVA ORDEN (SIEMPRE NUEVA PARA EL KDS) ---
         let currentCount = 0;
@@ -125,9 +104,12 @@ export const orderService = {
         const newOrderRef = doc(collection(db, "orders")); 
         transaction.set(newOrderRef, firebaseOrderData);
         
-        updates.forEach(update => {
-            transaction.update(update.ref, { currentStock: update.newStock });
-        });
+        // --- INVENTARIO: descuenta los insumos de las recetas (puede quedar negativo) ---
+        if (Object.keys(usage).length > 0) {
+            applySupplyUsage(transaction, branchId, usage, -1, {
+                type: 'sale', user: cashierName || 'Cajero', supplyNames, orderNumber: finalOrderNumber
+            });
+        }
       });
 
       if (shouldPrint) {
@@ -174,7 +156,7 @@ export const orderService = {
       await batch.commit();
   },
 
-  async cancelOrder(branchId: string, orderId: string, items: TicketItem[]) {
+  async cancelOrder(branchId: string, orderId: string, items: TicketItem[], opts: ReturnOptions = {}) {
     try {
         const batch = writeBatch(db);
         const orderRef = doc(db, "orders", orderId);
@@ -182,34 +164,12 @@ export const orderService = {
         // 1. Marcar como cancelada
         batch.update(orderRef, { 
             status: 'cancelled',
-            cancelledAt: serverTimestamp() 
+            cancelledAt: serverTimestamp(),
+            cancelMode: opts.mode || 'restore'
         });
 
-        // 2. Restaurar Stock (Inventario Inverso)
-        items.forEach(item => {
-            const qty = item.quantity || 1;
-
-            // Restaurar Base
-            const baseId = item.details?.itemId || item.productId;
-            if (baseId) {
-                const invRef = doc(db, "branches", branchId, "inventory", baseId);
-                batch.set(invRef, {
-                    currentStock: increment(qty)
-                }, { merge: true });
-            }
-
-            // Restaurar Modificadores
-            if (item.details?.selectedModifiers) {
-                item.details.selectedModifiers.forEach(mod => {
-                    if (mod.id) {
-                        const invRef = doc(db, "branches", branchId, "inventory", mod.id);
-                        batch.set(invRef, {
-                            currentStock: increment(qty)
-                        }, { merge: true });
-                    }
-                });
-            }
-        });
+        // 2. Regresar los insumos o registrarlos como merma
+        await returnSupplies(batch, branchId, sumSupplyUsage(items), opts);
 
         await batch.commit();
         return true;
@@ -219,7 +179,7 @@ export const orderService = {
     }
   },
 
-  async removeItemFromOrder(branchId: string, orderId: string, itemToRemove: TicketItem, remainingItems: TicketItem[], newTotal: number) {
+  async removeItemFromOrder(branchId: string, orderId: string, itemToRemove: TicketItem, remainingItems: TicketItem[], newTotal: number, opts: ReturnOptions = {}) {
     try {
         const batch = writeBatch(db);
         const orderRef = doc(db, "orders", orderId);
@@ -239,19 +199,8 @@ export const orderService = {
             });
         }
 
-        // 2. Restaurar Stock del item eliminado
-        const qty = itemToRemove.quantity || 1;
-        const baseId = itemToRemove.details?.itemId || itemToRemove.productId;
-        if (baseId) {
-            const invRef = doc(db, "branches", branchId, "inventory", baseId);
-            batch.set(invRef, { currentStock: increment(qty) }, { merge: true });
-        }
-        if (itemToRemove.details?.selectedModifiers) {
-            itemToRemove.details.selectedModifiers.forEach(mod => {
-                const invRef = doc(db, "branches", branchId, "inventory", mod.id);
-                batch.set(invRef, { currentStock: increment(qty) }, { merge: true });
-            });
-        }
+        // 2. Regresar los insumos de la unidad eliminada o registrarlos como merma
+        await returnSupplies(batch, branchId, sumSupplyUsage([itemToRemove]), opts);
 
         await batch.commit();
         return true;
